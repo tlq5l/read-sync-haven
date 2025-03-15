@@ -1,17 +1,21 @@
-
-import React, { useEffect } from 'react';
-import { useArticles } from '@/context/ArticleContext';
-import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
 import ArticleCard from '@/components/ArticleCard';
+import { Button } from '@/components/ui/button';
+import { useArticles } from '@/context/ArticleContext';
+import { Plus } from 'lucide-react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 export default function HomePage() {
-  const { articles, isLoading, currentView, refreshArticles } = useArticles();
+  const { articles, isLoading, currentView, error } = useArticles();
 
   useEffect(() => {
-    refreshArticles();
-  }, [refreshArticles]);
+    console.log("HomePage rendered with:", {
+      articlesCount: articles.length,
+      isLoading,
+      currentView,
+      hasError: !!error
+    });
+  }, [articles.length, isLoading, currentView, error]);
 
   const getViewTitle = () => {
     switch (currentView) {

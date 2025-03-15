@@ -3,12 +3,6 @@ import PouchDB from "pouchdb-browser";
 import PouchDBFind from "pouchdb-find";
 import { v4 as uuidv4 } from "uuid";
 
-// Polyfill for PouchDB to work in stricter browser environments
-if (typeof window !== "undefined" && typeof window.global === "undefined") {
-	// @ts-expect-error -- Global is needed for PouchDB
-	window.global = window;
-}
-
 // Register PouchDB plugins
 PouchDB.plugin(PouchDBFind);
 
@@ -107,6 +101,8 @@ async function initializeIndexes() {
 // Initialize database
 export async function initializeDatabase() {
 	try {
+		console.log("Starting database initialization...");
+
 		// First ensure PouchDB is properly configured
 		if (!PouchDB) {
 			console.error("PouchDB is not available");
@@ -117,6 +113,7 @@ export async function initializeDatabase() {
 
 		// Test database connections
 		try {
+			console.log("Testing database connections...");
 			const articlesInfo = await articlesDb.info();
 			const highlightsInfo = await highlightsDb.info();
 			const tagsInfo = await tagsDb.info();
@@ -142,6 +139,13 @@ export async function initializeDatabase() {
 					adapter: "memory",
 				});
 				tagsDb = new PouchDB<Tag>("bondwise_tags", { adapter: "memory" });
+
+				// Test if memory databases are working
+				console.log("Testing memory database connections...");
+				await articlesDb.info();
+				await highlightsDb.info();
+				await tagsDb.info();
+				console.log("Memory database connections successful");
 			} catch (recreateError) {
 				console.error("Failed to recreate databases:", recreateError);
 				return false;
@@ -150,6 +154,7 @@ export async function initializeDatabase() {
 
 		// Now create indexes
 		try {
+			console.log("Creating database indexes...");
 			await initializeIndexes();
 			console.log("Database indexes created successfully");
 		} catch (indexError) {
@@ -157,6 +162,7 @@ export async function initializeDatabase() {
 			initSuccess = false;
 		}
 
+		console.log("Database initialization completed with status:", initSuccess);
 		return initSuccess;
 	} catch (error) {
 		console.error("Failed to initialize database:", error);
@@ -255,7 +261,7 @@ export async function getAllArticles(options?: {
 		if (options?.tag) selector.tags = { $elemMatch: { $eq: options.tag } };
 
 		// Default sort
-		let sort: Array<Record<string, string>> = [{ savedAt: "desc" }];
+		let sort: Array<{ [propName: string]: "asc" | "desc" }> = [{ savedAt: "desc" }];
 
 		// Custom sort
 		if (options?.sortBy) {
@@ -269,7 +275,7 @@ export async function getAllArticles(options?: {
 			skip: options?.skip || 0,
 		});
 
-		return result.docs;
+		return result?.docs || [];
 	} catch (error) {
 		console.error("Error getting articles:", error);
 		return [];

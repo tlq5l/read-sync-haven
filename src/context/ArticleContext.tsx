@@ -1,21 +1,21 @@
 import { useToast } from "@/hooks/use-toast";
 import {
-    type Article,
-    deleteArticle,
-    getAllArticles,
-    initializeDatabase,
-    saveArticle,
-    updateArticle,
+	type Article,
+	deleteArticle,
+	getAllArticles,
+	initializeDatabase,
+	saveArticle,
+	updateArticle,
 } from "@/services/db";
 import { parseArticle } from "@/services/parser";
 import type React from "react";
 import {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useState,
 } from "react";
 
 interface ArticleContextType {
@@ -53,11 +53,14 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	useEffect(() => {
 		const init = async () => {
 			try {
+				console.log("Initializing database...");
 				const result = await initializeDatabase();
+				console.log("Database initialization result:", result);
 				setIsInitialized(true);
 
 				if (!result) {
 					// Database initialization had issues but didn't throw
+					console.warn("Database initialized with warnings");
 					toast({
 						title: "Database Warning",
 						description:
@@ -79,20 +82,39 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 						"Failed to initialize database. Please refresh or try again later.",
 					variant: "destructive",
 				});
+			} finally {
+				// Force reset loading state
+				setIsLoading(false);
 			}
 		};
 
+		// Fallback timeout to prevent stuck initializing state
+		const timeoutId = setTimeout(() => {
+			if (!isInitialized) {
+				console.warn("Database initialization timed out");
+				setIsInitialized(true);
+				setIsLoading(false);
+				toast({
+					title: "Database Timeout",
+					description: "Database initialization timed out. Some features may not work correctly.",
+					variant: "destructive",
+				});
+			}
+		}, 5000); // 5 second timeout for initialization
+
 		init();
+
+		return () => clearTimeout(timeoutId);
 	}, [toast]);
 
-	// consad articles based on current view
+	// Load articles based on current view
 	useEffect(() => {
 		if (!isInitialized) return;
 
 		const loadArticles = async () => {
 			setIsLoading(true);
 			try {
-				const options: Parameters<typeof getAllArticles>[0] = {
+				consnst options: Parameters<typeof getAllArticles>[0] = {
 					sortBy: "savedAt",
 					sortDirection: "desc",
 				};
@@ -103,7 +125,9 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					options.favorite = true;
 				}
 
+				console.log("Fetching articles with options:", options);
 				const fetchedArticles = await getAllArticles(options);
+				console.log("Fetched articles:", fetchedArticles.length);
 				setArticles(fetchedArticles);
 				setError(null);
 			} catch (err) {
@@ -137,7 +161,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		loadArticles();
 
 		return () => clearTimeout(timeoutId);
-	}, [currentView, isInitialized, isLoading, toast]);
+	}, [currentView, isInitialized, toast]);
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {
