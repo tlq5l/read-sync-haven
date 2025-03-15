@@ -11,7 +11,11 @@ export default defineConfig(({ mode }) => ({
 		port: 8080,
 	},
 	plugins: [
-		react(),
+		react({
+			// Force using React import with JSX
+			jsxImportSource: "react",
+			jsxRuntime: "classic",
+		}),
 		mode === "development" && componentTagger(),
 		// Add Node.js polyfills - reduce to only what's essential
 		nodePolyfills({
@@ -30,6 +34,12 @@ export default defineConfig(({ mode }) => ({
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),
+		},
+	},
+	optimizeDeps: {
+		include: ["@mui/material/esm", "@mui/icons-material/esm", "react-dom"],
+		esbuildOptions: {
+			target: "es2020",
 		},
 	},
 	define: {

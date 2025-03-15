@@ -5,8 +5,10 @@ import {
 	getAllArticles,
 	initializeDatabase,
 	saveArticle,
+	saveEpubFile,
 	updateArticle,
 } from "@/services/db";
+import { isValidEpub } from "@/services/epub";
 import { parseArticle } from "@/services/parser";
 import type React from "react";
 import {
@@ -26,6 +28,7 @@ interface ArticleContextType {
 	setCurrentView: (view: "all" | "unread" | "favorites") => void;
 	refreshArticles: () => Promise<void>;
 	addArticleByUrl: (url: string) => Promise<Article | null>;
+	addArticleByFile: (file: File) => Promise<Article | null>;
 	updateArticleStatus: (
 		id: string,
 		isRead: boolean,
@@ -237,6 +240,51 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		[toast],
 	);
 
+	// Add article by file (EPUB)
+	const addArticleByFile = useCallback(
+		async (file: File): Promise<Article | null> => {
+			setIsLoading(true);
+			try {
+				// Validate file type
+				if (!isValidEpub(file)) {
+					throw new Error("Invalid EPUB file. Only EPUB format is supported.");
+				}
+
+				// Save EPUB file
+				const savedArticle = await saveEpubFile(file);
+
+				// Update articles list to include new article
+				setArticles((prevArticles) => [savedArticle, ...prevArticles]);
+
+				toast({
+					title: "EPUB saved",
+					description: `"${file.name}" has been saved to your library.`,
+				});
+
+				return savedArticle;
+			} catch (err) {
+				console.error("Failed to add EPUB file:", err);
+				setError(
+					err instanceof Error ? err : new Error("Failed to add EPUB file"),
+				);
+
+				toast({
+					title: "Failed to save EPUB",
+					description:
+						err instanceof Error
+							? err.message
+							: "An error occurred while saving the EPUB file.",
+					variant: "destructive",
+				});
+
+				return null;
+			} finally {
+				setIsLoading(false);
+			}
+		},
+		[toast],
+	);
+
 	// Update article read status and favorite status
 	const updateArticleStatus = useCallback(
 		async (id: string, isRead: boolean, favorite?: boolean) => {
@@ -365,6 +413,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			setCurrentView,
 			refreshArticles,
 			addArticleByUrl,
+			addArticleByFile,
 			updateArticleStatus,
 			removeArticle,
 			updateReadingProgress,
@@ -376,6 +425,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			currentView,
 			refreshArticles,
 			addArticleByUrl,
+			addArticleByFile,
 			updateArticleStatus,
 			removeArticle,
 			updateReadingProgress,

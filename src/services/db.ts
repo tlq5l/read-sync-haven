@@ -60,7 +60,10 @@ export interface Article {
 	tags: string[];
 	estimatedReadTime?: number;
 	readingProgress?: number;
-	type: "article" | "pdf" | "note"; // We can extend this later
+	type: "article" | "pdf" | "note" | "epub"; // Added epub type
+	fileData?: string; // Base64 encoded file data for binary files like EPUB
+	fileSize?: number; // Size of the file in bytes
+	fileName?: string; // Original filename
 }
 
 export interface Highlight {
@@ -206,6 +209,9 @@ export async function saveArticle(
 		favorite: false,
 		tags: article.tags || [],
 		type: article.type || "article",
+		fileData: article.fileData,
+		fileSize: article.fileSize,
+		fileName: article.fileName,
 	};
 
 	try {
@@ -217,6 +223,72 @@ export async function saveArticle(
 	} catch (error) {
 		console.error("Error saving article:", error);
 		throw error;
+	}
+}
+
+import { extractEpubMetadata, getEstimatedReadingTime } from "./epub";
+
+// Function to save an EPUB file
+export async function saveEpubFile(file: File): Promise<Article> {
+	try {
+		// Read the file as ArrayBuffer with progress tracking
+		const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(reader.result as ArrayBuffer);
+			reader.onerror = reject;
+			reader.readAsArrayBuffer(file);
+		});
+
+		// Convert to Base64 for storage using chunked processing for large files
+		const CHUNK_SIZE = 1024 * 1024; // Process 1MB at a time
+		const bytes = new Uint8Array(arrayBuffer);
+		const length = bytes.length;
+		let base64 = "";
+
+		// Process in chunks to avoid memory issues with large files
+		for (let i = 0; i < length; i += CHUNK_SIZE) {
+			const chunk = bytes.slice(i, Math.min(i + CHUNK_SIZE, length));
+			base64 += chunk.reduce(
+				(data, byte) => data + String.fromCharCode(byte),
+				"",
+			);
+		}
+
+		const base64Encoded = btoa(base64);
+
+		// Extract metadata from the EPUB file
+		const metadata = await extractEpubMetadata(arrayBuffer);
+
+		// Use extracted metadata or fallback to filename
+		const title = metadata.title || file.name.replace(/\.epub$/i, "");
+		const author = metadata.author || "Unknown";
+		const excerpt = metadata.description || `EPUB book: ${title}`;
+
+		const article: Omit<
+			Article,
+			"_id" | "savedAt" | "isRead" | "favorite" | "tags"
+		> = {
+			title: title,
+			url: `local://${file.name}`, // Use a special URL scheme for local files
+			content:
+				"<div class='epub-placeholder'>EPUB content will be displayed in a reader.</div>",
+			excerpt: excerpt,
+			author: author,
+			publishedDate: metadata.publishedDate,
+			type: "epub",
+			fileData: base64Encoded,
+			fileSize: file.size,
+			fileName: file.name,
+			estimatedReadTime: getEstimatedReadingTime(file.size),
+			siteName: metadata.publisher || "EPUB Book",
+		};
+
+		return await saveArticle(article);
+	} catch (error) {
+		console.error("Error saving EPUB file:", error);
+		throw new Error(
+			`Failed to save EPUB file. ${error instanceof Error ? error.message : String(error)}`,
+		);
 	}
 }
 
