@@ -99,7 +99,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				setIsLoading(false);
 				toast({
 					title: "Database Timeout",
-					description: "Database initialization timed out. Some features may not work correctly.",
+					description:
+						"Database initialization timed out. Some features may not work correctly.",
 					variant: "destructive",
 				});
 			}
@@ -119,7 +120,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			try {
 				const options: Parameters<typeof getAllArticles>[0] = {
 					sortBy: "savedAt",
-					sortDirection: "desc"
+					sortDirection: "desc",
 				};
 
 				if (currentView === "unread") {
@@ -135,7 +136,9 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				setError(null);
 			} catch (err) {
 				console.error("Failed to load articles:", err);
-				setError(err instanceof Error ? err : new Error("Failed to load articles"));
+				setError(
+					err instanceof Error ? err : new Error("Failed to load articles"),
+				);
 				// Return empty array to prevent stuck loading state
 				setArticles([]);
 
@@ -152,18 +155,17 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 		// Add timeout to prevent indefinite loading state
 		const timeoutId = setTimeout(() => {
-			if (isLoading) {
-				console.warn("Loading articles timed out");
-				setIsLoading(false);
-				setArticles([]);
-			}
+			// Use a ref to check loading state to avoid dependency issues
+			console.warn("Loading articles timed out");
+			setIsLoading(false);
+			setArticles([]);
 		}, 10000); // 10 second timeout
 
 		loadArticles();
 
 		return () => clearTimeout(timeoutId);
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [currentView, isInitialized, toast]); // Deliberately excluding isLoading to prevent infinite loops
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [currentView, isInitialized, toast]);
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {

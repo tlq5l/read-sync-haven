@@ -49,83 +49,113 @@ export function normalizeUrl(url: string): string {
 // Fetch HTML content from URL
 export async function fetchHtml(url: string): Promise<string> {
 	try {
-		// Try direct fetch first - no mode specified to let browser determine
+		// Try direct fetch first with correct CORS mode
 		try {
 			const directResponse = await fetch(url, {
 				headers: {
 					"User-Agent":
 						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.160 Safari/537.36",
+					Accept:
+						"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 				},
+				mode: "cors", // Explicitly set CORS mode
+				credentials: "omit", // No credentials needed for article fetch
 				cache: "no-cache",
 			});
-			
+
 			if (directResponse.ok) {
 				return await directResponse.text();
 			}
 		} catch (directError) {
 			console.log("Direct fetch failed, trying CORS proxies", directError);
 		}
-		
-		// Try reliable modern CORS proxies as fallback (2025 updated list)
+
+		// Updated CORS proxies for 2025 based on current research
+		// Use a combination of reliable CORS proxies
 		const corsProxies = [
+			// Primary proxies - most reliable as of 2025
 			`https://corsproxy.io/?${encodeURIComponent(url)}`,
-			`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
 			`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-			`https://thingproxy.freeboard.io/fetch/${url}`,
+			`https://cors.proxy.consumet.org/?url=${encodeURIComponent(url)}`,
+			// Secondary options
+			`https://corsproxy.dev/?url=${encodeURIComponent(url)}`,
+			`https://proxy-middleware.zenrows.com/proxy?url=${encodeURIComponent(url)}`,
+			// Fallbacks
+			`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+			`https://crossorigin.me/${encodeURIComponent(url)}`,
 		];
 
-		let html = "";
-		let lastError: Error | null = null;
+		// Try each proxy individually with proper error handling and logging
+		// This provides better visibility into which proxy failed and why
+		for (const proxyUrl of corsProxies) {
+			try {
+				console.log(`Trying proxy: ${proxyUrl.split("?")[0]}`);
+				const response = await fetch(proxyUrl, {
+					headers: {
+						"User-Agent":
+							"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.160 Safari/537.36",
+						Accept:
+							"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+					},
+					cache: "no-cache",
+				});
 
-		// Use Promise.any to try all proxies concurrently - first successful one wins
+				if (response.ok) {
+					const text = await response.text();
+					if (text && text.length > 0) {
+						console.log(
+							`Successfully fetched content using ${proxyUrl.split("?")[0]}`,
+						);
+						return text;
+					}
+					console.warn(
+						`Proxy returned empty response: ${proxyUrl.split("?")[0]}`,
+					);
+				} else {
+					console.warn(
+						`Proxy failed with status ${response.status}: ${proxyUrl.split("?")[0]}`,
+					);
+				}
+			} catch (error) {
+				console.warn(`Error using proxy ${proxyUrl.split("?")[0]}:`, error);
+				// Continue to the next proxy
+			}
+		}
+
+		// If we get here, all individual proxies failed
+		// Try with Promise.any as a last resort, which will use the first successful proxy
 		try {
+			console.log("Trying all proxies concurrently with Promise.any");
 			const proxyRequests = corsProxies.map(async (proxyUrl) => {
 				const response = await fetch(proxyUrl, {
 					headers: {
 						"User-Agent":
 							"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.160 Safari/537.36",
+						Accept:
+							"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 					},
 					cache: "no-cache",
 				});
-				
+
 				if (!response.ok) {
-					throw new Error(`Proxy failed with status: ${response.status}`);
+					throw new Error(`HTTP error! Status: ${response.status}`);
 				}
-				
-				return response.text();
+
+				const text = await response.text();
+				if (!text || text.length === 0) {
+					throw new Error("Empty response");
+				}
+
+				return text;
 			});
-			
-			// First successful response wins
-			html = await Promise.any(proxyRequests);
-			return html;
+
+			return await Promise.any(proxyRequests);
 		} catch (aggregateError) {
-			// All proxies failed, try sequential fallback
-			console.warn("Concurrent proxy requests failed, trying sequential fallback");
-			
-			// Try each proxy sequentially as before
-			for (const proxyUrl of corsProxies) {
-				try {
-					const response = await fetch(proxyUrl, {
-						headers: {
-							"User-Agent":
-								"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.160 Safari/537.36",
-						},
-						cache: "no-cache",
-					});
-
-					if (response.ok) {
-						html = await response.text();
-						return html;
-					}
-				} catch (error) {
-					console.warn(`Proxy failed: ${proxyUrl}`, error);
-					lastError = error instanceof Error ? error : new Error(String(error));
-				}
-			}
+			// All proxies failed in Promise.any
+			throw new Error(
+				"All CORS proxies failed. Unable to fetch article content.",
+			);
 		}
-
-		// If we've tried all proxies and none worked, throw the last error
-		throw lastError || new Error("Failed to fetch page: All proxies failed");
 	} catch (error) {
 		console.error("Error fetching HTML:", error);
 		throw error instanceof Error ? error : new Error(String(error));
@@ -198,7 +228,7 @@ export async function parseArticle(
 
 	// Extract excerpt
 	const excerpt =
-		article.excerpt || article.textContent.substring(0, 280).trim() + "...";
+		article.excerpt || `${article.textContent.substring(0, 280).trim()}...`;
 
 	// Calculate estimated read time (average reading speed: 200 words per minute)
 	const wordCount = article.textContent.split(/\s+/).length;

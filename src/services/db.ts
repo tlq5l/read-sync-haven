@@ -19,16 +19,16 @@ try {
 		ajax: {
 			timeout: 30000, // 30 second timeout
 			retry: true,
-			retryTimeout: 1000
-		}
+			retryTimeout: 1000,
+		},
 	};
-	
+
 	articlesDb = new PouchDB<Article>("bondwise_articles", dbOptions);
 	highlightsDb = new PouchDB<Highlight>("bondwise_highlights", dbOptions);
 	tagsDb = new PouchDB<Tag>("bondwise_tags", dbOptions);
-	
+
 	// Test connections immediately to surface any issues
-	void articlesDb.info().catch(err => {
+	void articlesDb.info().catch((err) => {
 		console.error("Articles DB connection test failed:", err);
 		throw err;
 	});
@@ -274,7 +274,9 @@ export async function getAllArticles(options?: {
 		if (options?.tag) selector.tags = { $elemMatch: { $eq: options.tag } };
 
 		// Default sort
-		let sort: Array<{ [propName: string]: "asc" | "desc" }> = [{ savedAt: "desc" }];
+		let sort: Array<{ [propName: string]: "asc" | "desc" }> = [
+			{ savedAt: "desc" },
+		];
 
 		// Custom sort
 		if (options?.sortBy) {

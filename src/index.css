@@ -3,184 +3,184 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 210 50% 98%;
-    --foreground: 222 47% 11%;
+	:root {
+		--background: 210 50% 98%;
+		--foreground: 222 47% 11%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+		--card: 0 0% 100%;
+		--card-foreground: 222 47% 11%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+		--popover: 0 0% 100%;
+		--popover-foreground: 222 47% 11%;
 
-    --primary: 209 92% 48%;
-    --primary-foreground: 210 40% 98%;
+		--primary: 209 92% 48%;
+		--primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+		--secondary: 210 40% 96%;
+		--secondary-foreground: 222 47% 11%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+		--muted: 210 40% 96%;
+		--muted-foreground: 215 16% 47%;
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+		--accent: 210 40% 96%;
+		--accent-foreground: 222 47% 11%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+		--destructive: 0 84% 60%;
+		--destructive-foreground: 210 40% 98%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 221 83% 53%;
+		--border: 214 32% 91%;
+		--input: 214 32% 91%;
+		--ring: 221 83% 53%;
 
-    --radius: 0.5rem;
+		--radius: 0.5rem;
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 209 92% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 40% 96%;
-    --sidebar-accent-foreground: 222 47% 11%;
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 221 83% 53%;
-  }
+		--sidebar-background: 0 0% 100%;
+		--sidebar-foreground: 222 47% 11%;
+		--sidebar-primary: 209 92% 48%;
+		--sidebar-primary-foreground: 0 0% 100%;
+		--sidebar-accent: 210 40% 96%;
+		--sidebar-accent-foreground: 222 47% 11%;
+		--sidebar-border: 214 32% 91%;
+		--sidebar-ring: 221 83% 53%;
+	}
 
-  .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+	.dark {
+		--background: 222 47% 11%;
+		--foreground: 210 40% 98%;
 
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
+		--card: 222 47% 11%;
+		--card-foreground: 210 40% 98%;
 
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+		--popover: 222 47% 11%;
+		--popover-foreground: 210 40% 98%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
+		--primary: 217 91% 60%;
+		--primary-foreground: 222 47% 11%;
 
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+		--secondary: 217 33% 17%;
+		--secondary-foreground: 210 40% 98%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+		--muted: 217 33% 17%;
+		--muted-foreground: 215 20% 65%;
 
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
+		--accent: 217 33% 17%;
+		--accent-foreground: 210 40% 98%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+		--destructive: 0 63% 31%;
+		--destructive-foreground: 210 40% 98%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 224 76% 48%;
+		--border: 217 33% 17%;
+		--input: 217 33% 17%;
+		--ring: 224 76% 48%;
 
-    --sidebar-background: 223 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 224 76% 48%;
-  }
+		--sidebar-background: 223 47% 11%;
+		--sidebar-foreground: 210 40% 98%;
+		--sidebar-primary: 217 91% 60%;
+		--sidebar-primary-foreground: 0 0% 100%;
+		--sidebar-accent: 217 33% 17%;
+		--sidebar-accent-foreground: 210 40% 98%;
+		--sidebar-border: 217 33% 17%;
+		--sidebar-ring: 224 76% 48%;
+	}
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+	* {
+		@apply border-border;
+	}
 
-  body {
-    @apply bg-background text-foreground;
-  }
+	body {
+		@apply bg-background text-foreground;
+	}
 
-  /* Modern standard for forced colors mode */
-  @media (forced-colors: active) {
-    * {
-      forced-color-adjust: auto;
-    }
-  }
+	/* Modern standard for forced colors mode */
+	@media (forced-colors: active) {
+		* {
+			forced-color-adjust: auto;
+		}
+	}
 }
 
 /* Custom scrollbar styling */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+	width: 6px;
+	height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+	background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 3px;
+	background: hsl(var(--muted-foreground) / 0.3);
+	border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+	background: hsl(var(--muted-foreground) / 0.5);
 }
 
 /* High contrast mode support - using standard CSS */
 @media (forced-colors: active) {
-  ::-webkit-scrollbar-thumb {
-    background: ButtonText;
-    border: 1px solid ButtonText;
-  }
+	::-webkit-scrollbar-thumb {
+		background: ButtonText;
+		border: 1px solid ButtonText;
+	}
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: Highlight;
-  }
+	::-webkit-scrollbar-thumb:hover {
+		background: Highlight;
+	}
 }
 
 /* Reader mode styles */
 .reader-content {
-  @apply max-w-2xl mx-auto leading-relaxed;
+	@apply max-w-2xl mx-auto leading-relaxed;
 }
 
 .reader-content p {
-  @apply my-4;
+	@apply my-4;
 }
 
 .reader-content h1,
 .reader-content h2,
 .reader-content h3,
 .reader-content h4 {
-  @apply font-bold mt-6 mb-3;
+	@apply font-bold mt-6 mb-3;
 }
 
 .reader-content h1 {
-  @apply text-2xl;
+	@apply text-2xl;
 }
 
 .reader-content h2 {
-  @apply text-xl;
+	@apply text-xl;
 }
 
 .reader-content a {
-  @apply text-bondwise-600 hover:underline;
+	@apply text-bondwise-600 hover:underline;
 }
 
 .reader-content img {
-  @apply my-4 max-w-full rounded;
+	@apply my-4 max-w-full rounded;
 }
 
 .reader-content blockquote {
-  @apply border-l-4 border-bondwise-200 pl-4 italic my-4;
+	@apply border-l-4 border-bondwise-200 pl-4 italic my-4;
 }
 
 .reader-content pre {
-  @apply bg-muted p-4 rounded overflow-x-auto my-4;
+	@apply bg-muted p-4 rounded overflow-x-auto my-4;
 }
 
 .reader-content ul,
 .reader-content ol {
-  @apply pl-6 my-4;
+	@apply pl-6 my-4;
 }
 
 .reader-content ul {
-  @apply list-disc;
+	@apply list-disc;
 }
 
 .reader-content ol {
-  @apply list-decimal;
+	@apply list-decimal;
 }
