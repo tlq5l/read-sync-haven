@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -73,7 +72,7 @@
     --border: 217 33% 17%;
     --input: 217 33% 17%;
     --ring: 224 76% 48%;
-    
+
     --sidebar-background: 223 47% 11%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 217 91% 60%;
@@ -93,11 +92,10 @@
   body {
     @apply bg-background text-foreground;
   }
-  
-  /* If you need specific styles for forced colors mode (high contrast) */
+
+  /* Modern standard for forced colors mode */
   @media (forced-colors: active) {
     * {
-      /* Ensure standard system colors are used */
       forced-color-adjust: auto;
     }
   }
@@ -128,7 +126,7 @@
     background: ButtonText;
     border: 1px solid ButtonText;
   }
-  
+
   ::-webkit-scrollbar-thumb:hover {
     background: Highlight;
   }
@@ -143,9 +141,9 @@
   @apply my-4;
 }
 
-.reader-content h1, 
-.reader-content h2, 
-.reader-content h3, 
+.reader-content h1,
+.reader-content h2,
+.reader-content h3,
 .reader-content h4 {
   @apply font-bold mt-6 mb-3;
 }
@@ -174,7 +172,7 @@
   @apply bg-muted p-4 rounded overflow-x-auto my-4;
 }
 
-.reader-content ul, 
+.reader-content ul,
 .reader-content ol {
   @apply pl-6 my-4;
 }
