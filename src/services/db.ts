@@ -83,8 +83,16 @@ async function initializeIndexes() {
 
 // Initialize database
 export async function initializeDatabase() {
-  await initializeIndexes();
-  console.log('Database initialized successfully');
+  try {
+    await initializeIndexes();
+    console.log('Database initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    // Don't throw the error here, just report it
+    // This allows the app to continue even if there's an initialization issue
+    return false;
+  }
 }
 
 // Articles CRUD operations

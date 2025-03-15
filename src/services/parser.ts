@@ -3,6 +3,11 @@ import DOMPurify from "dompurify";
 import { JSDOM } from "jsdom";
 import TurndownService from "turndown";
 
+// Polyfill for fs and child_process for JSDOM
+// These will be replaced by the node polyfills plugin
+globalThis.fs = globalThis.fs || {};
+globalThis.child_process = globalThis.child_process || {};
+
 // Import types
 import type { Article } from "./db";
 
@@ -44,7 +49,24 @@ export function normalizeUrl(url: string): string {
 // Fetch HTML content from URL
 export async function fetchHtml(url: string): Promise<string> {
 	try {
-		// Try multiple CORS proxies in case one fails
+		// Try direct fetch first with no-cors mode as fallback
+		try {
+			const directResponse = await fetch(url, {
+				headers: {
+					"User-Agent":
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+				},
+				cache: "no-cache",
+			});
+			
+			if (directResponse.ok) {
+				return await directResponse.text();
+			}
+		} catch (directError) {
+			console.log("Direct fetch failed, trying CORS proxies", directError);
+		}
+		
+		// Try multiple CORS proxies as fallback
 		const corsProxies = [
 			`https://corsproxy.io/?${encodeURIComponent(url)}`,
 			`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,

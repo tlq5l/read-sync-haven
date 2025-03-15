@@ -30,6 +30,8 @@ export default defineConfig(({ mode }) => ({
         'events',
         'http',
         'https',
+        'fs',
+        'child_process',
       ],
       // Whether to polyfill `node:` protocol imports
       protocolImports: true,

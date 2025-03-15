@@ -38,16 +38,31 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     const init = async () => {
       try {
-        await initializeDatabase();
+        const result = await initializeDatabase();
         setIsInitialized(true);
+        
+        if (!result) {
+          // Database initialization had issues but didn't throw
+          toast({
+            title: "Database Warning",
+            description: "The database initialized with warnings. Some features may be limited.",
+            variant: "destructive",
+          });
+        }
       } catch (err) {
         console.error('Failed to initialize database:', err);
         setError(err instanceof Error ? err : new Error('Failed to initialize database'));
+        
+        toast({
+          title: "Database Error",
+          description: "Failed to initialize database. Please refresh or try again later.",
+          variant: "destructive",
+        });
       }
     };
     
     init();
-  }, []);
+  }, [toast]);
 
   // Load articles based on current view
   useEffect(() => {
@@ -73,13 +88,33 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (err) {
         console.error('Failed to load articles:', err);
         setError(err instanceof Error ? err : new Error('Failed to load articles'));
+        // Return empty array to prevent stuck loading state
+        setArticles([]);
+        
+        toast({
+          title: "Loading Error",
+          description: "Failed to load articles. Please try again.",
+          variant: "destructive",
+        });
       } finally {
+        // Always set loading to false to prevent stuck state
         setIsLoading(false);
       }
     };
     
+    // Add timeout to prevent indefinite loading state
+    const timeoutId = setTimeout(() => {
+      if (isLoading) {
+        console.warn('Loading articles timed out');
+        setIsLoading(false);
+        setArticles([]);
+      }
+    }, 10000); // 10 second timeout
+    
     loadArticles();
-  }, [currentView, isInitialized]);
+    
+    return () => clearTimeout(timeoutId);
+  }, [currentView, isInitialized, isLoading, toast]);
 
   // Refresh articles function
   const refreshArticles = async () => {
