@@ -1,4 +1,5 @@
 
+import * as React from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import OfflineIndicator from './OfflineIndicator';

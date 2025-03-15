@@ -77,6 +77,7 @@ async function initializeIndexes() {
     console.log('Database indexes created successfully');
   } catch (error) {
     console.error('Error creating database indexes:', error);
+    throw error; // Propagate the error to be caught by initializeDatabase
   }
 }
 
