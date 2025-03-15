@@ -42,6 +42,8 @@ pnpm-lock.yaml
 
 # TypeScript config files with comments
 tsconfig.node.json
+tsconfig.app.json
+tsconfig.json
 
 # Testing
 coverage/
