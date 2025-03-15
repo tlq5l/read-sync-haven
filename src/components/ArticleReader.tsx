@@ -1,3 +1,4 @@
+import EpubReader from "@/components/EpubReader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -125,6 +126,9 @@ export default function ArticleReader() {
 		);
 	}
 
+	// Check if article is an EPUB file
+	const isEpub = article.type === "epub" && article.fileData;
+
 	return (
 		<div
 			className={cn(
@@ -154,40 +158,68 @@ export default function ArticleReader() {
 				</div>
 			</div>
 
-			<div
-				ref={contentRef}
-				className="flex-1 overflow-y-auto px-4 md:px-8 py-6"
-			>
-				<div className="reader-content">
-					<h1 className="text-3xl font-bold mb-4">{article.title}</h1>
-					{article.author && (
-						<p className="text-muted-foreground mb-1">By {article.author}</p>
-					)}
-					<p className="text-sm text-muted-foreground mb-6">
-						{article.siteName}
-						{article.estimatedReadTime && (
-							<span> · {article.estimatedReadTime} min read</span>
+			{isEpub && article.fileData ? (
+				// If it's an EPUB file, render the EpubReader component
+				<div
+					className="flex-1 overflow-hidden flex flex-col"
+					style={{ height: "calc(100vh - 64px)" }}
+				>
+					<div className="px-4 md:px-8 py-4 border-b">
+						<h1 className="text-2xl font-bold mb-2">{article.title}</h1>
+						{article.author && (
+							<p className="text-muted-foreground mb-1">By {article.author}</p>
 						)}
-					</p>
-
-					<div className="prose max-w-none">
-						{parse(DOMPurify.sanitize(article.content))}
-					</div>
-
-					<div className="mt-8 pt-6 border-t">
-						<p className="text-sm text-muted-foreground">
-							<a
-								href={article.url}
-								target="_blank"
-								rel="noopener noreferrer"
-								className="text-bondwise-600 hover:underline"
-							>
-								View Original
-							</a>
+						<p className="text-sm text-muted-foreground mb-0">
+							{article.fileName || "EPUB Book"}
+							{article.estimatedReadTime && (
+								<span> · {article.estimatedReadTime} min read</span>
+							)}
 						</p>
 					</div>
+					<div className="flex-1 overflow-hidden relative">
+						<EpubReader
+							fileData={article.fileData}
+							fileName={article.fileName}
+						/>
+					</div>
 				</div>
-			</div>
+			) : (
+				// Otherwise, render the regular article content
+				<div
+					ref={contentRef}
+					className="flex-1 overflow-y-auto px-4 md:px-8 py-6"
+				>
+					<div className="reader-content">
+						<h1 className="text-3xl font-bold mb-4">{article.title}</h1>
+						{article.author && (
+							<p className="text-muted-foreground mb-1">By {article.author}</p>
+						)}
+						<p className="text-sm text-muted-foreground mb-6">
+							{article.siteName}
+							{article.estimatedReadTime && (
+								<span> · {article.estimatedReadTime} min read</span>
+							)}
+						</p>
+
+						<div className="prose max-w-none">
+							{parse(DOMPurify.sanitize(article.content))}
+						</div>
+
+						<div className="mt-8 pt-6 border-t">
+							<p className="text-sm text-muted-foreground">
+								<a
+									href={article.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="text-bondwise-600 hover:underline"
+								>
+									View Original
+								</a>
+							</p>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

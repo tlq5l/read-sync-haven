@@ -1,5 +1,12 @@
 // Simplified browser polyfills - focusing on essential functionality
 if (typeof window !== "undefined") {
+	// Ensure JSZip is available to EPUB.js
+	if (window.JSZip) {
+		console.log("JSZip loaded from global scope");
+	} else {
+		console.warn("JSZip not found. EPUB functionality may be limited.");
+	}
+
 	// Ensure process is defined for React and other libs that expect it
 	if (typeof window.process === "undefined") {
 		// Define minimal process object

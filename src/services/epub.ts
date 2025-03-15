@@ -15,15 +15,31 @@ export function arrayBufferToBase64(buffer: ArrayBuffer): string {
 	return btoa(binary);
 }
 
-// Helper function to convert Base64 to ArrayBuffer
+// Helper function to convert Base64 to ArrayBuffer with error handling
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
-	const binaryString = atob(base64);
-	const len = binaryString.length;
-	const bytes = new Uint8Array(len);
-	for (let i = 0; i < len; i++) {
-		bytes[i] = binaryString.charCodeAt(i);
+	try {
+		// Remove any data URL prefix if present
+		const base64Data = base64.replace(/^data:[^;]+;base64,/, "");
+
+		// Decode base64 to binary string
+		const binaryString = atob(base64Data);
+		const len = binaryString.length;
+
+		// Create array buffer and view
+		const bytes = new Uint8Array(len);
+
+		// Fill array buffer
+		for (let i = 0; i < len; i++) {
+			bytes[i] = binaryString.charCodeAt(i);
+		}
+
+		return bytes.buffer;
+	} catch (error) {
+		console.error("Error converting base64 to ArrayBuffer:", error);
+		throw new Error(
+			"Failed to convert EPUB data. The file might be corrupted.",
+		);
 	}
-	return bytes.buffer;
 }
 
 // Interface for EPUB metadata

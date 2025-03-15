@@ -26,7 +26,7 @@ interface ArticleContextType {
 	error: Error | null;
 	currentView: "all" | "unread" | "favorites";
 	setCurrentView: (view: "all" | "unread" | "favorites") => void;
-	refreshArticles: () => Promise<void>;
+	refreshArticles: () => Promise<Article[]>;
 	addArticleByUrl: (url: string) => Promise<Article | null>;
 	addArticleByFile: (file: File) => Promise<Article | null>;
 	updateArticleStatus: (
@@ -118,8 +118,10 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	useEffect(() => {
 		if (!isInitialized) return;
 
+		let isMounted = true;
+		setIsLoading(true);
+
 		const loadArticles = async () => {
-			setIsLoading(true);
 			try {
 				const options: Parameters<typeof getAllArticles>[0] = {
 					sortBy: "savedAt",
@@ -135,47 +137,54 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				console.log("Fetching articles with options:", options);
 				const fetchedArticles = await getAllArticles(options);
 				console.log("Fetched articles:", fetchedArticles.length);
-				setArticles(fetchedArticles);
-				setError(null);
+
+				if (isMounted) {
+					setArticles(fetchedArticles);
+					setError(null);
+					setIsLoading(false);
+				}
 			} catch (err) {
 				console.error("Failed to load articles:", err);
-				setError(
-					err instanceof Error ? err : new Error("Failed to load articles"),
-				);
-				// Return empty array to prevent stuck loading state
-				setArticles([]);
 
-				toast({
-					title: "Loading Error",
-					description: "Failed to load articles. Please try again.",
-					variant: "destructive",
-				});
-			} finally {
-				// Always set loading to false to prevent stuck state
-				setIsLoading(false);
+				if (isMounted) {
+					setError(
+						err instanceof Error ? err : new Error("Failed to load articles"),
+					);
+					// Return empty array to prevent stuck loading state
+					setArticles([]);
+					setIsLoading(false);
+
+					toast({
+						title: "Loading Error",
+						description: "Failed to load articles. Please try again.",
+						variant: "destructive",
+					});
+				}
 			}
 		};
 
 		// Add timeout to prevent indefinite loading state
 		const timeoutId = setTimeout(() => {
-			// Use a ref to check loading state to avoid dependency issues
-			console.warn("Loading articles timed out");
-			setIsLoading(false);
-			setArticles([]);
+			if (isMounted) {
+				console.warn("Loading articles timed out");
+				setIsLoading(false);
+			}
 		}, 10000); // 10 second timeout
 
 		loadArticles();
 
-		return () => clearTimeout(timeoutId);
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+		return () => {
+			isMounted = false;
+			clearTimeout(timeoutId);
+		};
 	}, [currentView, isInitialized, toast]);
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {
-		if (!isInitialized) return;
+		if (!isInitialized) return [];
 
-		setIsLoading(true);
 		try {
+			setIsLoading(true);
 			const options: Parameters<typeof getAllArticles>[0] = {
 				sortBy: "savedAt",
 				sortDirection: "desc",
@@ -187,18 +196,33 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				options.favorite = true;
 			}
 
+			console.log("Refreshing articles with options:", options);
 			const fetchedArticles = await getAllArticles(options);
-			setArticles(fetchedArticles);
-			setError(null);
+			console.log("Refreshed articles:", fetchedArticles.length);
+
+			// Only update articles if we successfully retrieved them
+			if (fetchedArticles && fetchedArticles.length >= 0) {
+				setArticles(fetchedArticles);
+				setError(null);
+			} else {
+				console.warn("Received empty or invalid article list during refresh");
+				// Don't update state to avoid clearing existing articles
+			}
+
+			return fetchedArticles;
 		} catch (err) {
 			console.error("Failed to refresh articles:", err);
-			setError(
-				err instanceof Error ? err : new Error("Failed to refresh articles"),
-			);
+			const errorObj =
+				err instanceof Error ? err : new Error("Failed to refresh articles");
+			setError(errorObj);
+
+			// Don't clear articles on refresh error - keep the existing ones
+			// to prevent flickering/disappearing content
+			return articles; // Return current articles instead of null
 		} finally {
 			setIsLoading(false);
 		}
-	}, [currentView, isInitialized]);
+	}, [currentView, isInitialized, articles]);
 
 	// Add article by URL
 	const addArticleByUrl = useCallback(

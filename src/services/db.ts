@@ -231,33 +231,58 @@ import { extractEpubMetadata, getEstimatedReadingTime } from "./epub";
 // Function to save an EPUB file
 export async function saveEpubFile(file: File): Promise<Article> {
 	try {
+		console.log(
+			`Processing EPUB file: ${file.name}, size: ${(file.size / 1024).toFixed(1)}KB`,
+		);
+
 		// Read the file as ArrayBuffer with progress tracking
 		const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
 			const reader = new FileReader();
 			reader.onload = () => resolve(reader.result as ArrayBuffer);
-			reader.onerror = reject;
+			reader.onerror = (e) => {
+				console.error("FileReader error:", e);
+				reject(new Error("Failed to read EPUB file"));
+			};
 			reader.readAsArrayBuffer(file);
 		});
 
-		// Convert to Base64 for storage using chunked processing for large files
-		const CHUNK_SIZE = 1024 * 1024; // Process 1MB at a time
-		const bytes = new Uint8Array(arrayBuffer);
-		const length = bytes.length;
-		let base64 = "";
+		console.log(
+			`FileReader successfully read file as ArrayBuffer: ${arrayBuffer.byteLength} bytes`,
+		);
 
-		// Process in chunks to avoid memory issues with large files
-		for (let i = 0; i < length; i += CHUNK_SIZE) {
-			const chunk = bytes.slice(i, Math.min(i + CHUNK_SIZE, length));
-			base64 += chunk.reduce(
-				(data, byte) => data + String.fromCharCode(byte),
-				"",
-			);
+		// Convert to Base64 using a more reliable method
+		let base64Encoded = "";
+		try {
+			// Use a more efficient chunking method
+			const bytes = new Uint8Array(arrayBuffer);
+			const chunks: string[] = [];
+			const chunkSize = 0x8000; // 32KB chunks
+
+			// Process in smaller chunks to avoid string overflow
+			for (let i = 0; i < bytes.length; i += chunkSize) {
+				const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+				chunks.push(String.fromCharCode.apply(null, Array.from(chunk)));
+			}
+
+			// Join all chunks and convert to base64
+			const binaryString = chunks.join("");
+			base64Encoded = btoa(binaryString);
+
+			console.log(`Base64 encoding successful: length ${base64Encoded.length}`);
+		} catch (encodeError) {
+			console.error("Error in base64 encoding:", encodeError);
+			throw new Error("Failed to encode EPUB data");
 		}
 
-		const base64Encoded = btoa(base64);
+		// Validate the converted data
+		if (!base64Encoded || base64Encoded.length < 100) {
+			throw new Error("Failed to properly encode EPUB file data");
+		}
 
 		// Extract metadata from the EPUB file
+		console.log("Extracting EPUB metadata...");
 		const metadata = await extractEpubMetadata(arrayBuffer);
+		console.log("EPUB metadata extracted:", metadata.title);
 
 		// Use extracted metadata or fallback to filename
 		const title = metadata.title || file.name.replace(/\.epub$/i, "");
@@ -282,6 +307,11 @@ export async function saveEpubFile(file: File): Promise<Article> {
 			estimatedReadTime: getEstimatedReadingTime(file.size),
 			siteName: metadata.publisher || "EPUB Book",
 		};
+
+		// Log the fileData length for debugging
+		console.log(
+			`EPUB file encoded successfully: ${base64Encoded.length} bytes encoded`,
+		);
 
 		return await saveArticle(article);
 	} catch (error) {
@@ -338,6 +368,9 @@ export async function getAllArticles(options?: {
 	sortDirection?: "asc" | "desc";
 }): Promise<Article[]> {
 	try {
+		// Ensure database is ready
+		await articlesDb.info();
+
 		const selector: Record<string, unknown> = {};
 
 		// Add filters
@@ -355,6 +388,11 @@ export async function getAllArticles(options?: {
 			sort = [{ [options.sortBy]: options.sortDirection || "desc" }];
 		}
 
+		console.log(
+			"Executing PouchDB find with selector:",
+			JSON.stringify(selector),
+		);
+
 		const result = await articlesDb.find({
 			selector,
 			sort,
@@ -362,10 +400,13 @@ export async function getAllArticles(options?: {
 			skip: options?.skip || 0,
 		});
 
-		return result?.docs || [];
+		const docs = result?.docs || [];
+		console.log(`Found ${docs.length} articles in database`);
+		return docs;
 	} catch (error) {
 		console.error("Error getting articles:", error);
-		return [];
+		// Throw the error so it can be handled by the caller
+		throw error;
 	}
 }
 
