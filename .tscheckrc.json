@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.app.json",
+  "include": ["src/**/*"],
+  "exclude": ["**/node_modules", "**/.*/"],
+  "compilerOptions": {
+    "composite": false,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true
+  }
+}
