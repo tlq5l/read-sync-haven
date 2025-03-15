@@ -4,12 +4,11 @@ import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
-	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useArticles } from "@/context/ArticleContext";
 import { useToast } from "@/hooks/use-toast";
-import { type Article, updateArticle } from "@/services/db";
+import type { Article } from "@/services/db";
 import { formatDistanceToNow } from "date-fns";
 import { Bookmark, BookmarkCheck, MoreHorizontal, Trash2 } from "lucide-react";
 import type React from "react";

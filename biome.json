@@ -24,8 +24,12 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true
-		}
+			"recommended": true,
+			"suspicious": {
+				"noExplicitAny": "off"
+			}
+		},
+		"ignore": ["src/lib/polyfills.ts"]
 	},
 	"javascript": {
 		"formatter": {

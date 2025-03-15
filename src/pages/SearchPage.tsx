@@ -1,9 +1,9 @@
 import ArticleCard from "@/components/ArticleCard";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { Input } from "@/components/ui/input";
 import { useArticles } from "@/context/ArticleContext";
-import { Article } from "@/services/db";
+
 import { ArrowLeft, Search } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";

@@ -2,11 +2,25 @@
 if (typeof window !== "undefined") {
 	// Ensure process is defined for React and other libs that expect it
 	if (typeof window.process === "undefined") {
-		(window as Window & typeof globalThis & { process?: unknown }).process = {
+		// Define minimal process object
+		const minimalProcess = {
 			env: {},
-			browser: true,
+			versions: {
+				node: "0.0.0",
+				v8: "0.0.0",
+				uv: "0.0.0",
+				zlib: "0.0.0",
+				ares: "0.0.0",
+				modules: "0.0.0",
+				http_parser: "0.0.0",
+				openssl: "0.0.0",
+			},
 			nextTick: (cb: () => void) => setTimeout(cb, 0),
 		};
+
+		// Use type assertion to avoid TypeScript errors
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		(window as any).process = minimalProcess;
 	}
 
 	// Required for PouchDB in some environments
@@ -27,11 +41,13 @@ if (typeof window !== "undefined") {
 						crypto?: Partial<Crypto>;
 					}
 			).crypto,
-			getRandomValues: (buffer: Uint8Array) => {
-				for (let i = 0; i < buffer.length; i++) {
-					buffer[i] = Math.floor(Math.random() * 256);
+			getRandomValues: <T extends ArrayBufferView | null>(array: T): T => {
+				if (array instanceof Uint8Array) {
+					for (let i = 0; i < array.length; i++) {
+						array[i] = Math.floor(Math.random() * 256);
+					}
 				}
-				return buffer;
+				return array;
 			},
 		};
 	}
@@ -46,23 +62,20 @@ if (typeof window !== "undefined") {
 	}
 
 	// Ensure setImmediate is defined (needed for some PouchDB operations)
-	if (
-		typeof (
-			window as Window &
-				typeof globalThis & {
-					setImmediate?: (...args: unknown[]) => number;
-				}
-		).setImmediate === "undefined"
-	) {
-		(
-			window as Window &
-				typeof globalThis & {
-					setImmediate?: (...args: unknown[]) => number;
-				}
-		).setImmediate = (
+	// Simplified setImmediate polyfill to avoid complex typing issues
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	if (typeof (window as any).setImmediate === "undefined") {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		(window as any).setImmediate = function setImmediate(
 			callback: (...args: unknown[]) => void,
 			...args: unknown[]
-		) => setTimeout(() => callback(...args), 0);
+		) {
+			return setTimeout(() => callback(...args), 0);
+		};
+
+		// Add minimal __promisify__ property to satisfy TypeScript
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		(window as any).setImmediate.__promisify__ = () => Promise.resolve();
 	}
 }
 

@@ -425,7 +425,7 @@ export async function deleteTag(id: string, rev: string): Promise<boolean> {
 }
 
 // Sync functionality (to be implemented later)
-export function setupSync(remoteUrl: string) {
+export function setupSync() {
 	// This function will set up sync with a remote CouchDB server
 	console.log("Sync functionality to be implemented");
 }

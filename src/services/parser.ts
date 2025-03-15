@@ -18,7 +18,7 @@ const turndownService = new TurndownService({
 // Add additional Turndown rules
 turndownService.addRule("removeExtraLineBreaks", {
 	filter: ["p", "h1", "h2", "h3", "h4", "h5", "h6"],
-	replacement: (content, node) => {
+	replacement: (content) => {
 		return `\n\n${content}\n\n`;
 	},
 });
@@ -145,7 +145,7 @@ export async function fetchHtml(url: string): Promise<string> {
 				return text;
 			});
 
-			return await Promise.any(proxyRequests);
+			return await Promise.race(proxyRequests);
 		} catch (aggregateError) {
 			// All proxies failed in Promise.any
 			throw new Error(
@@ -182,7 +182,7 @@ export async function parseArticle(
 	}
 
 	// Sanitize HTML content
-	const sanitizedHtml = DOMPurify.sanitize(article.content, {
+	const sanitizedHtml = DOMPurify.sanitize(article.content || "", {
 		ALLOWED_TAGS: [
 			"a",
 			"b",
@@ -220,18 +220,19 @@ export async function parseArticle(
 	});
 
 	// Convert to Markdown
-	const markdown = turndownService.turndown(sanitizedHtml);
+	// Markdown conversion removed as it's not used
 
 	// Extract excerpt
 	const excerpt =
-		article.excerpt || `${article.textContent.substring(0, 280).trim()}...`;
+		article.excerpt ||
+		`${(article.textContent || "").substring(0, 280).trim()}...`;
 
 	// Calculate estimated read time (average reading speed: 200 words per minute)
-	const wordCount = article.textContent.split(/\s+/).length;
+	const wordCount = (article.textContent || "").split(/\s+/).length;
 	const estimatedReadTime = Math.ceil(wordCount / 200);
 
 	return {
-		title: article.title,
+		title: article.title || "Untitled Article",
 		url: normalizedUrl,
 		content: sanitizedHtml, // Store sanitized HTML
 		excerpt,
