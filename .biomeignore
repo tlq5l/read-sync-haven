@@ -40,5 +40,8 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
+# TypeScript config files with comments
+tsconfig.node.json
+
 # Testing
 coverage/
