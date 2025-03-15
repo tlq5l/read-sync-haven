@@ -6,7 +6,13 @@
 		"useIgnoreFile": false
 	},
 	"files": {
-		"ignore": ["tsconfig.node.json", "tsconfig.app.json", "tsconfig.json"]
+		"ignore": [
+			"tsconfig.node.json",
+			"tsconfig.app.json",
+			"tsconfig.json",
+			"dist/**/*",
+			"dist/**/*.js"
+		]
 	},
 	"formatter": {
 		"enabled": true,

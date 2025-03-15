@@ -1,12 +1,8 @@
 import { Readability } from "@mozilla/readability";
 import DOMPurify from "dompurify";
-import { JSDOM } from "jsdom";
 import TurndownService from "turndown";
 
-// Polyfill for fs and child_process for JSDOM
-// These will be replaced by the node polyfills plugin
-globalThis.fs = globalThis.fs || {};
-globalThis.child_process = globalThis.child_process || {};
+// No need for Node.js polyfills as we're using browser-native DOMParser
 
 // Import types
 import type { Article } from "./db";
@@ -173,9 +169,9 @@ export async function parseArticle(
 	const normalizedUrl = normalizeUrl(url);
 	const html = await fetchHtml(normalizedUrl);
 
-	// Create a DOM from HTML
-	const dom = new JSDOM(html, { url: normalizedUrl });
-	const document = dom.window.document;
+	// Use browser's native DOMParser instead of JSDOM
+	const parser = new DOMParser();
+	const document = parser.parseFromString(html, "text/html");
 
 	// Use Readability to parse the article
 	const reader = new Readability(document);
@@ -248,8 +244,9 @@ export async function parseArticle(
 
 // Helper function to extract text content from HTML
 export function extractTextFromHtml(html: string): string {
-	const dom = new JSDOM(html);
-	return dom.window.document.body.textContent || "";
+	const parser = new DOMParser();
+	const doc = parser.parseFromString(html, "text/html");
+	return doc.body.textContent || "";
 }
 
 // Helper function to convert HTML to Markdown

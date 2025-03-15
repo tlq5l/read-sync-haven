@@ -1,36 +1,12 @@
-// Browser polyfills for JSDOM
+// Simplified browser polyfills - focusing on essential functionality
 if (typeof window !== "undefined") {
-	// Ensure process is defined
+	// Ensure process is defined for React and other libs that expect it
 	if (typeof window.process === "undefined") {
 		(window as Window & typeof globalThis & { process?: unknown }).process = {
 			env: {},
 			browser: true,
-			version: "v16.0.0",
 			nextTick: (cb: () => void) => setTimeout(cb, 0),
 		};
-	}
-
-	// Add JSDOM-related polyfills if needed
-	if (typeof window.TextEncoder === "undefined") {
-		try {
-			// Use the global TextEncoder if available
-			(
-				window as Window &
-					typeof globalThis & {
-						TextEncoder?: typeof TextEncoder;
-						TextDecoder?: typeof TextDecoder;
-					}
-			).TextEncoder = TextEncoder;
-			(
-				window as Window &
-					typeof globalThis & {
-						TextEncoder?: typeof TextEncoder;
-						TextDecoder?: typeof TextDecoder;
-					}
-			).TextDecoder = TextDecoder;
-		} catch (e) {
-			console.warn("TextEncoder/TextDecoder not available in this environment");
-		}
 	}
 
 	// Required for PouchDB in some environments
@@ -75,7 +51,6 @@ if (typeof window !== "undefined") {
 			window as Window &
 				typeof globalThis & {
 					setImmediate?: (...args: unknown[]) => number;
-					clearImmediate?: (id: number) => void;
 				}
 		).setImmediate === "undefined"
 	) {
@@ -83,22 +58,12 @@ if (typeof window !== "undefined") {
 			window as Window &
 				typeof globalThis & {
 					setImmediate?: (...args: unknown[]) => number;
-					clearImmediate?: (id: number) => void;
 				}
 		).setImmediate = (
 			callback: (...args: unknown[]) => void,
 			...args: unknown[]
 		) => setTimeout(() => callback(...args), 0);
-		(
-			window as Window &
-				typeof globalThis & { clearImmediate?: (id: number) => void }
-		).clearImmediate = (id: number) => {
-			clearTimeout(id);
-		};
 	}
-
-	// Console logging for polyfill initialization
-	console.log("Polyfills initialized for browser environment");
 }
 
 export {};
