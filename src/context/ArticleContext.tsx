@@ -51,6 +51,9 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 	// Initialize database on component mount
 	useEffect(() => {
+		// Skip if already initialized
+		if (isInitialized) return;
+
 		const init = async () => {
 			try {
 				console.log("Initializing database...");
@@ -105,7 +108,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		init();
 
 		return () => clearTimeout(timeoutId);
-	}, [toast]);
+	}, [isInitialized, toast]);
 
 	// Load articles based on current view
 	useEffect(() => {
@@ -114,9 +117,9 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		const loadArticles = async () => {
 			setIsLoading(true);
 			try {
-				consnst options: Parameters<typeof getAllArticles>[0] = {
+				const options: Parameters<typeof getAllArticles>[0] = {
 					sortBy: "savedAt",
-					sortDirection: "desc",
+					sortDirection: "desc"
 				};
 
 				if (currentView === "unread") {
@@ -132,9 +135,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				setError(null);
 			} catch (err) {
 				console.error("Failed to load articles:", err);
-				setError(
-					err instanceof Error ? err : new Error("Failed to load articles"),
-				);
+				setError(err instanceof Error ? err : new Error("Failed to load articles"));
 				// Return empty array to prevent stuck loading state
 				setArticles([]);
 
@@ -161,7 +162,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		loadArticles();
 
 		return () => clearTimeout(timeoutId);
-	}, [currentView, isInitialized, toast]);
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [currentView, isInitialized, toast]); // Deliberately excluding isLoading to prevent infinite loops
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {
