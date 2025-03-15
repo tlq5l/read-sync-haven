@@ -11,7 +11,8 @@
 		"format": "biome format --write .",
 		"check": "biome check --write .",
 		"preview": "vite preview",
-		"typecheck": "tsc --noEmit -p .tscheckrc.json"
+		"typecheck": "tsc --noEmit -p .tscheckrc.json",
+		"prepare": "husky"
 	},
 	"dependencies": {
 		"@biomejs/biome": "^1.9.4",
@@ -91,6 +92,7 @@
 		"@vitejs/plugin-react-swc": "^3.5.0",
 		"autoprefixer": "^10.4.20",
 		"globals": "^15.9.0",
+		"husky": "^9.1.7",
 		"lovable-tagger": "^1.1.7",
 		"postcss": "^8.4.47",
 		"process": "^0.11.10",
