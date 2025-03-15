@@ -114,7 +114,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({ child
     loadArticles();
     
     return () => clearTimeout(timeoutId);
-  }, [currentView, isInitialized, isLoading, toast]);
+  }, [currentView, isInitialized, toast]); // Removed isLoading from dependencies to prevent re-execution
 
   // Refresh articles function
   const refreshArticles = async () => {

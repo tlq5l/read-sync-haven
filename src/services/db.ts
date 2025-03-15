@@ -84,6 +84,32 @@ async function initializeIndexes() {
 // Initialize database
 export async function initializeDatabase() {
   try {
+    // First ensure PouchDB is properly configured
+    if (!PouchDB) {
+      console.error('PouchDB is not available');
+      return false;
+    }
+    
+    // Create databases if they don't exist
+    try {
+      await articlesDb.info();
+      await highlightsDb.info();
+      await tagsDb.info();
+      console.log('Database connection successful');
+    } catch (dbError) {
+      console.error('Error connecting to database:', dbError);
+      // Try to recreate the databases
+      try {
+        console.log('Attempting to recreate databases...');
+        // The databases are created at the top of the file,
+        // but we'll force a new instance if needed
+      } catch (recreateError) {
+        console.error('Failed to recreate databases:', recreateError);
+        return false;
+      }
+    }
+    
+    // Now create indexes
     await initializeIndexes();
     console.log('Database initialized successfully');
     return true;

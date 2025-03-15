@@ -93,6 +93,14 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* If you need specific styles for forced colors mode (high contrast) */
+  @media (forced-colors: active) {
+    * {
+      /* Ensure standard system colors are used */
+      forced-color-adjust: auto;
+    }
+  }
 }
 
 /* Custom scrollbar styling */
@@ -112,6 +120,18 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* High contrast mode support - using standard CSS */
+@media (forced-colors: active) {
+  ::-webkit-scrollbar-thumb {
+    background: ButtonText;
+    border: 1px solid ButtonText;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: Highlight;
+  }
 }
 
 /* Reader mode styles */
