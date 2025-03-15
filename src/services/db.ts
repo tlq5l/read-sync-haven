@@ -12,13 +12,26 @@ let highlightsDb: PouchDB.Database<Highlight>;
 let tagsDb: PouchDB.Database<Tag>;
 
 try {
-	articlesDb = new PouchDB<Article>("bondwise_articles", {
+	// Configure database options with better reliability settings
+	const dbOptions = {
 		auto_compaction: true,
+		revs_limit: 100,
+		ajax: {
+			timeout: 30000, // 30 second timeout
+			retry: true,
+			retryTimeout: 1000
+		}
+	};
+	
+	articlesDb = new PouchDB<Article>("bondwise_articles", dbOptions);
+	highlightsDb = new PouchDB<Highlight>("bondwise_highlights", dbOptions);
+	tagsDb = new PouchDB<Tag>("bondwise_tags", dbOptions);
+	
+	// Test connections immediately to surface any issues
+	void articlesDb.info().catch(err => {
+		console.error("Articles DB connection test failed:", err);
+		throw err;
 	});
-	highlightsDb = new PouchDB<Highlight>("bondwise_highlights", {
-		auto_compaction: true,
-	});
-	tagsDb = new PouchDB<Tag>("bondwise_tags", { auto_compaction: true });
 } catch (err) {
 	console.error("Failed to initialize PouchDB instances:", err);
 	// Create fallback instances in case of error

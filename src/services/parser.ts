@@ -49,12 +49,12 @@ export function normalizeUrl(url: string): string {
 // Fetch HTML content from URL
 export async function fetchHtml(url: string): Promise<string> {
 	try {
-		// Try direct fetch first with no-cors mode as fallback
+		// Try direct fetch first - no mode specified to let browser determine
 		try {
 			const directResponse = await fetch(url, {
 				headers: {
 					"User-Agent":
-						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+						"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.160 Safari/537.36",
 				},
 				cache: "no-cache",
 			});
@@ -66,35 +66,61 @@ export async function fetchHtml(url: string): Promise<string> {
 			console.log("Direct fetch failed, trying CORS proxies", directError);
 		}
 		
-		// Try multiple CORS proxies as fallback
+		// Try reliable modern CORS proxies as fallback (2025 updated list)
 		const corsProxies = [
 			`https://corsproxy.io/?${encodeURIComponent(url)}`,
 			`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-			`https://cors-anywhere.herokuapp.com/${url}`,
+			`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+			`https://thingproxy.freeboard.io/fetch/${url}`,
 		];
 
 		let html = "";
-		let lastError;
+		let lastError: Error | null = null;
 
-		// Try each proxy until one works
-		for (const proxyUrl of corsProxies) {
-			try {
+		// Use Promise.any to try all proxies concurrently - first successful one wins
+		try {
+			const proxyRequests = corsProxies.map(async (proxyUrl) => {
 				const response = await fetch(proxyUrl, {
 					headers: {
 						"User-Agent":
-							"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+							"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.160 Safari/537.36",
 					},
-					mode: "cors",
 					cache: "no-cache",
 				});
-
-				if (response.ok) {
-					html = await response.text();
-					return html;
+				
+				if (!response.ok) {
+					throw new Error(`Proxy failed with status: ${response.status}`);
 				}
-			} catch (error) {
-				console.warn(`Proxy failed: ${proxyUrl}`, error);
-				lastError = error;
+				
+				return response.text();
+			});
+			
+			// First successful response wins
+			html = await Promise.any(proxyRequests);
+			return html;
+		} catch (aggregateError) {
+			// All proxies failed, try sequential fallback
+			console.warn("Concurrent proxy requests failed, trying sequential fallback");
+			
+			// Try each proxy sequentially as before
+			for (const proxyUrl of corsProxies) {
+				try {
+					const response = await fetch(proxyUrl, {
+						headers: {
+							"User-Agent":
+								"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.160 Safari/537.36",
+						},
+						cache: "no-cache",
+					});
+
+					if (response.ok) {
+						html = await response.text();
+						return html;
+					}
+				} catch (error) {
+					console.warn(`Proxy failed: ${proxyUrl}`, error);
+					lastError = error instanceof Error ? error : new Error(String(error));
+				}
 			}
 		}
 
@@ -102,7 +128,7 @@ export async function fetchHtml(url: string): Promise<string> {
 		throw lastError || new Error("Failed to fetch page: All proxies failed");
 	} catch (error) {
 		console.error("Error fetching HTML:", error);
-		throw error;
+		throw error instanceof Error ? error : new Error(String(error));
 	}
 }
 
