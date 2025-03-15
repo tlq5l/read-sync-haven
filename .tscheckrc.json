@@ -4,7 +4,7 @@
 	"exclude": ["**/node_modules", "**/.*/"],
 	"compilerOptions": {
 		"composite": false,
-		"moduleResolution": "bundler",
-		"allowImportingTsExtensions": true
+		"allowImportingTsExtensions": true,
+		"noEmit": true
 	}
 }
