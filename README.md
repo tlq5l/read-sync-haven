@@ -1,69 +1,81 @@
-# Welcome to your Lovable project
 
-## Project info
+# BondWise: A Local-First Read-It-Later Application
 
-**URL**: https://lovable.dev/projects/8a759505-9cdf-4065-acca-e42927cf7063
+BondWise is a modern read-it-later application built with a local-first architecture. Save, organize, and read content from around the web, all while enjoying a fast, offline-capable reading experience.
 
-## How can I edit this code?
+## Project Overview
 
-There are several ways of editing your application.
+BondWise allows you to:
 
-**Use Lovable**
+- Save web articles with a simple URL
+- Read content in a clean, distraction-free environment
+- Organize your reading list with favorites and read/unread states
+- Use the application entirely offline
+- Store all your content locally for fast access
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/8a759505-9cdf-4065-acca-e42927cf7063) and start prompting.
+## Core Technologies
 
-Changes made via Lovable will be committed automatically to this repo.
+- **React** and **TypeScript** for the frontend
+- **PouchDB** for local-first data storage
+- **Readability** for web content parsing
+- **TailwindCSS** and **shadcn/ui** for styling
+- **React Router** for navigation
 
-**Use your preferred IDE**
+## Local Development
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+To run this project locally:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Clone the repository
+git clone <repository-url>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Navigate to the project directory
+cd bondwise
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Project Structure
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- `/src/components` - UI components
+- `/src/pages` - Page components for routing
+- `/src/services` - Core services (database, content parsing)
+- `/src/context` - React context providers
+- `/src/hooks` - Custom React hooks
 
-**Use GitHub Codespaces**
+## Technical Considerations
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Local-First Architecture
 
-## What technologies are used for this project?
+BondWise uses PouchDB to store all content locally in the browser, providing:
 
-This project is built with .
+- Fast access to saved content
+- Offline capability
+- Future sync capability with remote CouchDB servers
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Content Parsing
 
-## How can I deploy this project?
+The web content parser extracts clean, readable content from web pages using:
 
-Simply open [Lovable](https://lovable.dev/projects/8a759505-9cdf-4065-acca-e42927cf7063) and click on Share -> Publish.
+- Mozilla's Readability library
+- DOMPurify for HTML sanitization
+- TurndownService for HTML-to-Markdown conversion
 
-## I want to use a custom domain - is that possible?
+## Roadmap
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+This is the MVP version of BondWise. Future enhancements will include:
+
+- PDF support
+- Highlighting and annotations
+- Tagging and advanced organization
+- Syncing between devices
+- Mobile apps
+- Browser extensions
+
+## License
+
+This project is private and not licensed for public use.
