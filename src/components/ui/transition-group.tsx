@@ -54,12 +54,20 @@ const TransitionGroup = React.forwardRef<HTMLDivElement, TransitionGroupProps>(
       }
     }, [autoAnimate, animateGroup, hasAnimated]);
 
+    // Create safe HTML attributes that won't be passed to the DOM
+    const safeProps = { ...props };
+    // Remove any boolean props that might cause React warnings
+    delete safeProps.stagger;
+    delete safeProps.synchronized;
+
     return (
       <div 
         ref={ref} 
         className={cn("transition-group", className)} 
         data-group-id={groupId}
-        {...props}
+        data-stagger-children={staggerChildren ? "true" : "false"}
+        data-auto-animate={autoAnimate ? "true" : "false"}
+        {...safeProps}
       >
         {childrenWithStagger}
       </div>

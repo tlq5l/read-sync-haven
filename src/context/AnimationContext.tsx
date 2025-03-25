@@ -36,6 +36,7 @@ type AnimationContextType = {
   triggerTransition: (groupId: string) => void;
   isElementAnimating: (groupId: string, elementId: string) => boolean;
   synchronizeAnimations: (callback: () => void) => void;
+  animateAll: () => void;
   timings: typeof ANIMATION_TIMINGS;
   easings: typeof ANIMATION_EASINGS;
 };
@@ -50,6 +51,7 @@ const AnimationContext = createContext<AnimationContextType>({
   triggerTransition: () => {},
   isElementAnimating: () => false,
   synchronizeAnimations: () => {},
+  animateAll: () => {},
   timings: ANIMATION_TIMINGS,
   easings: ANIMATION_EASINGS,
 });
@@ -162,6 +164,23 @@ export function AnimationProvider({ children }: { children: React.ReactNode }) {
     }
   }, [transitionGroups]);
 
+  // Trigger all animation groups
+  const animateAll = useCallback(() => {
+    // Use synchronizeAnimations to ensure all animations start together
+    synchronizeAnimations(() => {
+      // Trigger all transition groups
+      transitionGroups.forEach(group => {
+        triggerTransition(group.id);
+      });
+      
+      // Apply animation classes to transition items
+      const items = document.querySelectorAll('.transition-item');
+      items.forEach(item => {
+        item.classList.add('animate');
+      });
+    });
+  }, [transitionGroups, triggerTransition]);
+
   // Check if an element is currently animating
   const isElementAnimating = useCallback((groupId: string, elementId: string) => {
     const group = transitionGroups.find((g) => g.id === groupId);
@@ -195,6 +214,7 @@ export function AnimationProvider({ children }: { children: React.ReactNode }) {
     triggerTransition,
     isElementAnimating,
     synchronizeAnimations,
+    animateAll,
     timings: ANIMATION_TIMINGS,
     easings: ANIMATION_EASINGS,
   };

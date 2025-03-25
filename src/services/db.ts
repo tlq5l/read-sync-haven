@@ -92,19 +92,48 @@ export interface Tag {
 // Create indexes
 async function initializeIndexes() {
 	try {
-		// Index for articles
+		// Create individual indexes for better performance and reliability
 		await articlesDb.createIndex({
-			index: { fields: ["savedAt", "isRead", "favorite", "tags"] },
+			index: { fields: ["savedAt"] },
+			name: "idx_savedAt"
+		});
+		
+		await articlesDb.createIndex({
+			index: { fields: ["isRead"] },
+			name: "idx_isRead"
+		});
+		
+		await articlesDb.createIndex({
+			index: { fields: ["favorite"] },
+			name: "idx_favorite"
+		});
+		
+		await articlesDb.createIndex({
+			index: { fields: ["tags"] },
+			name: "idx_tags"
+		});
+		
+		// Compound index for common queries
+		await articlesDb.createIndex({
+			index: { fields: ["isRead", "savedAt"] },
+			name: "idx_isRead_savedAt"
+		});
+		
+		await articlesDb.createIndex({
+			index: { fields: ["favorite", "savedAt"] },
+			name: "idx_favorite_savedAt"
 		});
 
 		// Index for highlights
 		await highlightsDb.createIndex({
 			index: { fields: ["articleId", "createdAt"] },
+			name: "idx_articleId_createdAt"
 		});
 
 		// Index for tags
 		await tagsDb.createIndex({
 			index: { fields: ["name"] },
+			name: "idx_tagName"
 		});
 
 		console.log("Database indexes created successfully");
@@ -371,6 +400,7 @@ export async function getAllArticles(options?: {
 		// Ensure database is ready
 		await articlesDb.info();
 
+		// Create a selector object for filters
 		const selector: Record<string, unknown> = {};
 
 		// Add filters
@@ -378,27 +408,76 @@ export async function getAllArticles(options?: {
 		if (options?.favorite !== undefined) selector.favorite = options.favorite;
 		if (options?.tag) selector.tags = { $elemMatch: { $eq: options.tag } };
 
-		// Default sort
-		let sort: Array<{ [propName: string]: "asc" | "desc" }> = [
-			{ savedAt: "desc" },
-		];
-
-		// Custom sort
-		if (options?.sortBy) {
-			sort = [{ [options.sortBy]: options.sortDirection || "desc" }];
+		// Determine which index to use based on filters and sort
+		const sortField = options?.sortBy || "savedAt";
+		const sortDirection = options?.sortDirection || "desc";
+		
+		// Choose the appropriate index based on query
+		let useIndex;
+		if (sortField === "savedAt") {
+			if (options?.isRead !== undefined) {
+				useIndex = "idx_isRead_savedAt";
+			} else if (options?.favorite !== undefined) {
+				useIndex = "idx_favorite_savedAt";
+			} else {
+				useIndex = "idx_savedAt";
+			}
 		}
-
+		
+		// Temporary fallback for non-indexed sorts
+		// For title or readAt sorts, we'll need to get all documents and sort in memory
+		if (sortField === "title" || sortField === "readAt") {
+			console.log(`Using in-memory sort for field: ${sortField}`);
+			
+			// Get all matching documents
+			const result = await articlesDb.find({
+				selector,
+				limit: options?.limit || 1000, // Higher limit for in-memory sorting
+				skip: options?.skip || 0,
+				use_index: useIndex,
+			});
+			
+			// Sort in memory
+			const docs = result?.docs || [];
+			docs.sort((a, b) => {
+				const aValue = a[sortField] || 0;
+				const bValue = b[sortField] || 0;
+				
+				if (sortDirection === "asc") {
+					return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+				} else {
+					return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+				}
+			});
+			
+			// Apply limit if needed
+			if (options?.limit) {
+				return docs.slice(0, options.limit);
+			}
+			
+			return docs;
+		}
+		
+		// Standard query with proper indexing
 		console.log(
-			"Executing PouchDB find with selector:",
-			JSON.stringify(selector),
+			`Executing PouchDB find with selector: ${JSON.stringify(selector)}, using index: ${useIndex}`,
 		);
 
-		const result = await articlesDb.find({
+		const findOptions: PouchDB.Find.FindRequest<Article> = {
 			selector,
-			sort,
 			limit: options?.limit || 50,
 			skip: options?.skip || 0,
-		});
+		};
+		
+		// Add sort configuration
+		findOptions.sort = [{ [sortField]: sortDirection }];
+		
+		// Use specific index if available
+		if (useIndex) {
+			findOptions.use_index = useIndex;
+		}
+
+		const result = await articlesDb.find(findOptions);
 
 		const docs = result?.docs || [];
 		console.log(`Found ${docs.length} articles in database`);
@@ -446,6 +525,7 @@ export async function getHighlightsByArticle(
 		const result = await highlightsDb.find({
 			selector: { articleId },
 			sort: [{ createdAt: "asc" }],
+			use_index: "idx_articleId_createdAt"
 		});
 		return result.docs;
 	} catch (error) {
@@ -489,6 +569,7 @@ export async function saveTag(name: string, color = "#3B82F6"): Promise<Tag> {
 	// Check if tag already exists
 	const existingTags = await tagsDb.find({
 		selector: { name: { $eq: name } },
+		use_index: "idx_tagName"
 	});
 
 	if (existingTags.docs.length > 0) {
@@ -519,6 +600,7 @@ export async function getAllTags(): Promise<Tag[]> {
 		const result = await tagsDb.find({
 			selector: {},
 			sort: [{ name: "asc" }],
+			use_index: "idx_tagName"
 		});
 		return result.docs;
 	} catch (error) {
