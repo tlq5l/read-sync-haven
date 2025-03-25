@@ -62,8 +62,8 @@ const TransitionGroup = React.forwardRef<HTMLDivElement, TransitionGroupProps>(
 		// Create safe HTML attributes that won't be passed to the DOM
 		const safeProps = { ...props };
 		// Remove any props that are not valid HTML attributes
-		const propsToRemove = ['stagger', 'synchronized'] as const;
-		propsToRemove.forEach(prop => {
+		const propsToRemove = ["stagger", "synchronized"] as const;
+		propsToRemove.forEach((prop) => {
 			if (prop in safeProps) {
 				delete (safeProps as any)[prop];
 			}

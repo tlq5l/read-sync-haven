@@ -104,26 +104,26 @@ async function initializeIndexes() {
 		// Create a basic index with a common field first
 		await articlesDb
 			.createIndex({
-				index: { fields: ["_id"] }
+				index: { fields: ["_id"] },
 			})
 			.catch((err) => console.warn("Error creating _id index:", err));
 
 		// Create simple indexes
 		await articlesDb
 			.createIndex({
-				index: { fields: ["savedAt"] }
+				index: { fields: ["savedAt"] },
 			})
 			.catch((err) => console.warn("Error creating savedAt index:", err));
 
 		await articlesDb
 			.createIndex({
-				index: { fields: ["isRead"] }
+				index: { fields: ["isRead"] },
 			})
 			.catch((err) => console.warn("Error creating isRead index:", err));
 
 		await articlesDb
 			.createIndex({
-				index: { fields: ["favorite"] }
+				index: { fields: ["favorite"] },
 			})
 			.catch((err) => console.warn("Error creating favorite index:", err));
 
@@ -133,13 +133,13 @@ async function initializeIndexes() {
 		// Highlight and tag indexes
 		await highlightsDb
 			.createIndex({
-				index: { fields: ["articleId"] }
+				index: { fields: ["articleId"] },
 			})
 			.catch((err) => console.warn("Error creating articleId index:", err));
 
 		await tagsDb
 			.createIndex({
-				index: { fields: ["name"] }
+				index: { fields: ["name"] },
 			})
 			.catch((err) => console.warn("Error creating tag name index:", err));
 
@@ -529,7 +529,8 @@ export async function getAllArticles(options?: {
 		// Add filters
 		if (options?.isRead !== undefined) selector.isRead = options.isRead;
 		if (options?.favorite !== undefined) selector.favorite = options.favorite;
-		if (options?.tag && typeof options.tag === 'string') selector.tags = { $elemMatch: { $eq: options.tag } };
+		if (options?.tag && typeof options.tag === "string")
+			selector.tags = { $elemMatch: { $eq: options.tag } };
 
 		// Fallback for when no records are found matching the selector
 		if (Object.keys(selector).length > 0) {
@@ -558,7 +559,7 @@ export async function getAllArticles(options?: {
 						(doc) => doc.favorite === options.favorite,
 					);
 				}
-				if (options?.tag && typeof options.tag === 'string') {
+				if (options?.tag && typeof options.tag === "string") {
 					filteredDocs = filteredDocs.filter(
 						(doc) => doc.tags && doc.tags.includes(options.tag as string),
 					);
@@ -601,8 +602,10 @@ export async function getAllArticles(options?: {
 			if (options?.favorite !== undefined) {
 				docs = docs.filter((doc) => doc.favorite === options.favorite);
 			}
-			if (options?.tag && typeof options.tag === 'string') {
-				docs = docs.filter((doc) => doc.tags && doc.tags.includes(options.tag as string));
+			if (options?.tag && typeof options.tag === "string") {
+				docs = docs.filter(
+					(doc) => doc.tags && doc.tags.includes(options.tag as string),
+				);
 			}
 
 			// Sort in memory
