@@ -9,7 +9,7 @@
 		"build:dev": "vite build --mode development",
 		"lint": "biome lint .",
 		"format": "biome format --write .",
-		"check": "biome check --write .",
+		"check": "biome check .",
 		"preview": "vite preview",
 		"typecheck": "tsc --noEmit -p .tscheckrc.json",
 		"prepare": "husky"

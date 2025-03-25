@@ -6,10 +6,12 @@ import {
 	initializeDatabase,
 	saveArticle,
 	saveEpubFile,
+	savePdfFile,
 	updateArticle,
 } from "@/services/db";
 import { isValidEpub } from "@/services/epub";
 import { parseArticle } from "@/services/parser";
+import { isValidPdf } from "@/services/pdf";
 import type React from "react";
 import {
 	createContext,
@@ -264,40 +266,55 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		[toast],
 	);
 
-	// Add article by file (EPUB)
+	// Add article by file (EPUB or PDF)
 	const addArticleByFile = useCallback(
 		async (file: File): Promise<Article | null> => {
 			setIsLoading(true);
 			try {
-				// Validate file type
-				if (!isValidEpub(file)) {
-					throw new Error("Invalid EPUB file. Only EPUB format is supported.");
+				// Check file type and validate
+				if (isValidEpub(file)) {
+					// Save EPUB file
+					const savedArticle = await saveEpubFile(file);
+
+					// Update articles list to include new article
+					setArticles((prevArticles) => [savedArticle, ...prevArticles]);
+
+					toast({
+						title: "EPUB saved",
+						description: `"${file.name}" has been saved to your library.`,
+					});
+
+					return savedArticle;
 				}
 
-				// Save EPUB file
-				const savedArticle = await saveEpubFile(file);
+				if (isValidPdf(file)) {
+					// Save PDF file
+					const savedArticle = await savePdfFile(file);
 
-				// Update articles list to include new article
-				setArticles((prevArticles) => [savedArticle, ...prevArticles]);
+					// Update articles list to include new article
+					setArticles((prevArticles) => [savedArticle, ...prevArticles]);
 
-				toast({
-					title: "EPUB saved",
-					description: `"${file.name}" has been saved to your library.`,
-				});
+					toast({
+						title: "PDF saved",
+						description: `"${file.name}" has been saved to your library.`,
+					});
 
-				return savedArticle;
-			} catch (err) {
-				console.error("Failed to add EPUB file:", err);
-				setError(
-					err instanceof Error ? err : new Error("Failed to add EPUB file"),
+					return savedArticle;
+				}
+
+				throw new Error(
+					"Invalid file type. Only EPUB and PDF formats are supported.",
 				);
+			} catch (err) {
+				console.error("Failed to add file:", err);
+				setError(err instanceof Error ? err : new Error("Failed to add file"));
 
 				toast({
-					title: "Failed to save EPUB",
+					title: "Failed to save file",
 					description:
 						err instanceof Error
 							? err.message
-							: "An error occurred while saving the EPUB file.",
+							: "An error occurred while saving the file.",
 					variant: "destructive",
 				});
 

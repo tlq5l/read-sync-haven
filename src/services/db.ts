@@ -64,6 +64,7 @@ export interface Article {
 	fileData?: string; // Base64 encoded file data for binary files like EPUB
 	fileSize?: number; // Size of the file in bytes
 	fileName?: string; // Original filename
+	pageCount?: number; // Number of pages (for PDF)
 }
 
 export interface Highlight {
@@ -89,28 +90,65 @@ export interface Tag {
 	createdAt: number;
 }
 
-// Create indexes
+// Track created indexes to avoid duplicate creation
+let indexesCreated = false;
+
+// Create indexes for better query performance
 async function initializeIndexes() {
+	if (indexesCreated) {
+		console.log("Indexes already created, skipping");
+		return;
+	}
+
 	try {
-		// Index for articles
-		await articlesDb.createIndex({
-			index: { fields: ["savedAt", "isRead", "favorite", "tags"] },
-		});
+		// Create a basic index with a common field first
+		await articlesDb
+			.createIndex({
+				index: { fields: ["_id"] },
+			})
+			.catch((err) => console.warn("Error creating _id index:", err));
 
-		// Index for highlights
-		await highlightsDb.createIndex({
-			index: { fields: ["articleId", "createdAt"] },
-		});
+		// Create simple indexes
+		await articlesDb
+			.createIndex({
+				index: { fields: ["savedAt"] },
+			})
+			.catch((err) => console.warn("Error creating savedAt index:", err));
 
-		// Index for tags
-		await tagsDb.createIndex({
-			index: { fields: ["name"] },
-		});
+		await articlesDb
+			.createIndex({
+				index: { fields: ["isRead"] },
+			})
+			.catch((err) => console.warn("Error creating isRead index:", err));
 
+		await articlesDb
+			.createIndex({
+				index: { fields: ["favorite"] },
+			})
+			.catch((err) => console.warn("Error creating favorite index:", err));
+
+		// Wait a bit between index creation to avoid concurrency issues
+		await new Promise((resolve) => setTimeout(resolve, 100));
+
+		// Highlight and tag indexes
+		await highlightsDb
+			.createIndex({
+				index: { fields: ["articleId"] },
+			})
+			.catch((err) => console.warn("Error creating articleId index:", err));
+
+		await tagsDb
+			.createIndex({
+				index: { fields: ["name"] },
+			})
+			.catch((err) => console.warn("Error creating tag name index:", err));
+
+		// Mark indexes as created
+		indexesCreated = true;
 		console.log("Database indexes created successfully");
 	} catch (error) {
 		console.error("Error creating database indexes:", error);
-		throw error; // Propagate the error to be caught by initializeDatabase
+		// Not throwing error to allow app to continue, but with reduced performance
 	}
 }
 
@@ -212,6 +250,7 @@ export async function saveArticle(
 		fileData: article.fileData,
 		fileSize: article.fileSize,
 		fileName: article.fileName,
+		pageCount: article.pageCount,
 	};
 
 	try {
@@ -227,12 +266,18 @@ export async function saveArticle(
 }
 
 import { extractEpubMetadata, getEstimatedReadingTime } from "./epub";
+import {
+	extractPdfMetadata,
+	getEstimatedReadingTime as getPdfReadingTime,
+} from "./pdf";
 
 // Function to save an EPUB file
 export async function saveEpubFile(file: File): Promise<Article> {
 	try {
 		console.log(
-			`Processing EPUB file: ${file.name}, size: ${(file.size / 1024).toFixed(1)}KB`,
+			`Processing EPUB file: ${file.name}, size: ${(file.size / 1024).toFixed(
+				1,
+			)}KB`,
 		);
 
 		// Read the file as ArrayBuffer with progress tracking
@@ -317,7 +362,109 @@ export async function saveEpubFile(file: File): Promise<Article> {
 	} catch (error) {
 		console.error("Error saving EPUB file:", error);
 		throw new Error(
-			`Failed to save EPUB file. ${error instanceof Error ? error.message : String(error)}`,
+			`Failed to save EPUB file. ${
+				error instanceof Error ? error.message : String(error)
+			}`,
+		);
+	}
+}
+
+// Function to save a PDF file
+export async function savePdfFile(file: File): Promise<Article> {
+	try {
+		console.log(
+			`Processing PDF file: ${file.name}, size: ${(file.size / 1024).toFixed(
+				1,
+			)}KB`,
+		);
+
+		// Read the file as ArrayBuffer
+		const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => resolve(reader.result as ArrayBuffer);
+			reader.onerror = (e) => {
+				console.error("FileReader error:", e);
+				reject(new Error("Failed to read PDF file"));
+			};
+			reader.readAsArrayBuffer(file);
+		});
+
+		console.log(
+			`FileReader successfully read file as ArrayBuffer: ${arrayBuffer.byteLength} bytes`,
+		);
+
+		// Convert to Base64 using a chunking method
+		let base64Encoded = "";
+		try {
+			const bytes = new Uint8Array(arrayBuffer);
+			const chunks: string[] = [];
+			const chunkSize = 0x8000; // 32KB chunks
+
+			// Process in smaller chunks to avoid string overflow
+			for (let i = 0; i < bytes.length; i += chunkSize) {
+				const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+				chunks.push(String.fromCharCode.apply(null, Array.from(chunk)));
+			}
+
+			// Join all chunks and convert to base64
+			const binaryString = chunks.join("");
+			base64Encoded = btoa(binaryString);
+
+			console.log(`Base64 encoding successful: length ${base64Encoded.length}`);
+		} catch (encodeError) {
+			console.error("Error in base64 encoding:", encodeError);
+			throw new Error("Failed to encode PDF data");
+		}
+
+		// Validate the converted data
+		if (!base64Encoded || base64Encoded.length < 100) {
+			throw new Error("Failed to properly encode PDF file data");
+		}
+
+		// Extract metadata from the PDF file
+		console.log("Extracting PDF metadata...");
+		const metadata = await extractPdfMetadata(file, arrayBuffer);
+		console.log("PDF metadata extracted:", metadata.title);
+
+		// Use extracted metadata or fallback to filename
+		const title = metadata.title || file.name.replace(/\.pdf$/i, "");
+		const author = metadata.author || "Unknown";
+		const excerpt = metadata.description || `PDF Document: ${title}`;
+		const pageCount =
+			metadata.pageCount || Math.max(1, Math.floor(file.size / 100000));
+
+		const article: Omit<
+			Article,
+			"_id" | "savedAt" | "isRead" | "favorite" | "tags"
+		> = {
+			title: title,
+			url: `local://${file.name}`, // Use a special URL scheme for local files
+			content:
+				"<div class='pdf-placeholder'>PDF content will be displayed in a reader.</div>",
+			excerpt: excerpt,
+			author: author,
+			publishedDate: metadata.publishedDate,
+			type: "pdf",
+			fileData: base64Encoded,
+			fileSize: file.size,
+			fileName: file.name,
+			pageCount: pageCount,
+			estimatedReadTime: getPdfReadingTime(file.size, pageCount),
+			siteName: "PDF Document",
+		};
+
+		// Log the fileData length for debugging
+		console.log(
+			`PDF file encoded successfully: ${base64Encoded.length} bytes encoded`,
+		);
+
+		return await saveArticle(article);
+	} catch (error) {
+		console.error("Error saving PDF file:", error);
+		throw new Error(
+			`Failed to save PDF file. ${
+				error instanceof Error ? error.message : String(error)
+			}`,
 		);
 	}
 }
@@ -371,42 +518,151 @@ export async function getAllArticles(options?: {
 		// Ensure database is ready
 		await articlesDb.info();
 
+		// Initialize indexes if not done yet
+		if (!indexesCreated) {
+			await initializeIndexes();
+		}
+
+		// Create a selector object for filters
 		const selector: Record<string, unknown> = {};
 
 		// Add filters
 		if (options?.isRead !== undefined) selector.isRead = options.isRead;
 		if (options?.favorite !== undefined) selector.favorite = options.favorite;
-		if (options?.tag) selector.tags = { $elemMatch: { $eq: options.tag } };
+		if (options?.tag && typeof options.tag === "string")
+			selector.tags = { $elemMatch: { $eq: options.tag } };
 
-		// Default sort
-		let sort: Array<{ [propName: string]: "asc" | "desc" }> = [
-			{ savedAt: "desc" },
-		];
+		// Fallback for when no records are found matching the selector
+		if (Object.keys(selector).length > 0) {
+			const count = await articlesDb.find({
+				selector,
+				limit: 1,
+			});
 
-		// Custom sort
-		if (options?.sortBy) {
-			sort = [{ [options.sortBy]: options.sortDirection || "desc" }];
+			if (count.docs.length === 0) {
+				console.warn("No records found with selector, falling back to allDocs");
+				// Fall back to allDocs which doesn't require indexes
+				const allDocs = await articlesDb.allDocs({ include_docs: true });
+				const docs = allDocs.rows
+					.map((row) => row.doc)
+					.filter((doc) => doc) as Article[];
+
+				// Filter in memory
+				let filteredDocs = [...docs];
+				if (options?.isRead !== undefined) {
+					filteredDocs = filteredDocs.filter(
+						(doc) => doc.isRead === options.isRead,
+					);
+				}
+				if (options?.favorite !== undefined) {
+					filteredDocs = filteredDocs.filter(
+						(doc) => doc.favorite === options.favorite,
+					);
+				}
+				if (options?.tag && typeof options.tag === "string") {
+					filteredDocs = filteredDocs.filter((doc) =>
+						doc.tags?.includes(options.tag as string),
+					);
+				}
+
+				// Sort in memory
+				const sortField = options?.sortBy || "savedAt";
+				const sortDirection = options?.sortDirection || "desc";
+
+				filteredDocs.sort((a, b) => {
+					const aVal = (a[sortField as keyof Article] as any) || 0;
+					const bVal = (b[sortField as keyof Article] as any) || 0;
+
+					if (sortDirection === "asc") {
+						return aVal > bVal ? 1 : -1;
+					}
+					return aVal < bVal ? 1 : -1;
+				});
+
+				// Apply limit and skip
+				const start = options?.skip || 0;
+				const end = options?.limit ? start + options.limit : undefined;
+				return filteredDocs.slice(start, end);
+			}
 		}
 
-		console.log(
-			"Executing PouchDB find with selector:",
-			JSON.stringify(selector),
-		);
+		// Standard query using allDocs (more reliable than find)
+		try {
+			// Try using allDocs first which is more reliable
+			const allDocs = await articlesDb.allDocs({ include_docs: true });
+			let docs = allDocs.rows
+				.map((row) => row.doc)
+				.filter((doc) => doc) as Article[];
 
-		const result = await articlesDb.find({
-			selector,
-			sort,
-			limit: options?.limit || 50,
-			skip: options?.skip || 0,
-		});
+			// Filter in memory
+			if (options?.isRead !== undefined) {
+				docs = docs.filter((doc) => doc.isRead === options.isRead);
+			}
+			if (options?.favorite !== undefined) {
+				docs = docs.filter((doc) => doc.favorite === options.favorite);
+			}
+			if (options?.tag && typeof options.tag === "string") {
+				docs = docs.filter((doc) => doc.tags?.includes(options.tag as string));
+			}
 
-		const docs = result?.docs || [];
-		console.log(`Found ${docs.length} articles in database`);
-		return docs;
+			// Sort in memory
+			const sortField = options?.sortBy || "savedAt";
+			const sortDirection = options?.sortDirection || "desc";
+
+			docs.sort((a, b) => {
+				const aVal = (a[sortField as keyof Article] as any) || 0;
+				const bVal = (b[sortField as keyof Article] as any) || 0;
+
+				if (sortDirection === "asc") {
+					return aVal > bVal ? 1 : -1;
+				}
+				return aVal < bVal ? 1 : -1;
+			});
+
+			// Apply limit and skip
+			const start = options?.skip || 0;
+			const end = options?.limit ? start + options.limit : undefined;
+
+			console.log(
+				`Found ${docs.length} articles, returning ${start} to ${
+					end || docs.length
+				}`,
+			);
+			return docs.slice(start, end || docs.length);
+		} catch (allDocsError) {
+			console.error("Error using allDocs, falling back to find:", allDocsError);
+
+			// Last resort - try find query with no sorting
+			const findQuery: PouchDB.Find.FindRequest<Article> = {
+				selector,
+				limit: options?.limit || 1000,
+				skip: options?.skip || 0,
+			};
+
+			const result = await articlesDb.find(findQuery);
+			const docs = result?.docs || [];
+
+			// Manual sort since we can't rely on PouchDB sort
+			const sortField = options?.sortBy || "savedAt";
+			const sortDirection = options?.sortDirection || "desc";
+
+			docs.sort((a, b) => {
+				const aVal = (a[sortField as keyof Article] as any) || 0;
+				const bVal = (b[sortField as keyof Article] as any) || 0;
+
+				if (sortDirection === "asc") {
+					return aVal > bVal ? 1 : -1;
+				}
+				return aVal < bVal ? 1 : -1;
+			});
+
+			console.log(`Found ${docs.length} articles using find fallback`);
+			return docs;
+		}
 	} catch (error) {
 		console.error("Error getting articles:", error);
-		// Throw the error so it can be handled by the caller
-		throw error;
+		// Return empty array instead of throwing to avoid breaking the UI
+		return [];
 	}
 }
 
@@ -443,11 +699,24 @@ export async function getHighlightsByArticle(
 	articleId: string,
 ): Promise<Highlight[]> {
 	try {
-		const result = await highlightsDb.find({
-			selector: { articleId },
-			sort: [{ createdAt: "asc" }],
-		});
-		return result.docs;
+		// Try using find with selector first
+		try {
+			const result = await highlightsDb.find({
+				selector: { articleId },
+			});
+			return result.docs;
+		} catch (findError) {
+			console.warn(
+				"Error using find for highlights, falling back to allDocs:",
+				findError,
+			);
+
+			// Fallback to allDocs and filter in memory
+			const allHighlights = await highlightsDb.allDocs({ include_docs: true });
+			return allHighlights.rows
+				.map((row) => row.doc)
+				.filter((doc) => doc && doc.articleId === articleId) as Highlight[];
+		}
 	} catch (error) {
 		console.error(`Error getting highlights for article ${articleId}:`, error);
 		return [];
@@ -487,12 +756,17 @@ export async function deleteHighlight(
 // Tags CRUD operations
 export async function saveTag(name: string, color = "#3B82F6"): Promise<Tag> {
 	// Check if tag already exists
-	const existingTags = await tagsDb.find({
-		selector: { name: { $eq: name } },
-	});
+	try {
+		const existingTags = await tagsDb.find({
+			selector: { name: { $eq: name } },
+		});
 
-	if (existingTags.docs.length > 0) {
-		return existingTags.docs[0];
+		if (existingTags.docs.length > 0) {
+			return existingTags.docs[0];
+		}
+	} catch (error) {
+		console.warn("Error looking up existing tag:", error);
+		// Continue with creation
 	}
 
 	const newTag: Tag = {
@@ -516,11 +790,21 @@ export async function saveTag(name: string, color = "#3B82F6"): Promise<Tag> {
 
 export async function getAllTags(): Promise<Tag[]> {
 	try {
-		const result = await tagsDb.find({
-			selector: {},
-			sort: [{ name: "asc" }],
-		});
-		return result.docs;
+		try {
+			const result = await tagsDb.find({
+				selector: {},
+			});
+			return result.docs;
+		} catch (findError) {
+			console.warn(
+				"Error using find for tags, falling back to allDocs:",
+				findError,
+			);
+
+			// Fallback to allDocs
+			const allTags = await tagsDb.allDocs({ include_docs: true });
+			return allTags.rows.map((row) => row.doc).filter((doc) => doc) as Tag[];
+		}
 	} catch (error) {
 		console.error("Error getting tags:", error);
 		return [];

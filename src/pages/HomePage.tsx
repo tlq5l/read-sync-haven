@@ -1,14 +1,24 @@
 import ArticleCard from "@/components/ArticleCard";
 import { Button } from "@/components/ui/button";
+import {
+	TransitionGroup,
+	TransitionItem,
+} from "@/components/ui/transition-group";
+import { useAnimation } from "@/context/AnimationContext";
 import { useArticles } from "@/context/ArticleContext";
+import { createAnimationFrame } from "@/lib/animation";
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 export default function HomePage() {
-	const { articles, isLoading, currentView, error, refreshArticles } =
-		useArticles();
+	const { articles, isLoading, currentView, refreshArticles } = useArticles();
 	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+	const { synchronizeAnimations } = useAnimation();
+	const animationFrameRef = useRef(createAnimationFrame());
+
+	// Reference to track if cards should animate
+	const shouldAnimateCards = useRef(true);
 
 	// On initial mount, refresh articles once
 	useEffect(() => {
@@ -19,6 +29,15 @@ export default function HomePage() {
 				.then(() => {
 					if (isMounted) {
 						setHasLoadedOnce(true);
+
+						// Trigger the animation after data is loaded
+						setTimeout(() => {
+							if (isMounted) {
+								synchronizeAnimations(() => {
+									shouldAnimateCards.current = true;
+								});
+							}
+						}, 100);
 					}
 				})
 				.catch((err) => {
@@ -31,19 +50,15 @@ export default function HomePage() {
 
 		return () => {
 			isMounted = false;
+			// Cancel any pending animations
+			animationFrameRef.current.cancel();
 		};
-	}, [hasLoadedOnce, refreshArticles]);
+	}, [hasLoadedOnce, refreshArticles, synchronizeAnimations]);
 
-	// Log for debugging but avoid excessive rendering
+	// Whenever the view changes, we should animate the cards again
 	useEffect(() => {
-		console.log("HomePage rendered with:", {
-			articlesCount: articles.length,
-			isLoading,
-			currentView,
-			hasError: !!error,
-			hasLoadedOnce,
-		});
-	}, [articles.length, isLoading, currentView, error, hasLoadedOnce]);
+		shouldAnimateCards.current = true;
+	}, []);
 
 	const getViewTitle = () => {
 		switch (currentView) {
@@ -73,19 +88,27 @@ export default function HomePage() {
 						<p className="text-muted-foreground">Loading articles...</p>
 					</div>
 				) : shouldShowEmptyState ? (
-					<div className="flex flex-col items-center justify-center h-64 space-y-4">
-						<p className="text-muted-foreground">No articles found</p>
-						<Button asChild>
-							<Link to="/add">
-								<Plus className="mr-2 h-4 w-4" />
-								Add Your First Article
-							</Link>
-						</Button>
-					</div>
+					<TransitionGroup
+						groupId="empty-state"
+						className="flex flex-col items-center justify-center h-64 space-y-4"
+						autoAnimate={true}
+					>
+						<TransitionItem showFrom="top">
+							<p className="text-muted-foreground">No articles found</p>
+						</TransitionItem>
+						<TransitionItem showFrom="bottom">
+							<Button asChild>
+								<Link to="/add">
+									<Plus className="mr-2 h-4 w-4" />
+									Add Your First Article
+								</Link>
+							</Button>
+						</TransitionItem>
+					</TransitionGroup>
 				) : (
 					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-						{articles.map((article) => (
-							<ArticleCard key={article._id} article={article} />
+						{articles.map((article, index) => (
+							<ArticleCard key={article._id} article={article} index={index} />
 						))}
 					</div>
 				)}

@@ -292,6 +292,7 @@ const SidebarRail = React.forwardRef<
 	return (
 		<button
 			ref={ref}
+			type="button"
 			data-sidebar="rail"
 			aria-label="Toggle Sidebar"
 			tabIndex={-1}
