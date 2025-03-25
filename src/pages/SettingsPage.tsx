@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -101,96 +102,112 @@ export default function SettingsPage() {
 				</TabsList>
 				
 				<TabsContent value="appearance" className="space-y-6">
-					<Card>
-						<CardHeader>
-							<CardTitle>Appearance</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							<div className="flex items-center justify-between">
-								<div className="space-y-0.5">
-									<Label htmlFor="dark-mode">Dark Mode</Label>
-									<p className="text-sm text-muted-foreground">
-										{theme === "dark"
-											? "Dark mode enabled"
-											: "Light mode enabled"}
-									</p>
-								</div>
-								<ThemeToggle showLabel={false} />
-							</div>
+					<ScrollArea className="h-[70vh]">
+						<div className="pr-4">
+							<Card>
+								<CardHeader>
+									<CardTitle>Appearance</CardTitle>
+								</CardHeader>
+								<CardContent className="space-y-4">
+									<div className="flex items-center justify-between">
+										<div className="space-y-0.5">
+											<Label htmlFor="dark-mode">Dark Mode</Label>
+											<p className="text-sm text-muted-foreground">
+												{theme === "dark"
+													? "Dark mode enabled"
+													: "Light mode enabled"}
+											</p>
+										</div>
+										<ThemeToggle showLabel={false} />
+									</div>
 
-							<Separator />
+									<Separator />
 
-							<div className="flex items-center justify-between">
-								<div className="space-y-0.5">
-									<Label htmlFor="font-size">Larger Text</Label>
-									<p className="text-sm text-muted-foreground">Coming soon</p>
-								</div>
-								<Switch id="font-size" disabled />
-							</div>
-						</CardContent>
-					</Card>
+									<div className="flex items-center justify-between">
+										<div className="space-y-0.5">
+											<Label htmlFor="font-size">Larger Text</Label>
+											<p className="text-sm text-muted-foreground">Coming soon</p>
+										</div>
+										<Switch id="font-size" disabled />
+									</div>
+								</CardContent>
+							</Card>
+						</div>
+					</ScrollArea>
 				</TabsContent>
 				
 				<TabsContent value="data" className="space-y-6">
-					<Card>
-						<CardHeader>
-							<CardTitle>Data</CardTitle>
-						</CardHeader>
-						<CardContent className="space-y-4">
-							<div className="flex items-center justify-between">
-								<div className="space-y-0.5">
-									<Label htmlFor="sync">Sync (Coming Soon)</Label>
-									<p className="text-sm text-muted-foreground">
-										Enable syncing between devices
-									</p>
-								</div>
-								<Switch id="sync" disabled />
-							</div>
+					<ScrollArea className="h-[70vh]">
+						<div className="pr-4">
+							<Card>
+								<CardHeader>
+									<CardTitle>Data</CardTitle>
+								</CardHeader>
+								<CardContent className="space-y-4">
+									<div className="flex items-center justify-between">
+										<div className="space-y-0.5">
+											<Label htmlFor="sync">Sync (Coming Soon)</Label>
+											<p className="text-sm text-muted-foreground">
+												Enable syncing between devices
+											</p>
+										</div>
+										<Switch id="sync" disabled />
+									</div>
 
-							<Separator />
+									<Separator />
 
-							<div className="space-y-2">
-								<h3 className="text-sm font-medium">Export Data</h3>
-								<p className="text-sm text-muted-foreground">
-									Download all your articles and highlights
-								</p>
-								<Button onClick={exportData} disabled={isExportingData}>
-									{isExportingData ? "Exporting..." : "Export Data"}
-								</Button>
-							</div>
-						</CardContent>
-					</Card>
+									<div className="space-y-2">
+										<h3 className="text-sm font-medium">Export Data</h3>
+										<p className="text-sm text-muted-foreground">
+											Download all your articles and highlights
+										</p>
+										<Button onClick={exportData} disabled={isExportingData}>
+											{isExportingData ? "Exporting..." : "Export Data"}
+										</Button>
+									</div>
+								</CardContent>
+							</Card>
+						</div>
+					</ScrollArea>
 				</TabsContent>
 				
 				<TabsContent value="shortcuts">
-					<KeyboardShortcutsTab />
+					<ScrollArea className="h-[70vh]">
+						<div className="pr-4">
+							<KeyboardShortcutsTab />
+						</div>
+					</ScrollArea>
 				</TabsContent>
 				
-				<Card className="mt-6">
-					<CardHeader>
-						<CardTitle>About</CardTitle>
-					</CardHeader>
-					<CardContent className="space-y-4">
-						<div className="space-y-2">
-							<h3 className="text-sm font-medium">BondWise</h3>
-							<p className="text-sm text-muted-foreground">
-								Version 0.1.0 (MVP)
-							</p>
-							<p className="text-sm text-muted-foreground">
-								A local-first read-it-later application for power readers.
-							</p>
-						</div>
+				<ScrollArea className="h-[16vh] mt-6">
+					<div className="pr-4">
+						<Card>
+							<CardHeader>
+								<CardTitle>About</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								<div className="space-y-2">
+									<h3 className="text-sm font-medium">BondWise</h3>
+									<p className="text-sm text-muted-foreground">
+										Version 0.1.0 (MVP)
+									</p>
+									<p className="text-sm text-muted-foreground">
+										A local-first read-it-later application for power readers.
+									</p>
+								</div>
 
-						<Separator />
+								<Separator />
 
-						<div className="space-y-2">
-							<Button variant="outline" className="gap-2">
-								<HelpCircle className="h-4 w-4" />
-								Help & Support
-							</Button>
-						</div>
-					</CardContent>
-				</Card>
+								<div className="space-y-2">
+									<Button variant="outline" className="gap-2">
+										<HelpCircle className="h-4 w-4" />
+										Help & Support
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
+					</div>
+				</ScrollArea>
 			</Tabs>
 		</div>
 	);
