@@ -81,7 +81,7 @@ export function AnimationProvider({ children }: { children: React.ReactNode }) {
 	}, [animationFrame]);
 
 	// Create a new transition group
-	const createTransitionGroup = useCallback(
+	const createTransitionGroup = useCallback<AnimationContextType['createTransitionGroup']>(
 		(id: string, timeout = ANIMATION_TIMINGS.normal) => {
 			setTransitionGroups((prev) => {
 				// Don't duplicate groups

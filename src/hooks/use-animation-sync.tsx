@@ -38,8 +38,9 @@ export function useAnimationSync(options: UseAnimationSyncOptions = {}) {
 	const animation = useAnimation();
 	// Create local variables for missing properties to avoid TS errors
 	const syncAnimations = animation.synchronizeAnimations;
-	const registerComponent = (id: string, priority: number) => {};
-	const unregisterComponent = (id: string) => {};
+	// Using empty functions with underscore prefixed parameters to avoid unused parameter warnings
+	const registerComponent = (_id: string, _priority: number) => {};
+	const unregisterComponent = (_id: string) => {};
 	const reducedMotion = false;
 	const [isAnimating, setIsAnimating] = useState(false);
 	const [hasAnimated, setHasAnimated] = useState(false);
@@ -55,6 +56,7 @@ export function useAnimationSync(options: UseAnimationSyncOptions = {}) {
 				unregisterComponent(componentId.current);
 			};
 		}
+		return undefined;
 	}, [registerComponent, unregisterComponent, priority, synchronized]);
 
 	// Listen for global animation triggers
