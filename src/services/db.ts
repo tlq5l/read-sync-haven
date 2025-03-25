@@ -89,57 +89,59 @@ export interface Tag {
 	createdAt: number;
 }
 
-// Create indexes
+// Track created indexes to avoid duplicate creation
+let indexesCreated = false;
+
+// Create indexes for better query performance
 async function initializeIndexes() {
+	if (indexesCreated) {
+		console.log("Indexes already created, skipping");
+		return;
+	}
+	
 	try {
-		// Create individual indexes for better performance and reliability
+		// Create a basic index with a common field first
+		await articlesDb.createIndex({
+			index: { fields: ["_id"] },
+			name: "idx_id"
+		}).catch(err => console.warn("Error creating _id index:", err));
+		
+		// Create simple indexes
 		await articlesDb.createIndex({
 			index: { fields: ["savedAt"] },
 			name: "idx_savedAt"
-		});
+		}).catch(err => console.warn("Error creating savedAt index:", err));
 		
 		await articlesDb.createIndex({
 			index: { fields: ["isRead"] },
 			name: "idx_isRead"
-		});
+		}).catch(err => console.warn("Error creating isRead index:", err));
 		
 		await articlesDb.createIndex({
 			index: { fields: ["favorite"] },
 			name: "idx_favorite"
-		});
+		}).catch(err => console.warn("Error creating favorite index:", err));
 		
-		await articlesDb.createIndex({
-			index: { fields: ["tags"] },
-			name: "idx_tags"
-		});
+		// Wait a bit between index creation to avoid concurrency issues
+		await new Promise(resolve => setTimeout(resolve, 100));
 		
-		// Compound index for common queries
-		await articlesDb.createIndex({
-			index: { fields: ["isRead", "savedAt"] },
-			name: "idx_isRead_savedAt"
-		});
-		
-		await articlesDb.createIndex({
-			index: { fields: ["favorite", "savedAt"] },
-			name: "idx_favorite_savedAt"
-		});
-
-		// Index for highlights
+		// Highlight and tag indexes
 		await highlightsDb.createIndex({
-			index: { fields: ["articleId", "createdAt"] },
-			name: "idx_articleId_createdAt"
-		});
-
-		// Index for tags
+			index: { fields: ["articleId"] },
+			name: "idx_articleId"
+		}).catch(err => console.warn("Error creating articleId index:", err));
+		
 		await tagsDb.createIndex({
 			index: { fields: ["name"] },
-			name: "idx_tagName"
-		});
-
+			name: "idx_name"
+		}).catch(err => console.warn("Error creating tag name index:", err));
+		
+		// Mark indexes as created
+		indexesCreated = true;
 		console.log("Database indexes created successfully");
 	} catch (error) {
 		console.error("Error creating database indexes:", error);
-		throw error; // Propagate the error to be caught by initializeDatabase
+		// Not throwing error to allow app to continue, but with reduced performance
 	}
 }
 
@@ -399,6 +401,11 @@ export async function getAllArticles(options?: {
 	try {
 		// Ensure database is ready
 		await articlesDb.info();
+        
+        // Initialize indexes if not done yet
+        if (!indexesCreated) {
+            await initializeIndexes();
+        }
 
 		// Create a selector object for filters
 		const selector: Record<string, unknown> = {};
@@ -407,85 +414,131 @@ export async function getAllArticles(options?: {
 		if (options?.isRead !== undefined) selector.isRead = options.isRead;
 		if (options?.favorite !== undefined) selector.favorite = options.favorite;
 		if (options?.tag) selector.tags = { $elemMatch: { $eq: options.tag } };
+        
+        // Fallback for when no records are found matching the selector
+        if (Object.keys(selector).length > 0) {
+            const count = await articlesDb.find({
+                selector,
+                limit: 1
+            });
+            
+            if (count.docs.length === 0) {
+                console.warn("No records found with selector, falling back to allDocs");
+                // Fall back to allDocs which doesn't require indexes
+                const allDocs = await articlesDb.allDocs({ include_docs: true });
+                const docs = allDocs.rows
+                    .map(row => row.doc)
+                    .filter(doc => doc) as Article[];
+                
+                // Filter in memory
+                let filteredDocs = [...docs];
+                if (options?.isRead !== undefined) {
+                    filteredDocs = filteredDocs.filter(doc => doc.isRead === options.isRead);
+                }
+                if (options?.favorite !== undefined) {
+                    filteredDocs = filteredDocs.filter(doc => doc.favorite === options.favorite);
+                }
+                if (options?.tag) {
+                    filteredDocs = filteredDocs.filter(doc => doc.tags && doc.tags.includes(options.tag!));
+                }
+                
+                // Sort in memory
+                const sortField = options?.sortBy || "savedAt";
+                const sortDirection = options?.sortDirection || "desc";
+                
+                filteredDocs.sort((a, b) => {
+                    const aVal = a[sortField as keyof Article] as any || 0;
+                    const bVal = b[sortField as keyof Article] as any || 0;
+                    
+                    if (sortDirection === "asc") {
+                        return aVal > bVal ? 1 : -1;
+                    } else {
+                        return aVal < bVal ? 1 : -1;
+                    }
+                });
+                
+                // Apply limit and skip
+                const start = options?.skip || 0;
+                const end = options?.limit ? start + options.limit : undefined;
+                return filteredDocs.slice(start, end);
+            }
+        }
 
-		// Determine which index to use based on filters and sort
-		const sortField = options?.sortBy || "savedAt";
-		const sortDirection = options?.sortDirection || "desc";
-		
-		// Choose the appropriate index based on query
-		let useIndex;
-		if (sortField === "savedAt") {
-			if (options?.isRead !== undefined) {
-				useIndex = "idx_isRead_savedAt";
-			} else if (options?.favorite !== undefined) {
-				useIndex = "idx_favorite_savedAt";
-			} else {
-				useIndex = "idx_savedAt";
-			}
-		}
-		
-		// Temporary fallback for non-indexed sorts
-		// For title or readAt sorts, we'll need to get all documents and sort in memory
-		if (sortField === "title" || sortField === "readAt") {
-			console.log(`Using in-memory sort for field: ${sortField}`);
-			
-			// Get all matching documents
-			const result = await articlesDb.find({
-				selector,
-				limit: options?.limit || 1000, // Higher limit for in-memory sorting
-				skip: options?.skip || 0,
-				use_index: useIndex,
-			});
-			
-			// Sort in memory
-			const docs = result?.docs || [];
-			docs.sort((a, b) => {
-				const aValue = a[sortField] || 0;
-				const bValue = b[sortField] || 0;
-				
-				if (sortDirection === "asc") {
-					return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
-				} else {
-					return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
-				}
-			});
-			
-			// Apply limit if needed
-			if (options?.limit) {
-				return docs.slice(0, options.limit);
-			}
-			
-			return docs;
-		}
-		
-		// Standard query with proper indexing
-		console.log(
-			`Executing PouchDB find with selector: ${JSON.stringify(selector)}, using index: ${useIndex}`,
-		);
-
-		const findOptions: PouchDB.Find.FindRequest<Article> = {
-			selector,
-			limit: options?.limit || 50,
-			skip: options?.skip || 0,
-		};
-		
-		// Add sort configuration
-		findOptions.sort = [{ [sortField]: sortDirection }];
-		
-		// Use specific index if available
-		if (useIndex) {
-			findOptions.use_index = useIndex;
-		}
-
-		const result = await articlesDb.find(findOptions);
-
-		const docs = result?.docs || [];
-		console.log(`Found ${docs.length} articles in database`);
-		return docs;
+		// Standard query using allDocs (more reliable than find)
+        try {
+            // Try using allDocs first which is more reliable
+            const allDocs = await articlesDb.allDocs({ include_docs: true });
+            let docs = allDocs.rows
+                .map(row => row.doc)
+                .filter(doc => doc) as Article[];
+            
+            // Filter in memory 
+            if (options?.isRead !== undefined) {
+                docs = docs.filter(doc => doc.isRead === options.isRead);
+            }
+            if (options?.favorite !== undefined) {
+                docs = docs.filter(doc => doc.favorite === options.favorite);
+            }
+            if (options?.tag) {
+                docs = docs.filter(doc => doc.tags && doc.tags.includes(options.tag));
+            }
+            
+            // Sort in memory
+            const sortField = options?.sortBy || "savedAt";
+            const sortDirection = options?.sortDirection || "desc";
+            
+            docs.sort((a, b) => {
+                const aVal = a[sortField as keyof Article] as any || 0;
+                const bVal = b[sortField as keyof Article] as any || 0;
+                
+                if (sortDirection === "asc") {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+            
+            // Apply limit and skip
+            const start = options?.skip || 0;
+            const end = options?.limit ? start + options.limit : undefined;
+            
+            console.log(`Found ${docs.length} articles, returning ${start} to ${end || docs.length}`);
+            return docs.slice(start, end || docs.length);
+        } catch (allDocsError) {
+            console.error("Error using allDocs, falling back to find:", allDocsError);
+            
+            // Last resort - try find query with no sorting
+            const findQuery: PouchDB.Find.FindRequest<Article> = {
+                selector,
+                limit: options?.limit || 1000,
+                skip: options?.skip || 0
+            };
+            
+            const result = await articlesDb.find(findQuery);
+            const docs = result?.docs || [];
+            
+            // Manual sort since we can't rely on PouchDB sort
+            const sortField = options?.sortBy || "savedAt";
+            const sortDirection = options?.sortDirection || "desc";
+            
+            docs.sort((a, b) => {
+                const aVal = a[sortField as keyof Article] as any || 0;
+                const bVal = b[sortField as keyof Article] as any || 0;
+                
+                if (sortDirection === "asc") {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+            
+            console.log(`Found ${docs.length} articles using find fallback`);
+            return docs;
+        }
 	} catch (error) {
 		console.error("Error getting articles:", error);
-		// Throw the error so it can be handled by the caller
-		throw error;
+		// Return empty array instead of throwing to avoid breaking the UI
+		return [];
 	}
 }
 
@@ -522,12 +575,21 @@ export async function getHighlightsByArticle(
 	articleId: string,
 ): Promise<Highlight[]> {
 	try {
-		const result = await highlightsDb.find({
-			selector: { articleId },
-			sort: [{ createdAt: "asc" }],
-			use_index: "idx_articleId_createdAt"
-		});
-		return result.docs;
+		// Try using find with selector first
+		try {
+			const result = await highlightsDb.find({
+				selector: { articleId }
+			});
+			return result.docs;
+		} catch (findError) {
+			console.warn("Error using find for highlights, falling back to allDocs:", findError);
+			
+			// Fallback to allDocs and filter in memory
+			const allHighlights = await highlightsDb.allDocs({ include_docs: true });
+			return allHighlights.rows
+				.map(row => row.doc)
+				.filter(doc => doc && doc.articleId === articleId) as Highlight[];
+		}
 	} catch (error) {
 		console.error(`Error getting highlights for article ${articleId}:`, error);
 		return [];
@@ -567,13 +629,17 @@ export async function deleteHighlight(
 // Tags CRUD operations
 export async function saveTag(name: string, color = "#3B82F6"): Promise<Tag> {
 	// Check if tag already exists
-	const existingTags = await tagsDb.find({
-		selector: { name: { $eq: name } },
-		use_index: "idx_tagName"
-	});
+	try {
+		const existingTags = await tagsDb.find({
+			selector: { name: { $eq: name } }
+		});
 
-	if (existingTags.docs.length > 0) {
-		return existingTags.docs[0];
+		if (existingTags.docs.length > 0) {
+			return existingTags.docs[0];
+		}
+	} catch (error) {
+		console.warn("Error looking up existing tag:", error);
+		// Continue with creation
 	}
 
 	const newTag: Tag = {
@@ -597,12 +663,20 @@ export async function saveTag(name: string, color = "#3B82F6"): Promise<Tag> {
 
 export async function getAllTags(): Promise<Tag[]> {
 	try {
-		const result = await tagsDb.find({
-			selector: {},
-			sort: [{ name: "asc" }],
-			use_index: "idx_tagName"
-		});
-		return result.docs;
+		try {
+			const result = await tagsDb.find({
+				selector: {}
+			});
+			return result.docs;
+		} catch (findError) {
+			console.warn("Error using find for tags, falling back to allDocs:", findError);
+			
+			// Fallback to allDocs
+			const allTags = await tagsDb.allDocs({ include_docs: true });
+			return allTags.rows
+				.map(row => row.doc)
+				.filter(doc => doc) as Tag[];
+		}
 	} catch (error) {
 		console.error("Error getting tags:", error);
 		return [];
