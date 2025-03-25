@@ -1,9 +1,9 @@
+/* Import animation utilities */
+@import "./styles/animation-utils.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import animation utilities */
-@import "./styles/animation-utils.css";
 
 @layer base {
 	:root {
