@@ -1,7 +1,7 @@
-import { Moon, Sun } from "lucide-react";
-import { useTheme } from "@/context/ThemeContext";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { useTheme } from "@/context/ThemeContext";
+import { Moon, Sun } from "lucide-react";
 
 interface ThemeToggleProps {
 	showLabel?: boolean;

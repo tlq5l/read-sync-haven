@@ -128,13 +128,17 @@ export function syncAnimateElements(
 	if (!elements.length) return;
 
 	// Step 1: Prepare all elements before animation
-	elements.forEach((element) => {
+	for (const element of elements) {
 		// Temporarily add will-change for the animation duration
 		element.style.setProperty("will-change", WILL_CHANGE_PROPERTIES.join(", "));
-	});
+	}
 
 	// Step 2: Force a reflow to ensure transitions happen together
-	const forceReflow = () => elements.forEach((el) => el.offsetHeight);
+	const forceReflow = () => {
+		for (const el of elements) {
+			el.offsetHeight;
+		}
+	};
 	forceReflow();
 
 	// Step 3: Use requestAnimationFrame for better timing
@@ -162,10 +166,10 @@ export function syncAnimateElements(
 	// Step 4: Clean up hardware acceleration after animation completes
 	const totalDuration = duration + staggerMs * (elements.length - 1);
 	setTimeout(() => {
-		elements.forEach((element) => {
+		for (const element of elements) {
 			// Clear will-change after animation completes
 			element.style.removeProperty("will-change");
-		});
+		}
 	}, totalDuration + 50); // Add a little buffer
 }
 
@@ -179,28 +183,30 @@ export function syncAnimateElements(
 export function batchAnimate(
 	className: string,
 	elements: HTMLElement[],
-	delayMs: number = 0,
+	delayMs = 0,
 	cleanup?: () => void,
 ): void {
 	if (!elements.length) return;
 
 	// Prepare elements for animation
-	elements.forEach((el) => {
+	for (const el of elements) {
 		// Temporarily set will-change
 		el.style.setProperty("will-change", WILL_CHANGE_PROPERTIES.join(", "));
-	});
+	}
 
 	// Force layout recalculation
-	elements.forEach((el) => el.offsetHeight);
+	for (const el of elements) {
+		el.offsetHeight;
+	}
 
 	// Wait for next frame to ensure batch processing
 	setTimeout(() => {
 		requestAnimationFrame(() => {
 			// Double RAF for more reliable synchronization
 			requestAnimationFrame(() => {
-				elements.forEach((el) => {
+				for (const el of elements) {
 					el.classList.add(className);
-				});
+				}
 
 				// Clean up after animation completes
 				if (cleanup) {
@@ -210,9 +216,9 @@ export function batchAnimate(
 						parseFloat(styles.transitionDuration) * 1000 || DURATION.normal;
 
 					setTimeout(() => {
-						elements.forEach((el) => {
+						for (const el of elements) {
 							el.style.removeProperty("will-change");
-						});
+						}
 						cleanup();
 					}, duration + 50);
 				}

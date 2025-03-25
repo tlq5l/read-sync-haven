@@ -4,14 +4,13 @@ import { ArticleProvider } from "@/context/ArticleContext";
 import { useOffline } from "@/hooks/use-offline";
 
 import { useEffect } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import OfflineIndicator from "./OfflineIndicator";
 import Sidebar from "./Sidebar";
 
 export default function Layout() {
 	// isOffline is used by the OfflineIndicator component
 	useOffline();
-	const location = useLocation();
 	const { animateAll } = useAnimation();
 
 	// Trigger animations on route changes

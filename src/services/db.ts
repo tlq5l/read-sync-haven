@@ -560,8 +560,8 @@ export async function getAllArticles(options?: {
 					);
 				}
 				if (options?.tag && typeof options.tag === "string") {
-					filteredDocs = filteredDocs.filter(
-						(doc) => doc.tags?.includes(options.tag as string),
+					filteredDocs = filteredDocs.filter((doc) =>
+						doc.tags?.includes(options.tag as string),
 					);
 				}
 
@@ -574,7 +574,7 @@ export async function getAllArticles(options?: {
 					const bVal = (b[sortField as keyof Article] as any) || 0;
 
 					if (sortDirection === "asc") {
-					return aVal > bVal ? 1 : -1;
+						return aVal > bVal ? 1 : -1;
 					}
 					return aVal < bVal ? 1 : -1;
 				});
@@ -651,7 +651,7 @@ export async function getAllArticles(options?: {
 				const bVal = (b[sortField as keyof Article] as any) || 0;
 
 				if (sortDirection === "asc") {
-				return aVal > bVal ? 1 : -1;
+					return aVal > bVal ? 1 : -1;
 				}
 				return aVal < bVal ? 1 : -1;
 			});

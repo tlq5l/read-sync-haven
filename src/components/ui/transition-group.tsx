@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
 import { useTransitionGroup } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
+import React, { useEffect, useState } from "react";
 
 export interface TransitionGroupProps
 	extends React.HTMLAttributes<HTMLDivElement> {
@@ -63,11 +63,11 @@ const TransitionGroup = React.forwardRef<HTMLDivElement, TransitionGroupProps>(
 		const safeProps = { ...props };
 		// Remove any props that are not valid HTML attributes
 		const propsToRemove = ["stagger", "synchronized"] as const;
-		propsToRemove.forEach((prop) => {
+		for (const prop of propsToRemove) {
 			if (prop in safeProps) {
 				delete (safeProps as any)[prop];
 			}
-		});
+		}
 
 		return (
 			<div
