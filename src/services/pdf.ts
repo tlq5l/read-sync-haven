@@ -112,7 +112,7 @@ export function getEstimatedReadingTime(
 		// Average reading speed is about 2 minutes per page
 		return Math.max(1, pageCount * 2);
 	}
-	
+
 	// Estimate page count based on file size (100KB per page)
 	// and then calculate reading time
 	const estimatedPages = Math.max(1, Math.floor(fileSize / 100000));
