@@ -1,6 +1,6 @@
 import { TransitionGroup } from "@/components/ui/transition-group";
-import { ArticleProvider } from "@/context/ArticleContext";
 import { useAnimation } from "@/context/AnimationContext";
+import { ArticleProvider } from "@/context/ArticleContext";
 import { useOffline } from "@/hooks/use-offline";
 
 import { useEffect } from "react";
@@ -22,7 +22,7 @@ export default function Layout() {
 		}, 10);
 
 		return () => clearTimeout(timer);
-	}, [location.pathname, animateAll]);
+	}, [animateAll]);
 
 	return (
 		<ArticleProvider>

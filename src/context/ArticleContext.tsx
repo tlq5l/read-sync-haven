@@ -10,8 +10,8 @@ import {
 	updateArticle,
 } from "@/services/db";
 import { isValidEpub } from "@/services/epub";
-import { isValidPdf } from "@/services/pdf";
 import { parseArticle } from "@/services/parser";
+import { isValidPdf } from "@/services/pdf";
 import type React from "react";
 import {
 	createContext,
@@ -285,7 +285,9 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					});
 
 					return savedArticle;
-				} else if (isValidPdf(file)) {
+				}
+				
+				if (isValidPdf(file)) {
 					// Save PDF file
 					const savedArticle = await savePdfFile(file);
 
@@ -298,11 +300,11 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					});
 
 					return savedArticle;
-				} else {
-					throw new Error(
-						"Invalid file type. Only EPUB and PDF formats are supported.",
-					);
 				}
+				
+				throw new Error(
+					"Invalid file type. Only EPUB and PDF formats are supported.",
+				);
 			} catch (err) {
 				console.error("Failed to add file:", err);
 				setError(err instanceof Error ? err : new Error("Failed to add file"));

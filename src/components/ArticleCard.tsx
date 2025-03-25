@@ -66,16 +66,16 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 	const getFormattedDate = () => {
 		try {
 			// Make sure savedAt exists and is a valid number
-			if (!article.savedAt || isNaN(Number(article.savedAt))) {
+			if (!article.savedAt || Number.isNaN(Number(article.savedAt))) {
 				return "Recently";
 			}
 
 			// Use a safe fallback date if savedAt is invalid
-			let date;
+			let date: Date;
 			try {
 				date = new Date(article.savedAt);
 				// Check if date is valid
-				if (isNaN(date.getTime())) {
+				if (Number.isNaN(date.getTime())) {
 					return "Recently";
 				}
 			} catch (e) {

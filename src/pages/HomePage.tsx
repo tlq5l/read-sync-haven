@@ -58,7 +58,7 @@ export default function HomePage() {
 	// Whenever the view changes, we should animate the cards again
 	useEffect(() => {
 		shouldAnimateCards.current = true;
-	}, [currentView]);
+	}, []);
 
 	const getViewTitle = () => {
 		switch (currentView) {

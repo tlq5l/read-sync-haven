@@ -20,7 +20,7 @@ const WILL_CHANGE_PROPERTIES = ["transform", "opacity"];
  */
 export function applyHardwareAcceleration(
 	element: HTMLElement,
-	permanent: boolean = false,
+	permanent = false,
 ): void {
 	if (!element) return;
 
@@ -80,9 +80,9 @@ export const EASING = {
  */
 export function applyOptimizedTiming(
 	element: HTMLElement,
-	property: string = "all",
-	duration: number = DURATION.normal,
-	easing: string = EASING.standard,
+	property = "all",
+	duration = DURATION.normal,
+	easing = EASING.standard,
 ): void {
 	if (!element) return;
 
@@ -120,10 +120,10 @@ export function applyMotionPreference(element: HTMLElement): void {
  */
 export function syncAnimateElements(
 	elements: HTMLElement[],
-	property: string = "all",
-	duration: number = DURATION.normal,
-	easing: string = EASING.standard,
-	staggerMs: number = 0,
+	property = "all",
+	duration = DURATION.normal,
+	easing = EASING.standard,
+	staggerMs = 0,
 ): void {
 	if (!elements.length) return;
 

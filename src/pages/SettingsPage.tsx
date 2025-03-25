@@ -1,3 +1,4 @@
+import { KeyboardShortcutsTab } from "@/components/keyboard-shortcuts-tab";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -6,16 +7,15 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { KeyboardShortcutsTab } from "@/components/keyboard-shortcuts-tab";
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { databases } from "@/services/db";
 import {
 	ArrowLeft,
-	HelpCircle,
-	Palette,
 	Database,
+	HelpCircle,
 	Keyboard,
+	Palette,
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";

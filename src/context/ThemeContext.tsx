@@ -67,7 +67,7 @@ export function ThemeProvider({
 
 // Add system theme change listener
 export function ThemeSupport() {
-	const { setTheme, theme } = useTheme();
+	const { theme } = useTheme();
 
 	useEffect(() => {
 		const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
