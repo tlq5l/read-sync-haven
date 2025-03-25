@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useArticles } from "@/context/ArticleContext";
+import { useTheme } from "@/context/ThemeContext";
 import { cn } from "@/lib/utils";
 import {
 	BookOpen,
@@ -8,9 +9,11 @@ import {
 	Clock,
 	Library,
 	MenuIcon,
+	Moon,
 	Plus,
 	SearchIcon,
 	Settings,
+	Sun,
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -19,10 +22,15 @@ export default function Sidebar() {
 	const [collapsed, setCollapsed] = useState(false);
 	const location = useLocation();
 	const { currentView, setCurrentView } = useArticles();
+	const { theme, setTheme } = useTheme();
 
 	const isActive = (path: string) => location.pathname === path;
 	const isViewActive = (view: "all" | "unread" | "favorites") =>
 		currentView === view;
+
+	const toggleTheme = () => {
+		setTheme(theme === "dark" ? "light" : "dark");
+	};
 
 	return (
 		<div
@@ -51,7 +59,7 @@ export default function Sidebar() {
 						variant="ghost"
 						className={cn(
 							"w-full flex items-center justify-start gap-3 py-2",
-							isViewActive("all") && "bg-bondwise-50 text-bondwise-600",
+							isViewActive("all") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 						)}
 						onClick={() => setCurrentView("all")}
 					>
@@ -63,7 +71,7 @@ export default function Sidebar() {
 						variant="ghost"
 						className={cn(
 							"w-full flex items-center justify-start gap-3 py-2",
-							isViewActive("unread") && "bg-bondwise-50 text-bondwise-600",
+							isViewActive("unread") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 						)}
 						onClick={() => setCurrentView("unread")}
 					>
@@ -75,7 +83,7 @@ export default function Sidebar() {
 						variant="ghost"
 						className={cn(
 							"w-full flex items-center justify-start gap-3 py-2",
-							isViewActive("favorites") && "bg-bondwise-50 text-bondwise-600",
+							isViewActive("favorites") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 						)}
 						onClick={() => setCurrentView("favorites")}
 					>
@@ -95,7 +103,7 @@ export default function Sidebar() {
 							variant="ghost"
 							className={cn(
 								"w-full flex items-center justify-start gap-3 py-2",
-								isActive("/") && "bg-bondwise-50 text-bondwise-600",
+								isActive("/") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 							)}
 							asChild
 						>
@@ -109,7 +117,7 @@ export default function Sidebar() {
 							variant="ghost"
 							className={cn(
 								"w-full flex items-center justify-start gap-3 py-2",
-								isActive("/search") && "bg-bondwise-50 text-bondwise-600",
+								isActive("/search") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 							)}
 							asChild
 						>
@@ -123,7 +131,7 @@ export default function Sidebar() {
 							variant="ghost"
 							className={cn(
 								"w-full flex items-center justify-start gap-3 py-2",
-								isActive("/settings") && "bg-bondwise-50 text-bondwise-600",
+								isActive("/settings") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 							)}
 							asChild
 						>
@@ -131,6 +139,17 @@ export default function Sidebar() {
 								<Settings size={20} />
 								{!collapsed && <span>Settings</span>}
 							</Link>
+						</Button>
+						
+						<Button
+							variant="ghost"
+							className="w-full flex items-center justify-start gap-3 py-2"
+							onClick={toggleTheme}
+						>
+							{theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
+							{!collapsed && (
+								<span>{theme === "dark" ? "Dark Mode" : "Light Mode"}</span>
+							)}
 						</Button>
 					</div>
 				</div>

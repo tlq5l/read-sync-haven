@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { databases } from "@/services/db";
 import { ArrowLeft, HelpCircle } from "lucide-react";
@@ -11,6 +13,7 @@ import { Link } from "react-router-dom";
 
 export default function SettingsPage() {
 	const { toast } = useToast();
+	const { theme } = useTheme();
 	const [isExportingData, setIsExportingData] = useState(false);
 
 	const exportData = async () => {
@@ -85,9 +88,11 @@ export default function SettingsPage() {
 						<div className="flex items-center justify-between">
 							<div className="space-y-0.5">
 								<Label htmlFor="dark-mode">Dark Mode</Label>
-								<p className="text-sm text-muted-foreground">Coming soon</p>
+								<p className="text-sm text-muted-foreground">
+									{theme === "dark" ? "Dark mode enabled" : "Light mode enabled"}
+								</p>
 							</div>
-							<Switch id="dark-mode" disabled />
+							<ThemeToggle showLabel={false} />
 						</div>
 
 						<Separator />

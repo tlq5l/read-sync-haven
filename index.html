@@ -7,6 +7,25 @@
     <meta name="description" content="A local-first read-it-later application for power readers" />
     <meta name="author" content="BondWise" />
     <meta property="og:image" content="/og-image.png" />
+    <!-- Prevent flash of unstyled content (FOUC) with a script to apply the saved theme -->
+    <script>
+      (function() {
+        try {
+          const storedTheme = localStorage.getItem('bondwise-ui-theme');
+          if (storedTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else if (storedTheme === 'light') {
+            document.documentElement.classList.add('light');
+          } else {
+            // Handle system preference
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            document.documentElement.classList.add(prefersDark ? 'dark' : 'light');
+          }
+        } catch (e) {
+          console.error('Error applying theme:', e);
+        }
+      })();
+    </script>
     <!-- JSZip is required for epub.js to process EPUB files - load it in head to ensure it's available -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   </head>
