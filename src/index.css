@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import animation utilities */
+@import "./styles/animation-utils.css";
+
 @layer base {
 	:root {
 		--background: 210 50% 98%;
@@ -42,6 +45,13 @@
 		--sidebar-accent-foreground: 222 47% 11%;
 		--sidebar-border: 214 32% 91%;
 		--sidebar-ring: 221 83% 53%;
+        
+        /* Animation variables */
+        --animation-duration-fast: 150ms;
+        --animation-duration-normal: 250ms;
+        --animation-duration-slow: 400ms;
+        --animation-timing-function-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+        --animation-timing-function-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 	}
 
 	.dark {
@@ -99,6 +109,33 @@
 			forced-color-adjust: auto;
 		}
 	}
+    
+    /* Apply optimized transitions as the default */
+    a,
+    button,
+    select,
+    textarea,
+    input[type="checkbox"],
+    input[type="radio"],
+    [role="button"],
+    .transition,
+    .animate {
+        transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 250ms;
+        transform: translateZ(0);
+    }
+    
+    /* Much faster transitions for prefers-reduced-motion */
+    .reduce-motion *,
+    @media (prefers-reduced-motion: reduce) {
+        * {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
 }
 
 /* Custom scrollbar styling */
@@ -183,4 +220,25 @@
 
 .reader-content ol {
 	@apply list-decimal;
+}
+
+/* Optimize animation performance for common UI components */
+.accordion-content,
+.dropdown-content,
+.dialog-content,
+.drawer-content,
+.toast,
+.tooltip-content,
+.popover-content,
+.card {
+    transform: translateZ(0);
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+}
+
+/* GPU-accelerated class */
+.gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform, opacity;
+    backface-visibility: hidden;
 }

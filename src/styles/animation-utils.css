@@ -1,0 +1,86 @@
+/**
+ * Animation Utilities
+ * This file contains CSS utilities to optimize animation performance
+ */
+
+/* GPU Acceleration Class */
+.gpu-accelerated {
+  will-change: transform, opacity;
+  transform: translateZ(0); /* Force GPU rendering */
+  backface-visibility: hidden; /* Prevent flickering in some browsers */
+}
+
+/* Smooth Motion Classes */
+.motion-smooth {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.motion-accelerate {
+  transition-timing-function: cubic-bezier(0.4, 0, 1, 1);
+}
+
+.motion-decelerate {
+  transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+}
+
+.motion-bounce {
+  transition-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Optimized Animation Durations */
+.duration-micro {
+  transition-duration: 100ms;
+}
+
+.duration-short {
+  transition-duration: 200ms;
+}
+
+.duration-medium {
+  transition-duration: 300ms;
+}
+
+.duration-long {
+  transition-duration: 500ms;
+}
+
+/* Prefers Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Hardware accelerated animations for common components */
+.accordion-content,
+.dialog-content,
+.dropdown-content,
+.toast,
+.drawer-content,
+.tooltip-content {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+/* Sliding animations with hardware acceleration */
+.slide-up {
+  transform: translateY(0) translateZ(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-down {
+  transform: translateY(100%) translateZ(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-left {
+  transform: translateX(-100%) translateZ(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.slide-right {
+  transform: translateX(100%) translateZ(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
