@@ -286,7 +286,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 					return savedArticle;
 				}
-				
+
 				if (isValidPdf(file)) {
 					// Save PDF file
 					const savedArticle = await savePdfFile(file);
@@ -301,7 +301,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 					return savedArticle;
 				}
-				
+
 				throw new Error(
 					"Invalid file type. Only EPUB and PDF formats are supported.",
 				);
