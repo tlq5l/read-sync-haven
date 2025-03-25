@@ -1,11 +1,12 @@
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import {
-	Shortcut,
+	type Shortcut,
 	matchesShortcut,
 	shortcutGroups,
 } from "@/lib/keyboard-shortcuts";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import type React from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 interface KeyboardContextType {

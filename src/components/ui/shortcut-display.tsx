@@ -1,4 +1,4 @@
-import { Shortcut, formatShortcut } from "@/lib/keyboard-shortcuts";
+import { type Shortcut, formatShortcut } from "@/lib/keyboard-shortcuts";
 import { cn } from "@/lib/utils";
 
 interface ShortcutItemProps {

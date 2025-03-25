@@ -213,7 +213,7 @@ export function batchAnimate(
 					// Estimate animation duration from CSS (or use default)
 					const styles = window.getComputedStyle(elements[0]);
 					const duration =
-						parseFloat(styles.transitionDuration) * 1000 || DURATION.normal;
+						Number.parseFloat(styles.transitionDuration) * 1000 || DURATION.normal;
 
 					setTimeout(() => {
 						for (const el of elements) {
