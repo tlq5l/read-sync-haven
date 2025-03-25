@@ -13,14 +13,14 @@ export default function Layout() {
 	useOffline();
 	const location = useLocation();
 	const { animateAll } = useAnimation();
-	
+
 	// Trigger animations on route changes
 	useEffect(() => {
 		// Small delay to ensure components are ready
 		const timer = setTimeout(() => {
 			animateAll();
 		}, 10);
-		
+
 		return () => clearTimeout(timer);
 	}, [location.pathname, animateAll]);
 
@@ -28,7 +28,7 @@ export default function Layout() {
 		<ArticleProvider>
 			<div className="flex h-screen bg-background">
 				<Sidebar />
-				<TransitionGroup 
+				<TransitionGroup
 					className="flex-1 overflow-hidden"
 					groupId="main-content"
 					timeout={250}

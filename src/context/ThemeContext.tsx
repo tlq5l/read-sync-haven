@@ -27,7 +27,7 @@ export function ThemeProvider({
 	...props
 }: ThemeProviderProps) {
 	const [theme, setTheme] = useState<Theme>(
-		() => (localStorage.getItem(storageKey) as Theme) || defaultTheme
+		() => (localStorage.getItem(storageKey) as Theme) || defaultTheme,
 	);
 
 	useEffect(() => {
@@ -84,7 +84,7 @@ export function ThemeSupport() {
 			if (theme === "system") {
 				document.documentElement.classList.remove("light", "dark");
 				document.documentElement.classList.add(
-					event.matches ? "dark" : "light"
+					event.matches ? "dark" : "light",
 				);
 			}
 		};

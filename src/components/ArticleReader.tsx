@@ -1,4 +1,5 @@
 import EpubReader from "@/components/EpubReader";
+import PdfReader from "@/components/PdfReader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -128,6 +129,8 @@ export default function ArticleReader() {
 
 	// Check if article is an EPUB file
 	const isEpub = article.type === "epub" && article.fileData;
+	// Check if article is a PDF file
+	const isPdf = article.type === "pdf" && article.fileData;
 
 	return (
 		<div
@@ -178,6 +181,34 @@ export default function ArticleReader() {
 					</div>
 					<div className="flex-1 overflow-hidden relative">
 						<EpubReader
+							fileData={article.fileData}
+							fileName={article.fileName}
+						/>
+					</div>
+				</div>
+			) : isPdf && article.fileData ? (
+				// If it's a PDF file, render the PdfReader component
+				<div
+					className="flex-1 overflow-hidden flex flex-col"
+					style={{ height: "calc(100vh - 64px)" }}
+				>
+					<div className="px-4 md:px-8 py-4 border-b">
+						<h1 className="text-2xl font-bold mb-2">{article.title}</h1>
+						{article.author && (
+							<p className="text-muted-foreground mb-1">By {article.author}</p>
+						)}
+						<p className="text-sm text-muted-foreground mb-0">
+							{article.fileName || "PDF Document"}
+							{article.pageCount && (
+								<span> · {article.pageCount} pages</span>
+							)}
+							{article.estimatedReadTime && (
+								<span> · {article.estimatedReadTime} min read</span>
+							)}
+						</p>
+					</div>
+					<div className="flex-1 overflow-hidden relative">
+						<PdfReader
 							fileData={article.fileData}
 							fileName={article.fileName}
 						/>

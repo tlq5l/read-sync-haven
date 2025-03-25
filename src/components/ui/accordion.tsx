@@ -47,7 +47,7 @@ const AccordionContent = React.forwardRef<
 		className={cn(
 			"overflow-hidden text-sm transition-all gpu-accelerated accordion-content",
 			"data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down",
-			className
+			className,
 		)}
 		{...props}
 	>

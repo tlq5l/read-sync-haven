@@ -41,15 +41,19 @@ export default function FileUpload({
 		// Check file size
 		if (file.size > maxSize) {
 			setError(
-				`File is too large. Maximum size is ${Math.round(maxSize / (1024 * 1024))}MB.`,
+				`File is too large. Maximum size is ${Math.round(
+					maxSize / (1024 * 1024),
+				)}MB.`,
 			);
 			return false;
 		}
 
 		// Check file type based on extension
 		const fileExt = file.name.split(".").pop()?.toLowerCase();
-		if (fileExt !== "epub") {
-			setError("Only EPUB files are supported.");
+		const acceptedExtensions = accept.split(",").map(ext => ext.trim().replace(".", ""));
+		
+		if (!acceptedExtensions.includes(fileExt || "")) {
+			setError(`Only ${accept} files are supported.`);
 			return false;
 		}
 
@@ -96,6 +100,12 @@ export default function FileUpload({
 		}
 	};
 
+	// Create a formatted list of accepted file types for display
+	const acceptedFileTypes = accept
+		.split(",")
+		.map(ext => ext.trim().toUpperCase().replace(".", ""))
+		.join(", ");
+
 	return (
 		<div className="w-full">
 			<input
@@ -119,7 +129,7 @@ export default function FileUpload({
 					onDragLeave={handleDragLeave}
 					onDrop={handleFileDrop}
 					onClick={handleButtonClick}
-					aria-label="Upload EPUB file"
+					aria-label={`Upload ${acceptedFileTypes} file`}
 					style={{ minHeight: "200px" }}
 					type="button"
 				>
@@ -128,7 +138,7 @@ export default function FileUpload({
 					</div>
 					<div className="text-center">
 						<p className="text-sm font-medium">
-							Drag and drop your EPUB file here
+							Drag and drop your {acceptedFileTypes} file here
 						</p>
 						<p className="text-xs text-muted-foreground mt-1">
 							or click to browse files

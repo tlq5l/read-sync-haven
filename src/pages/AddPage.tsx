@@ -11,6 +11,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 export default function AddPage() {
 	const [isUploading, setIsUploading] = useState(false);
+	const [uploadType, setUploadType] = useState<"epub" | "pdf">("epub");
 	const { addArticleByFile } = useArticles();
 	const { toast } = useToast();
 	const navigate = useNavigate();
@@ -22,16 +23,16 @@ export default function AddPage() {
 			if (article) {
 				toast({
 					title: "Success",
-					description: "EPUB file added to your library",
+					description: `${file.name} added to your library`,
 				});
 				// Navigate to the article
 				navigate(`/read/${article._id}`);
 			}
 		} catch (error) {
-			console.error("Error uploading EPUB:", error);
+			console.error(`Error uploading ${uploadType.toUpperCase()}:`, error);
 			toast({
 				title: "Error",
-				description: "Failed to upload EPUB file",
+				description: `Failed to upload ${uploadType.toUpperCase()} file`,
 				variant: "destructive",
 			});
 		} finally {
@@ -51,9 +52,10 @@ export default function AddPage() {
 			</div>
 
 			<Tabs defaultValue="article" className="w-full">
-				<TabsList className="grid grid-cols-2 mb-6">
+				<TabsList className="grid grid-cols-3 mb-6">
 					<TabsTrigger value="article">Web Article</TabsTrigger>
 					<TabsTrigger value="epub">EPUB File</TabsTrigger>
+					<TabsTrigger value="pdf">PDF File</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="article">
@@ -80,30 +82,42 @@ export default function AddPage() {
 								locally in your browser.
 							</p>
 							<FileUpload
-								onFileSelect={handleFileSelect}
-								isUploading={isUploading}
+								onFileSelect={(file) => {
+									setUploadType("epub");
+									handleFileSelect(file);
+								}}
+								isUploading={isUploading && uploadType === "epub"}
 								accept=".epub"
 								maxSize={50 * 1024 * 1024} // 50MB
 							/>
 						</CardContent>
 					</Card>
 				</TabsContent>
-			</Tabs>
 
-			<div className="mt-6">
-				<Card className="opacity-50">
-					<CardHeader className="flex flex-row items-center gap-2">
-						<FileText className="h-5 w-5" />
-						<CardTitle>Upload PDF (Coming Soon)</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<p className="text-muted-foreground mb-4">
-							This feature will be available in a future update.
-						</p>
-						<Button disabled>Upload PDF</Button>
-					</CardContent>
-				</Card>
-			</div>
+				<TabsContent value="pdf">
+					<Card>
+						<CardHeader className="flex flex-row items-center gap-2">
+							<FileText className="h-5 w-5" />
+							<CardTitle>Upload PDF File</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<p className="text-muted-foreground mb-4">
+								Upload PDF files to read in your library. Files are stored
+								locally in your browser.
+							</p>
+							<FileUpload
+								onFileSelect={(file) => {
+									setUploadType("pdf");
+									handleFileSelect(file);
+								}}
+								isUploading={isUploading && uploadType === "pdf"}
+								accept=".pdf"
+								maxSize={50 * 1024 * 1024} // 50MB
+							/>
+						</CardContent>
+					</Card>
+				</TabsContent>
+			</Tabs>
 		</div>
 	);
 }

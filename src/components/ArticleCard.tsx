@@ -25,7 +25,7 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 	const { updateArticleStatus, removeArticle } = useArticles();
 	const { toast } = useToast();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
-	
+
 	// Use synchronized animation with staggered delay based on index
 	const cardAnimation = useSynchronizedAnimation({
 		groupId: "article-cards",
@@ -69,7 +69,7 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 			if (!article.savedAt || isNaN(Number(article.savedAt))) {
 				return "Recently";
 			}
-			
+
 			// Use a safe fallback date if savedAt is invalid
 			let date;
 			try {
@@ -81,7 +81,7 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 			} catch (e) {
 				return "Recently";
 			}
-			
+
 			return formatDistanceToNow(date, { addSuffix: true });
 		} catch (error) {
 			console.error("Error formatting date:", error);
@@ -90,13 +90,15 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 	};
 
 	return (
-		<Card 
+		<Card
 			ref={cardAnimation.ref}
 			className="overflow-hidden transition-all gpu-accelerated duration-200 hover:shadow-md"
-			style={{ 
-				opacity: 0, 
-				transform: 'translateY(20px) translateZ(0)',
-				animation: `fadeIn 200ms ${index * 30}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`
+			style={{
+				opacity: 0,
+				transform: "translateY(20px) translateZ(0)",
+				animation: `fadeIn 200ms ${
+					index * 30
+				}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
 			}}
 		>
 			<Link to={`/read/${article._id}`}>
@@ -132,7 +134,10 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 												<MoreHorizontal size={16} />
 											</Button>
 										</DropdownMenuTrigger>
-										<DropdownMenuContent align="end" className="gpu-accelerated">
+										<DropdownMenuContent
+											align="end"
+											className="gpu-accelerated"
+										>
 											<DropdownMenuItem
 												className="text-destructive focus:text-destructive"
 												onClick={handleDelete}
@@ -176,7 +181,10 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 												<MoreHorizontal size={16} />
 											</Button>
 										</DropdownMenuTrigger>
-										<DropdownMenuContent align="end" className="gpu-accelerated">
+										<DropdownMenuContent
+											align="end"
+											className="gpu-accelerated"
+										>
 											<DropdownMenuItem
 												className="text-destructive focus:text-destructive"
 												onClick={handleDelete}
@@ -225,12 +233,12 @@ const cardAnimation = `
 
 // Inject the animation styles
 const injectStyles = () => {
-  if (!document.getElementById('card-animation-styles')) {
-    const styleEl = document.createElement('style');
-    styleEl.id = 'card-animation-styles';
-    styleEl.innerHTML = cardAnimation;
-    document.head.appendChild(styleEl);
-  }
+	if (!document.getElementById("card-animation-styles")) {
+		const styleEl = document.createElement("style");
+		styleEl.id = "card-animation-styles";
+		styleEl.innerHTML = cardAnimation;
+		document.head.appendChild(styleEl);
+	}
 };
 
 // Execute once when the component is loaded

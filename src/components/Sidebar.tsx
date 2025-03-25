@@ -1,5 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { TransitionGroup, TransitionItem } from "@/components/ui/transition-group";
+import {
+	TransitionGroup,
+	TransitionItem,
+} from "@/components/ui/transition-group";
 import { useAnimation } from "@/context/AnimationContext";
 import { useArticles } from "@/context/ArticleContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -27,14 +30,14 @@ export default function Sidebar() {
 	const { currentView, setCurrentView } = useArticles();
 	const { theme, setTheme } = useTheme();
 	const { synchronizeAnimations } = useAnimation();
-	
+
 	// Create synchronized animations for the sidebar
 	const sidebarAnimation = useSynchronizedAnimation({
 		groupId: "sidebar",
 		elementId: "sidebar-container",
 		duration: 200,
 	});
-	
+
 	const isActive = (path: string) => location.pathname === path;
 	const isViewActive = (view: "all" | "unread" | "favorites") =>
 		currentView === view;
@@ -42,7 +45,7 @@ export default function Sidebar() {
 	const toggleTheme = () => {
 		setTheme(theme === "dark" ? "light" : "dark");
 	};
-	
+
 	const toggleCollapsed = () => {
 		// Use synchronizeAnimations to ensure smooth transitions
 		synchronizeAnimations(() => {
@@ -61,7 +64,9 @@ export default function Sidebar() {
 		>
 			<div className="flex items-center p-4 border-b">
 				{!collapsed && (
-					<h1 className="text-xl font-bold text-bondwise-600 transition-opacity duration-200">BondWise</h1>
+					<h1 className="text-xl font-bold text-bondwise-600 transition-opacity duration-200">
+						BondWise
+					</h1>
 				)}
 				<Button
 					variant="ghost"
@@ -74,8 +79,8 @@ export default function Sidebar() {
 			</div>
 
 			<div className="flex-grow overflow-y-auto py-4">
-				<TransitionGroup 
-					groupId="sidebar-items" 
+				<TransitionGroup
+					groupId="sidebar-items"
 					className="px-2 space-y-1"
 					staggerChildren={true}
 					staggerDelay={30}
@@ -86,12 +91,17 @@ export default function Sidebar() {
 							variant="ghost"
 							className={cn(
 								"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-								isViewActive("all") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+								isViewActive("all") &&
+									"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 							)}
 							onClick={() => setCurrentView("all")}
 						>
 							<Library size={20} />
-							{!collapsed && <span className="transition-opacity duration-200">All Articles</span>}
+							{!collapsed && (
+								<span className="transition-opacity duration-200">
+									All Articles
+								</span>
+							)}
 						</Button>
 					</TransitionItem>
 
@@ -100,12 +110,15 @@ export default function Sidebar() {
 							variant="ghost"
 							className={cn(
 								"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-								isViewActive("unread") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+								isViewActive("unread") &&
+									"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 							)}
 							onClick={() => setCurrentView("unread")}
 						>
 							<Clock size={20} />
-							{!collapsed && <span className="transition-opacity duration-200">Unread</span>}
+							{!collapsed && (
+								<span className="transition-opacity duration-200">Unread</span>
+							)}
 						</Button>
 					</TransitionItem>
 
@@ -114,12 +127,17 @@ export default function Sidebar() {
 							variant="ghost"
 							className={cn(
 								"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-								isViewActive("favorites") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+								isViewActive("favorites") &&
+									"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 							)}
 							onClick={() => setCurrentView("favorites")}
 						>
 							<Bookmark size={20} />
-							{!collapsed && <span className="transition-opacity duration-200">Favorites</span>}
+							{!collapsed && (
+								<span className="transition-opacity duration-200">
+									Favorites
+								</span>
+							)}
 						</Button>
 					</TransitionItem>
 				</TransitionGroup>
@@ -130,8 +148,8 @@ export default function Sidebar() {
 							Navigation
 						</h3>
 					)}
-					<TransitionGroup 
-						groupId="sidebar-navigation" 
+					<TransitionGroup
+						groupId="sidebar-navigation"
 						className="space-y-1"
 						staggerChildren={true}
 						staggerDelay={30}
@@ -142,13 +160,18 @@ export default function Sidebar() {
 								variant="ghost"
 								className={cn(
 									"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-									isActive("/") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+									isActive("/") &&
+										"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 								)}
 								asChild
 							>
 								<Link to="/">
 									<BookOpen size={20} />
-									{!collapsed && <span className="transition-opacity duration-200">Home</span>}
+									{!collapsed && (
+										<span className="transition-opacity duration-200">
+											Home
+										</span>
+									)}
 								</Link>
 							</Button>
 						</TransitionItem>
@@ -158,13 +181,18 @@ export default function Sidebar() {
 								variant="ghost"
 								className={cn(
 									"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-									isActive("/search") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+									isActive("/search") &&
+										"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 								)}
 								asChild
 							>
 								<Link to="/search">
 									<SearchIcon size={20} />
-									{!collapsed && <span className="transition-opacity duration-200">Search</span>}
+									{!collapsed && (
+										<span className="transition-opacity duration-200">
+											Search
+										</span>
+									)}
 								</Link>
 							</Button>
 						</TransitionItem>
@@ -174,17 +202,22 @@ export default function Sidebar() {
 								variant="ghost"
 								className={cn(
 									"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-									isActive("/settings") && "bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+									isActive("/settings") &&
+										"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
 								)}
 								asChild
 							>
 								<Link to="/settings">
 									<Settings size={20} />
-									{!collapsed && <span className="transition-opacity duration-200">Settings</span>}
+									{!collapsed && (
+										<span className="transition-opacity duration-200">
+											Settings
+										</span>
+									)}
 								</Link>
 							</Button>
 						</TransitionItem>
-						
+
 						<TransitionItem showFrom="left" className="w-full">
 							<Button
 								variant="ghost"
@@ -193,7 +226,9 @@ export default function Sidebar() {
 							>
 								{theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
 								{!collapsed && (
-									<span className="transition-opacity duration-200">{theme === "dark" ? "Dark Mode" : "Light Mode"}</span>
+									<span className="transition-opacity duration-200">
+										{theme === "dark" ? "Dark Mode" : "Light Mode"}
+									</span>
 								)}
 							</Button>
 						</TransitionItem>
@@ -205,7 +240,11 @@ export default function Sidebar() {
 				<Button className="w-full gap-2 transition-all duration-200" asChild>
 					<Link to="/add">
 						<Plus size={18} />
-						{!collapsed ? <span className="transition-opacity duration-200">Add Content</span> : null}
+						{!collapsed ? (
+							<span className="transition-opacity duration-200">
+								Add Content
+							</span>
+						) : null}
 					</Link>
 				</Button>
 			</div>

@@ -1,6 +1,9 @@
 import ArticleCard from "@/components/ArticleCard";
 import { Button } from "@/components/ui/button";
-import { TransitionGroup, TransitionItem } from "@/components/ui/transition-group";
+import {
+	TransitionGroup,
+	TransitionItem,
+} from "@/components/ui/transition-group";
 import { useAnimation } from "@/context/AnimationContext";
 import { useArticles } from "@/context/ArticleContext";
 import { createAnimationFrame } from "@/lib/animation";
@@ -14,7 +17,7 @@ export default function HomePage() {
 	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 	const { synchronizeAnimations } = useAnimation();
 	const animationFrameRef = useRef(createAnimationFrame());
-	
+
 	// Reference to track if cards should animate
 	const shouldAnimateCards = useRef(true);
 
@@ -27,7 +30,7 @@ export default function HomePage() {
 				.then(() => {
 					if (isMounted) {
 						setHasLoadedOnce(true);
-						
+
 						// Trigger the animation after data is loaded
 						setTimeout(() => {
 							if (isMounted) {
@@ -86,9 +89,9 @@ export default function HomePage() {
 						<p className="text-muted-foreground">Loading articles...</p>
 					</div>
 				) : shouldShowEmptyState ? (
-					<TransitionGroup 
-						groupId="empty-state" 
-						className="flex flex-col items-center justify-center h-64 space-y-4" 
+					<TransitionGroup
+						groupId="empty-state"
+						className="flex flex-col items-center justify-center h-64 space-y-4"
 						autoAnimate={true}
 					>
 						<TransitionItem showFrom="top">
@@ -106,11 +109,7 @@ export default function HomePage() {
 				) : (
 					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 						{articles.map((article, index) => (
-							<ArticleCard 
-								key={article._id} 
-								article={article} 
-								index={index} 
-							/>
+							<ArticleCard key={article._id} article={article} index={index} />
 						))}
 					</div>
 				)}

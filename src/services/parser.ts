@@ -75,7 +75,9 @@ export async function fetchHtml(url: string): Promise<string> {
 			`https://cors.proxy.consumet.org/?url=${encodeURIComponent(url)}`,
 			// Secondary options
 			`https://corsproxy.dev/?url=${encodeURIComponent(url)}`,
-			`https://proxy-middleware.zenrows.com/proxy?url=${encodeURIComponent(url)}`,
+			`https://proxy-middleware.zenrows.com/proxy?url=${encodeURIComponent(
+				url,
+			)}`,
 			// Fallbacks
 			`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
 			`https://crossorigin.me/${encodeURIComponent(url)}`,
@@ -109,7 +111,9 @@ export async function fetchHtml(url: string): Promise<string> {
 					);
 				} else {
 					console.warn(
-						`Proxy failed with status ${response.status}: ${proxyUrl.split("?")[0]}`,
+						`Proxy failed with status ${response.status}: ${
+							proxyUrl.split("?")[0]
+						}`,
 					);
 				}
 			} catch (error) {
