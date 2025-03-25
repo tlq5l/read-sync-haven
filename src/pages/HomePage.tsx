@@ -7,12 +7,12 @@ import {
 import { useAnimation } from "@/context/AnimationContext";
 import { useArticles } from "@/context/ArticleContext";
 import { createAnimationFrame } from "@/lib/animation";
-import { Plus } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 export default function HomePage() {
-	const { articles, isLoading, currentView, refreshArticles } = useArticles();
+	const { articles, isLoading, currentView, refreshArticles, error, retryLoading } = useArticles();
 	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 	const { synchronizeAnimations } = useAnimation();
 	const animationFrameRef = useRef(createAnimationFrame());
@@ -87,6 +87,22 @@ export default function HomePage() {
 					<div className="flex items-center justify-center h-64">
 						<p className="text-muted-foreground">Loading articles...</p>
 					</div>
+				) : error ? (
+					<TransitionGroup
+						groupId="error-state"
+						className="flex flex-col items-center justify-center h-64 space-y-4"
+						autoAnimate={true}
+					>
+						<TransitionItem showFrom="top">
+							<p className="text-muted-foreground">{error.message || "Error loading articles"}</p>
+						</TransitionItem>
+						<TransitionItem showFrom="bottom">
+							<Button onClick={retryLoading}>
+								<RefreshCw className="mr-2 h-4 w-4" />
+								Retry Loading
+							</Button>
+						</TransitionItem>
+					</TransitionGroup>
 				) : shouldShowEmptyState ? (
 					<TransitionGroup
 						groupId="empty-state"

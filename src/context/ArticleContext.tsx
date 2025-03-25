@@ -38,6 +38,7 @@ interface ArticleContextType {
 	) => Promise<void>;
 	removeArticle: (id: string, rev: string) => Promise<void>;
 	updateReadingProgress: (id: string, progress: number) => Promise<void>;
+	retryLoading: () => Promise<void>;
 }
 
 const ArticleContext = createContext<ArticleContextType | undefined>(undefined);
@@ -53,6 +54,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	>("all");
 	const [isInitialized, setIsInitialized] = useState<boolean>(false);
 	const { toast } = useToast();
+	const [retryCount, setRetryCount] = useState<number>(0);
 
 	// Initialize database on component mount
 	useEffect(() => {
@@ -136,29 +138,36 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					options.favorite = true;
 				}
 
-				console.log("Fetching articles with options:", options);
+				console.log(`Fetching articles with options for view: ${currentView}`, options);
 				const fetchedArticles = await getAllArticles(options);
-				console.log("Fetched articles:", fetchedArticles.length);
+				console.log(`Fetched ${fetchedArticles.length} articles for ${currentView} view`);
 
 				if (isMounted) {
 					setArticles(fetchedArticles);
 					setError(null);
 					setIsLoading(false);
+					
+					// Reset retry count on successful fetch
+					setRetryCount(0);
 				}
 			} catch (err) {
-				console.error("Failed to load articles:", err);
+				console.error(`Failed to load articles for ${currentView} view:`, err);
 
 				if (isMounted) {
+					const errorMessage = err instanceof Error 
+						? err.message 
+						: "Failed to load articles";
+						
 					setError(
-						err instanceof Error ? err : new Error("Failed to load articles"),
+						err instanceof Error ? err : new Error(`Failed to load articles for ${currentView} view`),
 					);
 					// Return empty array to prevent stuck loading state
 					setArticles([]);
 					setIsLoading(false);
 
 					toast({
-						title: "Loading Error",
-						description: "Failed to load articles. Please try again.",
+						title: `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Loading Error`,
+						description: `${errorMessage}. Tap the retry button to try again.`,
 						variant: "destructive",
 					});
 				}
@@ -167,9 +176,16 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 		// Add timeout to prevent indefinite loading state
 		const timeoutId = setTimeout(() => {
-			if (isMounted) {
-				console.warn("Loading articles timed out");
+			if (isMounted && isLoading) {
+				console.warn(`Loading articles for ${currentView} view timed out`);
 				setIsLoading(false);
+				setError(new Error(`Loading ${currentView} articles timed out. Please try again.`));
+				
+				toast({
+					title: "Loading Timeout",
+					description: `Loading ${currentView} articles timed out. Please try again.`,
+					variant: "destructive",
+				});
 			}
 		}, 10000); // 10 second timeout
 
@@ -179,7 +195,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			isMounted = false;
 			clearTimeout(timeoutId);
 		};
-	}, [currentView, isInitialized, toast]);
+	}, [currentView, isInitialized, toast, retryCount]);
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {
@@ -444,6 +460,18 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		[toast],
 	);
 
+	// Add retry function
+	const retryLoading = useCallback(async () => {
+		setRetryCount(prev => prev + 1);
+		setIsLoading(true);
+		setError(null);
+		
+		toast({
+			title: "Retrying",
+			description: `Retrying to load ${currentView} articles...`,
+		});
+	}, [currentView, toast]);
+
 	// Create context value
 	const contextValue = useMemo(
 		() => ({
@@ -458,18 +486,21 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			updateArticleStatus,
 			removeArticle,
 			updateReadingProgress,
+			retryLoading,
 		}),
 		[
 			articles,
 			isLoading,
 			error,
 			currentView,
+			setCurrentView,
 			refreshArticles,
 			addArticleByUrl,
 			addArticleByFile,
 			updateArticleStatus,
 			removeArticle,
 			updateReadingProgress,
+			retryLoading,
 		],
 	);
 

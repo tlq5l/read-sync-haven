@@ -516,7 +516,14 @@ export async function getAllArticles(options?: {
 }): Promise<Article[]> {
 	try {
 		// Ensure database is ready
-		await articlesDb.info();
+		const dbInfo = await articlesDb.info();
+		console.log(`Database has ${dbInfo.doc_count} documents`);
+		
+		// If we have no documents at all, return empty array immediately
+		if (dbInfo.doc_count === 0) {
+			console.warn("No documents in database");
+			return [];
+		}
 
 		// Initialize indexes if not done yet
 		if (!indexesCreated) {
@@ -534,55 +541,64 @@ export async function getAllArticles(options?: {
 
 		// Fallback for when no records are found matching the selector
 		if (Object.keys(selector).length > 0) {
-			const count = await articlesDb.find({
-				selector,
-				limit: 1,
-			});
-
-			if (count.docs.length === 0) {
-				console.warn("No records found with selector, falling back to allDocs");
-				// Fall back to allDocs which doesn't require indexes
-				const allDocs = await articlesDb.allDocs({ include_docs: true });
-				const docs = allDocs.rows
-					.map((row) => row.doc)
-					.filter((doc) => doc) as Article[];
-
-				// Filter in memory
-				let filteredDocs = [...docs];
-				if (options?.isRead !== undefined) {
-					filteredDocs = filteredDocs.filter(
-						(doc) => doc.isRead === options.isRead,
-					);
-				}
-				if (options?.favorite !== undefined) {
-					filteredDocs = filteredDocs.filter(
-						(doc) => doc.favorite === options.favorite,
-					);
-				}
-				if (options?.tag && typeof options.tag === "string") {
-					filteredDocs = filteredDocs.filter((doc) =>
-						doc.tags?.includes(options.tag as string),
-					);
-				}
-
-				// Sort in memory
-				const sortField = options?.sortBy || "savedAt";
-				const sortDirection = options?.sortDirection || "desc";
-
-				filteredDocs.sort((a, b) => {
-					const aVal = (a[sortField as keyof Article] as any) || 0;
-					const bVal = (b[sortField as keyof Article] as any) || 0;
-
-					if (sortDirection === "asc") {
-						return aVal > bVal ? 1 : -1;
-					}
-					return aVal < bVal ? 1 : -1;
+			try {
+				const count = await articlesDb.find({
+					selector,
+					limit: 1,
 				});
 
-				// Apply limit and skip
-				const start = options?.skip || 0;
-				const end = options?.limit ? start + options.limit : undefined;
-				return filteredDocs.slice(start, end);
+				if (count.docs.length === 0) {
+					console.warn("No records found with selector, falling back to allDocs");
+					// Fall back to allDocs which doesn't require indexes
+					const allDocs = await articlesDb.allDocs({ include_docs: true });
+					const docs = allDocs.rows
+						.map((row) => row.doc)
+						.filter((doc) => doc) as Article[];
+					
+					console.log(`Found ${docs.length} total articles, applying filters...`);
+
+					// Filter in memory
+					let filteredDocs = [...docs];
+					if (options?.isRead !== undefined) {
+						filteredDocs = filteredDocs.filter(
+							(doc) => doc.isRead === options.isRead,
+						);
+						console.log(`After isRead filter: ${filteredDocs.length} articles`);
+					}
+					if (options?.favorite !== undefined) {
+						filteredDocs = filteredDocs.filter(
+							(doc) => doc.favorite === options.favorite,
+						);
+						console.log(`After favorite filter: ${filteredDocs.length} articles`);
+					}
+					if (options?.tag && typeof options.tag === "string") {
+						filteredDocs = filteredDocs.filter((doc) =>
+							doc.tags?.includes(options.tag as string),
+						);
+						console.log(`After tag filter: ${filteredDocs.length} articles`);
+					}
+
+					// Sort in memory
+					const sortField = options?.sortBy || "savedAt";
+					const sortDirection = options?.sortDirection || "desc";
+
+					filteredDocs.sort((a, b) => {
+						const aVal = (a[sortField as keyof Article] as any) || 0;
+						const bVal = (b[sortField as keyof Article] as any) || 0;
+
+						if (sortDirection === "asc") {
+							return aVal > bVal ? 1 : -1;
+						}
+						return aVal < bVal ? 1 : -1;
+					});
+
+					// Apply limit and skip
+					const start = options?.skip || 0;
+					const end = options?.limit ? start + options.limit : undefined;
+					return filteredDocs.slice(start, end);
+				}
+			} catch (findError) {
+				console.error("Error using find, falling back to allDocs:", findError);
 			}
 		}
 
@@ -593,16 +609,22 @@ export async function getAllArticles(options?: {
 			let docs = allDocs.rows
 				.map((row) => row.doc)
 				.filter((doc) => doc) as Article[];
+			
+			console.log(`Retrieved ${docs.length} articles via allDocs, applying filters`);
 
 			// Filter in memory
 			if (options?.isRead !== undefined) {
 				docs = docs.filter((doc) => doc.isRead === options.isRead);
+				console.log(`After isRead filter: ${docs.length} articles remain`);
 			}
 			if (options?.favorite !== undefined) {
-				docs = docs.filter((doc) => doc.favorite === options.favorite);
+				// Make sure favorite property exists and is explicitly true
+				docs = docs.filter((doc) => doc.favorite === true);
+				console.log(`After favorite filter: ${docs.length} articles remain`);
 			}
 			if (options?.tag && typeof options.tag === "string") {
 				docs = docs.filter((doc) => doc.tags?.includes(options.tag as string));
+				console.log(`After tag filter: ${docs.length} articles remain`);
 			}
 
 			// Sort in memory
