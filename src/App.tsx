@@ -1,8 +1,9 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AnimationProvider } from "@/context/AnimationContext";
 import { ThemeProvider, ThemeSupport } from "@/context/ThemeContext";
-import { prefersReducedMotion } from "@/lib/animation";
+import { prefersReducedMotion, setupGlobalAnimationTimings } from "@/lib/animation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 
@@ -44,6 +45,10 @@ const MotionPreferenceHandler = ({ children }: { children: React.ReactNode }) =>
 		};
 
 		mediaQuery.addEventListener("change", handleMotionPreferenceChange);
+		
+		// Setup global animation timings
+		setupGlobalAnimationTimings();
+		
 		return () => {
 			mediaQuery.removeEventListener("change", handleMotionPreferenceChange);
 		};
@@ -55,26 +60,28 @@ const MotionPreferenceHandler = ({ children }: { children: React.ReactNode }) =>
 const App = () => (
 	<ThemeProvider defaultTheme="system" storageKey="bondwise-ui-theme">
 		<ThemeSupport />
-		<MotionPreferenceHandler>
-			<QueryClientProvider client={queryClient}>
-				<TooltipProvider>
-					<Toaster />
-					<Sonner />
-					<BrowserRouter>
-						<Routes>
-							<Route element={<Layout />}>
-								<Route path="/" element={<HomePage />} />
-								<Route path="/add" element={<AddPage />} />
-								<Route path="/read/:id" element={<ReadPage />} />
-								<Route path="/search" element={<SearchPage />} />
-								<Route path="/settings" element={<SettingsPage />} />
-							</Route>
-							<Route path="*" element={<NotFound />} />
-						</Routes>
-					</BrowserRouter>
-				</TooltipProvider>
-			</QueryClientProvider>
-		</MotionPreferenceHandler>
+		<AnimationProvider>
+			<MotionPreferenceHandler>
+				<QueryClientProvider client={queryClient}>
+					<TooltipProvider>
+						<Toaster />
+						<Sonner />
+						<BrowserRouter>
+							<Routes>
+								<Route element={<Layout />}>
+									<Route path="/" element={<HomePage />} />
+									<Route path="/add" element={<AddPage />} />
+									<Route path="/read/:id" element={<ReadPage />} />
+									<Route path="/search" element={<SearchPage />} />
+									<Route path="/settings" element={<SettingsPage />} />
+								</Route>
+								<Route path="*" element={<NotFound />} />
+							</Routes>
+						</BrowserRouter>
+					</TooltipProvider>
+				</QueryClientProvider>
+			</MotionPreferenceHandler>
+		</AnimationProvider>
 	</ThemeProvider>
 );
 
