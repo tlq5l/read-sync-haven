@@ -21,7 +21,7 @@ import {
 	Settings,
 	Sun,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 export default function Sidebar() {

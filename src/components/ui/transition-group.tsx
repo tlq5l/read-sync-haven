@@ -56,13 +56,18 @@ const TransitionGroup = React.forwardRef<HTMLDivElement, TransitionGroupProps>(
 
 				return () => clearTimeout(timeoutId);
 			}
+			return undefined;
 		}, [autoAnimate, animateGroup, hasAnimated]);
 
 		// Create safe HTML attributes that won't be passed to the DOM
 		const safeProps = { ...props };
-		// Remove any boolean props that might cause React warnings
-		delete safeProps.stagger;
-		delete safeProps.synchronized;
+		// Remove any props that are not valid HTML attributes
+		const propsToRemove = ['stagger', 'synchronized'] as const;
+		propsToRemove.forEach(prop => {
+			if (prop in safeProps) {
+				delete (safeProps as any)[prop];
+			}
+		});
 
 		return (
 			<div

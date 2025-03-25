@@ -28,7 +28,7 @@ export default function PdfReader({ fileData, fileName }: PdfReaderProps) {
 		if (!fileData) {
 			setError("No PDF data provided");
 			setIsLoading(false);
-			return;
+			return undefined;
 		}
 
 		try {
@@ -51,6 +51,7 @@ export default function PdfReader({ fileData, fileName }: PdfReaderProps) {
 			console.error("Error processing PDF:", err);
 			setError("Failed to load PDF file");
 			setIsLoading(false);
+			return undefined;
 		}
 	}, [fileData]);
 

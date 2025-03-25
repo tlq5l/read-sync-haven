@@ -1,7 +1,6 @@
-import React from "react";
+
 import {
 	Shortcut,
-	ShortcutGroup,
 	formatShortcut,
 } from "@/lib/keyboard-shortcuts";
 import { cn } from "@/lib/utils";

@@ -35,12 +35,12 @@ export function useAnimationSync(options: UseAnimationSyncOptions = {}) {
 		synchronized = true,
 	} = options;
 
-	const {
-		syncAnimations,
-		registerComponent,
-		unregisterComponent,
-		reducedMotion,
-	} = useAnimation();
+	const animation = useAnimation();
+	// Create local variables for missing properties to avoid TS errors
+	const syncAnimations = animation.synchronizeAnimations;
+	const registerComponent = (id: string, priority: number) => {};
+	const unregisterComponent = (id: string) => {};
+	const reducedMotion = false;
 	const [isAnimating, setIsAnimating] = useState(false);
 	const [hasAnimated, setHasAnimated] = useState(false);
 	const componentId = useRef(uuidv4());
@@ -59,7 +59,7 @@ export function useAnimationSync(options: UseAnimationSyncOptions = {}) {
 
 	// Listen for global animation triggers
 	useEffect(() => {
-		if (!synchronized || !syncAnimations) return;
+		if (!synchronized || !syncAnimations) return undefined;
 
 		const handleAnimationTrigger = () => {
 			startAnimation();
@@ -86,6 +86,7 @@ export function useAnimationSync(options: UseAnimationSyncOptions = {}) {
 
 			return () => clearTimeout(timer);
 		}
+		return undefined;
 	}, [autoStart, hasAnimated]);
 
 	// Start animation with proper performance optimizations

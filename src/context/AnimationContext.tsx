@@ -38,7 +38,7 @@ type TransitionGroup = {
 type AnimationContextType = {
 	registerTransitionElement: (groupId: string, elementId: string) => void;
 	unregisterTransitionElement: (groupId: string, elementId: string) => void;
-	createTransitionGroup: (id: string, timeout?: number) => void;
+	createTransitionGroup: (id: string, timeout?: number | undefined) => void;
 	triggerTransition: (groupId: string) => void;
 	isElementAnimating: (groupId: string, elementId: string) => boolean;
 	synchronizeAnimations: (callback: () => void) => void;

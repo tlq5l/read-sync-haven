@@ -1,5 +1,4 @@
-import { useNavigate } from "react-router-dom";
-import { useTheme } from "@/context/ThemeContext";
+// Unused imports removed
 
 export interface ShortcutKey {
 	key: string;

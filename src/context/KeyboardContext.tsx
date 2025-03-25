@@ -4,7 +4,6 @@ import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import {
 	Shortcut,
-	ShortcutKey,
 	matchesShortcut,
 	shortcutGroups,
 } from "@/lib/keyboard-shortcuts";

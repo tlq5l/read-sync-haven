@@ -54,7 +54,7 @@ export interface PdfMetadata {
 // In a real implementation, you might use a PDF.js or similar library to extract actual metadata
 export async function extractPdfMetadata(
 	file: File,
-	fileBuffer: ArrayBuffer,
+	_fileBuffer: ArrayBuffer, // Renamed to indicate it's unused
 ): Promise<PdfMetadata> {
 	try {
 		// For now, we'll just extract basic info from the filename

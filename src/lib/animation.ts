@@ -2,13 +2,7 @@
  * Animation utilities to improve performance and smoothness
  */
 
-const TRANSFORM_PROPERTIES = [
-	"transform",
-	"translate3d(0,0,0)",
-	"translateZ(0)",
-	"scale3d(1, 1, 1)",
-	"rotate3d(0, 0, 1, 0deg)",
-];
+// Unused constant removed
 
 const WILL_CHANGE_PROPERTIES = ["transform", "opacity"];
 
