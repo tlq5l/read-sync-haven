@@ -10,7 +10,13 @@ import { KeyboardShortcutsTab } from "@/components/keyboard-shortcuts-tab";
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { databases } from "@/services/db";
-import { ArrowLeft, HelpCircle, Palette, Database, Keyboard } from "lucide-react";
+import {
+	ArrowLeft,
+	HelpCircle,
+	Palette,
+	Database,
+	Keyboard,
+} from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -85,7 +91,12 @@ export default function SettingsPage() {
 				<h1 className="text-2xl font-bold ml-2">Settings</h1>
 			</div>
 
-			<Tabs defaultValue="appearance" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+			<Tabs
+				defaultValue="appearance"
+				value={activeTab}
+				onValueChange={setActiveTab}
+				className="space-y-6"
+			>
 				<TabsList className="grid grid-cols-3 mb-4">
 					<TabsTrigger value="appearance" className="flex items-center gap-1">
 						<Palette className="h-4 w-4" />
@@ -100,7 +111,7 @@ export default function SettingsPage() {
 						<span>Shortcuts</span>
 					</TabsTrigger>
 				</TabsList>
-				
+
 				<TabsContent value="appearance" className="space-y-6">
 					<ScrollArea className="h-[70vh]">
 						<div className="pr-4">
@@ -126,7 +137,9 @@ export default function SettingsPage() {
 									<div className="flex items-center justify-between">
 										<div className="space-y-0.5">
 											<Label htmlFor="font-size">Larger Text</Label>
-											<p className="text-sm text-muted-foreground">Coming soon</p>
+											<p className="text-sm text-muted-foreground">
+												Coming soon
+											</p>
 										</div>
 										<Switch id="font-size" disabled />
 									</div>
@@ -135,7 +148,7 @@ export default function SettingsPage() {
 						</div>
 					</ScrollArea>
 				</TabsContent>
-				
+
 				<TabsContent value="data" className="space-y-6">
 					<ScrollArea className="h-[70vh]">
 						<div className="pr-4">
@@ -170,7 +183,7 @@ export default function SettingsPage() {
 						</div>
 					</ScrollArea>
 				</TabsContent>
-				
+
 				<TabsContent value="shortcuts">
 					<ScrollArea className="h-[70vh]">
 						<div className="pr-4">
@@ -178,7 +191,7 @@ export default function SettingsPage() {
 						</div>
 					</ScrollArea>
 				</TabsContent>
-				
+
 				<ScrollArea className="h-[16vh] mt-6">
 					<div className="pr-4">
 						<Card>

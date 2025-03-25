@@ -272,7 +272,10 @@ export async function saveArticle(
 }
 
 import { extractEpubMetadata, getEstimatedReadingTime } from "./epub";
-import { extractPdfMetadata, getEstimatedReadingTime as getPdfReadingTime } from "./pdf";
+import {
+	extractPdfMetadata,
+	getEstimatedReadingTime as getPdfReadingTime,
+} from "./pdf";
 
 // Function to save an EPUB file
 export async function saveEpubFile(file: File): Promise<Article> {
@@ -433,7 +436,8 @@ export async function savePdfFile(file: File): Promise<Article> {
 		const title = metadata.title || file.name.replace(/\.pdf$/i, "");
 		const author = metadata.author || "Unknown";
 		const excerpt = metadata.description || `PDF Document: ${title}`;
-		const pageCount = metadata.pageCount || Math.max(1, Math.floor(file.size / 100000));
+		const pageCount =
+			metadata.pageCount || Math.max(1, Math.floor(file.size / 100000));
 
 		const article: Omit<
 			Article,

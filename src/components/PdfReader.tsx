@@ -1,7 +1,14 @@
 import { base64ToArrayBuffer } from "@/services/pdf";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
-import { ChevronLeft, ChevronRight, Loader2, Search, ZoomIn, ZoomOut } from "lucide-react";
+import {
+	ChevronLeft,
+	ChevronRight,
+	Loader2,
+	Search,
+	ZoomIn,
+	ZoomOut,
+} from "lucide-react";
 
 // Note: In a real implementation, you would use a PDF library like react-pdf
 // For now, we'll create a simple viewer that displays the PDF using browser's built-in PDF viewer
@@ -27,15 +34,15 @@ export default function PdfReader({ fileData, fileName }: PdfReaderProps) {
 		try {
 			// Convert base64 to ArrayBuffer
 			const arrayBuffer = base64ToArrayBuffer(fileData);
-			
+
 			// Create a Blob from the ArrayBuffer
 			const blob = new Blob([arrayBuffer], { type: "application/pdf" });
-			
+
 			// Create an object URL for the Blob
 			const url = URL.createObjectURL(blob);
 			setObjectUrl(url);
 			setIsLoading(false);
-			
+
 			// Clean up the URL when the component unmounts
 			return () => {
 				if (url) URL.revokeObjectURL(url);

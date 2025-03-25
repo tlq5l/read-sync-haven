@@ -199,9 +199,7 @@ export default function ArticleReader() {
 						)}
 						<p className="text-sm text-muted-foreground mb-0">
 							{article.fileName || "PDF Document"}
-							{article.pageCount && (
-								<span> · {article.pageCount} pages</span>
-							)}
+							{article.pageCount && <span> · {article.pageCount} pages</span>}
 							{article.estimatedReadTime && (
 								<span> · {article.estimatedReadTime} min read</span>
 							)}

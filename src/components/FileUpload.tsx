@@ -50,8 +50,10 @@ export default function FileUpload({
 
 		// Check file type based on extension
 		const fileExt = file.name.split(".").pop()?.toLowerCase();
-		const acceptedExtensions = accept.split(",").map(ext => ext.trim().replace(".", ""));
-		
+		const acceptedExtensions = accept
+			.split(",")
+			.map((ext) => ext.trim().replace(".", ""));
+
 		if (!acceptedExtensions.includes(fileExt || "")) {
 			setError(`Only ${accept} files are supported.`);
 			return false;
@@ -103,7 +105,7 @@ export default function FileUpload({
 	// Create a formatted list of accepted file types for display
 	const acceptedFileTypes = accept
 		.split(",")
-		.map(ext => ext.trim().toUpperCase().replace(".", ""))
+		.map((ext) => ext.trim().toUpperCase().replace(".", ""))
 		.join(", ");
 
 	return (

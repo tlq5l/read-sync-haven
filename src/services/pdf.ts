@@ -35,9 +35,7 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
 		return bytes.buffer;
 	} catch (error) {
 		console.error("Error converting base64 to ArrayBuffer:", error);
-		throw new Error(
-			"Failed to convert PDF data. The file might be corrupted.",
-		);
+		throw new Error("Failed to convert PDF data. The file might be corrupted.");
 	}
 }
 
@@ -63,7 +61,7 @@ export async function extractPdfMetadata(
 		// In a real implementation, you would use PDF.js to parse the PDF and extract metadata
 		const fileName = file.name;
 		const title = fileName.replace(/\.pdf$/i, "");
-		
+
 		// Estimate page count based on file size
 		// This is a very rough estimate - 100KB per page
 		const pageCount = Math.max(1, Math.floor(file.size / 100000));
@@ -106,7 +104,10 @@ export function isValidPdf(file: File): boolean {
 }
 
 // Get estimated reading time for a PDF document
-export function getEstimatedReadingTime(fileSize: number, pageCount?: number): number {
+export function getEstimatedReadingTime(
+	fileSize: number,
+	pageCount?: number,
+): number {
 	if (pageCount) {
 		// Average reading speed is about 2 minutes per page
 		return Math.max(1, pageCount * 2);

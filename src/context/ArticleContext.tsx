@@ -299,13 +299,13 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 					return savedArticle;
 				} else {
-					throw new Error("Invalid file type. Only EPUB and PDF formats are supported.");
+					throw new Error(
+						"Invalid file type. Only EPUB and PDF formats are supported.",
+					);
 				}
 			} catch (err) {
 				console.error("Failed to add file:", err);
-				setError(
-					err instanceof Error ? err : new Error("Failed to add file"),
-				);
+				setError(err instanceof Error ? err : new Error("Failed to add file"));
 
 				toast({
 					title: "Failed to save file",
