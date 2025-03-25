@@ -561,7 +561,7 @@ export async function getAllArticles(options?: {
 				}
 				if (options?.tag && typeof options.tag === "string") {
 					filteredDocs = filteredDocs.filter(
-						(doc) => doc.tags && doc.tags.includes(options.tag as string),
+						(doc) => doc.tags?.includes(options.tag as string),
 					);
 				}
 
@@ -574,10 +574,9 @@ export async function getAllArticles(options?: {
 					const bVal = (b[sortField as keyof Article] as any) || 0;
 
 					if (sortDirection === "asc") {
-						return aVal > bVal ? 1 : -1;
-					} else {
-						return aVal < bVal ? 1 : -1;
+					return aVal > bVal ? 1 : -1;
 					}
+					return aVal < bVal ? 1 : -1;
 				});
 
 				// Apply limit and skip
@@ -603,9 +602,7 @@ export async function getAllArticles(options?: {
 				docs = docs.filter((doc) => doc.favorite === options.favorite);
 			}
 			if (options?.tag && typeof options.tag === "string") {
-				docs = docs.filter(
-					(doc) => doc.tags && doc.tags.includes(options.tag as string),
-				);
+				docs = docs.filter((doc) => doc.tags?.includes(options.tag as string));
 			}
 
 			// Sort in memory
@@ -618,9 +615,8 @@ export async function getAllArticles(options?: {
 
 				if (sortDirection === "asc") {
 					return aVal > bVal ? 1 : -1;
-				} else {
-					return aVal < bVal ? 1 : -1;
 				}
+				return aVal < bVal ? 1 : -1;
 			});
 
 			// Apply limit and skip
@@ -655,10 +651,9 @@ export async function getAllArticles(options?: {
 				const bVal = (b[sortField as keyof Article] as any) || 0;
 
 				if (sortDirection === "asc") {
-					return aVal > bVal ? 1 : -1;
-				} else {
-					return aVal < bVal ? 1 : -1;
+				return aVal > bVal ? 1 : -1;
 				}
+				return aVal < bVal ? 1 : -1;
 			});
 
 			console.log(`Found ${docs.length} articles using find fallback`);
