@@ -62,6 +62,33 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 		}
 	};
 
+	// Format the saved date with error handling
+	const getFormattedDate = () => {
+		try {
+			// Make sure savedAt exists and is a valid number
+			if (!article.savedAt || isNaN(Number(article.savedAt))) {
+				return "Recently";
+			}
+			
+			// Use a safe fallback date if savedAt is invalid
+			let date;
+			try {
+				date = new Date(article.savedAt);
+				// Check if date is valid
+				if (isNaN(date.getTime())) {
+					return "Recently";
+				}
+			} catch (e) {
+				return "Recently";
+			}
+			
+			return formatDistanceToNow(date, { addSuffix: true });
+		} catch (error) {
+			console.error("Error formatting date:", error);
+			return "Recently";
+		}
+	};
+
 	return (
 		<Card 
 			ref={cardAnimation.ref}
@@ -163,20 +190,16 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 							</div>
 						)}
 						<h3 className="text-lg font-medium line-clamp-2 mb-2">
-							{article.title}
+							{article.title || "Untitled"}
 						</h3>
 						<p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-							{article.excerpt}
+							{article.excerpt || "No excerpt available"}
 						</p>
 						<div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
-							<span>{article.siteName}</span>
+							<span>{article.siteName || "Unknown source"}</span>
 							<div className="flex items-center gap-3">
-								<span>{article.estimatedReadTime} min read</span>
-								<span>
-									{formatDistanceToNow(new Date(article.savedAt), {
-										addSuffix: true,
-									})}
-								</span>
+								<span>{article.estimatedReadTime || "?"} min read</span>
+								<span>{getFormattedDate()}</span>
 							</div>
 						</div>
 					</div>
