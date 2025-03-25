@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { ShortcutDisplay } from "@/components/ui/shortcut-display";
 import { useKeyboard } from "@/context/KeyboardContext";
-import { Separator } from "@/components/ui/separator";
 import { Keyboard } from "lucide-react";
 
 export function KeyboardShortcutsTab() {

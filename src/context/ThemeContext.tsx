@@ -91,7 +91,7 @@ export function ThemeSupport() {
 
 		mediaQuery.addEventListener("change", listener);
 		return () => mediaQuery.removeEventListener("change", listener);
-	}, [theme, setTheme]);
+	}, [theme]);
 
 	return null;
 }

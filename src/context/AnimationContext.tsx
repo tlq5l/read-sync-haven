@@ -191,15 +191,15 @@ export function AnimationProvider({ children }: { children: React.ReactNode }) {
 		// Use synchronizeAnimations to ensure all animations start together
 		synchronizeAnimations(() => {
 			// Trigger all transition groups
-			transitionGroups.forEach((group) => {
+			for (const group of transitionGroups) {
 				triggerTransition(group.id);
-			});
+			}
 
 			// Apply animation classes to transition items
 			const items = document.querySelectorAll(".transition-item");
-			items.forEach((item) => {
+			for (const item of items) {
 				item.classList.add("animate");
-			});
+			}
 		});
 	}, [transitionGroups, triggerTransition]);
 

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
 import { useAnimation } from "@/context/AnimationContext";
+import { useEffect, useRef, useState } from "react";
 
 interface SynchronizedAnimationOptions {
 	groupId?: string;
@@ -71,7 +71,7 @@ export function useSynchronizedAnimation({
 		return () => {
 			clearInterval(intervalId);
 		};
-	}, [groupId, uniqueElementId, isElementAnimating, isAnimating, disabled]);
+	}, [groupId, isElementAnimating, isAnimating, disabled]);
 
 	// Apply styles to the element when it's referenced
 	const animationRef = (element: HTMLElement | null) => {

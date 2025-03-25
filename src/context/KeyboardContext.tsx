@@ -1,5 +1,3 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -7,6 +5,8 @@ import {
 	matchesShortcut,
 	shortcutGroups,
 } from "@/lib/keyboard-shortcuts";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface KeyboardContextType {
 	shortcuts: Shortcut[];
@@ -31,8 +31,8 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 		// Flatten all shortcuts and add actions
 		const allShortcuts: Shortcut[] = [];
 
-		shortcutGroups.forEach((group) => {
-			group.shortcuts.forEach((shortcut) => {
+		for (const group of shortcutGroups) {
+			for (const shortcut of group.shortcuts) {
 				let action: () => void;
 
 				// Define actions based on shortcut ID
@@ -85,8 +85,8 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 					...shortcut,
 					action,
 				});
-			});
-		});
+			}
+		}
 
 		setShortcuts(allShortcuts);
 	}, [navigate, theme, setTheme, toast]);

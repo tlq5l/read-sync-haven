@@ -1,6 +1,4 @@
 import { base64ToArrayBuffer } from "@/services/pdf";
-import { useEffect, useRef, useState } from "react";
-import { Button } from "./ui/button";
 import {
 	ChevronLeft,
 	ChevronRight,
@@ -9,6 +7,8 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Button } from "./ui/button";
 
 // Note: In a real implementation, you would use a PDF library like react-pdf
 // For now, we'll create a simple viewer that displays the PDF using browser's built-in PDF viewer

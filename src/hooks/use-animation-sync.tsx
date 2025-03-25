@@ -57,7 +57,7 @@ export function useAnimationSync(options: UseAnimationSyncOptions = {}) {
 			};
 		}
 		return undefined;
-	}, [registerComponent, unregisterComponent, priority, synchronized]);
+	}, [priority, synchronized]);
 
 	// Listen for global animation triggers
 	useEffect(() => {
