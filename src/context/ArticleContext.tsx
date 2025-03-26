@@ -126,13 +126,13 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 		// Use fetch lock to prevent concurrent fetches
 		if (fetchLockRef.current) {
-			console.log('Fetch operation already in progress, skipping');
+			console.log("Fetch operation already in progress, skipping");
 			return;
 		}
 
 		let isMounted = true;
 		let isLoadingInProgress = true; // Track loading state for timeout
-		
+
 		// Set fetch lock and loading state
 		fetchLockRef.current = true;
 		setIsLoading(true);
@@ -232,7 +232,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 		// Use fetch lock to prevent concurrent fetches
 		if (fetchLockRef.current) {
-			console.log('Refresh operation already in progress, skipping');
+			console.log("Refresh operation already in progress, skipping");
 			return articles; // Return current articles
 		}
 
@@ -240,7 +240,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Set fetch lock and loading state
 			fetchLockRef.current = true;
 			setIsLoading(true);
-			
+
 			const options: Parameters<typeof getAllArticles>[0] = {
 				sortBy: "savedAt",
 				sortDirection: "desc",
@@ -504,10 +504,10 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	const retryLoading = useCallback(async () => {
 		// Only proceed if not already loading
 		if (fetchLockRef.current) {
-			console.log('Retry operation already in progress, skipping');
+			console.log("Retry operation already in progress, skipping");
 			return;
 		}
-		
+
 		setIsLoading(true);
 		setError(null);
 
