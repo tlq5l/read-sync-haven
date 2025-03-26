@@ -12,7 +12,14 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 export default function HomePage() {
-	const { articles, isLoading, currentView, refreshArticles, error, retryLoading } = useArticles();
+	const {
+		articles,
+		isLoading,
+		currentView,
+		refreshArticles,
+		error,
+		retryLoading,
+	} = useArticles();
 	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 	const { synchronizeAnimations } = useAnimation();
 	const animationFrameRef = useRef(createAnimationFrame());
@@ -94,7 +101,9 @@ export default function HomePage() {
 						autoAnimate={true}
 					>
 						<TransitionItem showFrom="top">
-							<p className="text-muted-foreground">{error.message || "Error loading articles"}</p>
+							<p className="text-muted-foreground">
+								{error.message || "Error loading articles"}
+							</p>
 						</TransitionItem>
 						<TransitionItem showFrom="bottom">
 							<Button onClick={retryLoading}>

@@ -10,6 +10,7 @@
 		"lint": "biome lint .",
 		"format": "biome format --write .",
 		"check": "biome check .",
+		"validate": "bun run format && bun run typecheck && bun run check",
 		"preview": "vite preview",
 		"typecheck": "tsc --noEmit -p .tscheckrc.json",
 		"prepare": "husky"

@@ -414,11 +414,21 @@
 
 /* Special animation for theme toggle */
 @keyframes wiggle {
-	0% { transform: rotate(0deg); }
-	25% { transform: rotate(-10deg); }
-	50% { transform: rotate(10deg); }
-	75% { transform: rotate(-5deg); }
-	100% { transform: rotate(0deg); }
+	0% {
+		transform: rotate(0deg);
+	}
+	25% {
+		transform: rotate(-10deg);
+	}
+	50% {
+		transform: rotate(10deg);
+	}
+	75% {
+		transform: rotate(-5deg);
+	}
+	100% {
+		transform: rotate(0deg);
+	}
 }
 
 .animate-wiggle {
@@ -427,5 +437,6 @@
 
 /* Add smooth fade transitions for elements when theme changes */
 html.changing-theme * {
-	transition: background-color 0.5s ease-out, color 0.5s ease-out, border-color 0.5s ease-out;
+	transition: background-color 0.5s ease-out, color 0.5s ease-out, border-color
+		0.5s ease-out;
 }

@@ -1,14 +1,14 @@
 {
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/node",
-      "config": {
-        "buildCommand": "npm run build"
-      }
-    }
-  ],
-  "env": {
-    "ROLLUP_WASM_NODE": "true"
-  }
+	"builds": [
+		{
+			"src": "package.json",
+			"use": "@vercel/node",
+			"config": {
+				"buildCommand": "npm run build"
+			}
+		}
+	],
+	"env": {
+		"ROLLUP_WASM_NODE": "true"
+	}
 }

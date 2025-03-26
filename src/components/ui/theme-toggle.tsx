@@ -17,24 +17,24 @@ export function ThemeToggle({ showLabel = true }: ThemeToggleProps) {
 	const toggleTheme = () => {
 		const newTheme = theme === "dark" ? "light" : "dark";
 		setIsChanging(true);
-		
+
 		// Show toast with visual feedback
 		toast({
 			title: `Theme Changed: ${newTheme === "dark" ? "Dark" : "Light"} Mode`,
 			description: `${newTheme === "dark" ? "Dark" : "Light"} mode has been activated.`,
 		});
-		
+
 		// Apply theme change
 		setTheme(newTheme);
 	};
-	
+
 	// Reset changing state after animation completes
 	useEffect(() => {
 		if (isChanging) {
 			const timer = setTimeout(() => {
 				setIsChanging(false);
 			}, 600); // Match animation duration
-			
+
 			return () => clearTimeout(timer);
 		}
 	}, [isChanging]);
@@ -45,7 +45,7 @@ export function ThemeToggle({ showLabel = true }: ThemeToggleProps) {
 			{isChanging && (
 				<span className="absolute inset-0 rounded-md bg-primary/20 animate-pulse" />
 			)}
-			
+
 			<Switch
 				id="theme-toggle"
 				checked={theme === "dark"}

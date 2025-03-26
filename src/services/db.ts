@@ -518,7 +518,7 @@ export async function getAllArticles(options?: {
 		// Ensure database is ready
 		const dbInfo = await articlesDb.info();
 		console.log(`Database has ${dbInfo.doc_count} documents`);
-		
+
 		// If we have no documents at all, return empty array immediately
 		if (dbInfo.doc_count === 0) {
 			console.warn("No documents in database");
@@ -548,14 +548,18 @@ export async function getAllArticles(options?: {
 				});
 
 				if (count.docs.length === 0) {
-					console.warn("No records found with selector, falling back to allDocs");
+					console.warn(
+						"No records found with selector, falling back to allDocs",
+					);
 					// Fall back to allDocs which doesn't require indexes
 					const allDocs = await articlesDb.allDocs({ include_docs: true });
 					const docs = allDocs.rows
 						.map((row) => row.doc)
 						.filter((doc) => doc) as Article[];
-					
-					console.log(`Found ${docs.length} total articles, applying filters...`);
+
+					console.log(
+						`Found ${docs.length} total articles, applying filters...`,
+					);
 
 					// Filter in memory
 					let filteredDocs = [...docs];
@@ -569,7 +573,9 @@ export async function getAllArticles(options?: {
 						filteredDocs = filteredDocs.filter(
 							(doc) => doc.favorite === options.favorite,
 						);
-						console.log(`After favorite filter: ${filteredDocs.length} articles`);
+						console.log(
+							`After favorite filter: ${filteredDocs.length} articles`,
+						);
 					}
 					if (options?.tag && typeof options.tag === "string") {
 						filteredDocs = filteredDocs.filter((doc) =>
@@ -609,8 +615,10 @@ export async function getAllArticles(options?: {
 			let docs = allDocs.rows
 				.map((row) => row.doc)
 				.filter((doc) => doc) as Article[];
-			
-			console.log(`Retrieved ${docs.length} articles via allDocs, applying filters`);
+
+			console.log(
+				`Retrieved ${docs.length} articles via allDocs, applying filters`,
+			);
 
 			// Filter in memory
 			if (options?.isRead !== undefined) {

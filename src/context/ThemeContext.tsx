@@ -35,7 +35,7 @@ export function ThemeProvider({
 
 		// Add transition class to enable smooth theme change
 		root.classList.add("changing-theme");
-		
+
 		// Remove the old theme class
 		root.classList.remove("light", "dark");
 
@@ -50,12 +50,12 @@ export function ThemeProvider({
 			// Add the new theme class
 			root.classList.add(theme);
 		}
-		
+
 		// Remove transition class after animation completes
 		const transitionTimeout = setTimeout(() => {
 			root.classList.remove("changing-theme");
 		}, 500); // Match transition duration in CSS
-		
+
 		return () => clearTimeout(transitionTimeout);
 	}, [theme]);
 

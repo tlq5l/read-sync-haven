@@ -138,15 +138,20 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					options.favorite = true;
 				}
 
-				console.log(`Fetching articles with options for view: ${currentView}`, options);
+				console.log(
+					`Fetching articles with options for view: ${currentView}`,
+					options,
+				);
 				const fetchedArticles = await getAllArticles(options);
-				console.log(`Fetched ${fetchedArticles.length} articles for ${currentView} view`);
+				console.log(
+					`Fetched ${fetchedArticles.length} articles for ${currentView} view`,
+				);
 
 				if (isMounted) {
 					setArticles(fetchedArticles);
 					setError(null);
 					setIsLoading(false);
-					
+
 					// Reset retry count on successful fetch
 					setRetryCount(0);
 				}
@@ -154,12 +159,13 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				console.error(`Failed to load articles for ${currentView} view:`, err);
 
 				if (isMounted) {
-					const errorMessage = err instanceof Error 
-						? err.message 
-						: "Failed to load articles";
-						
+					const errorMessage =
+						err instanceof Error ? err.message : "Failed to load articles";
+
 					setError(
-						err instanceof Error ? err : new Error(`Failed to load articles for ${currentView} view`),
+						err instanceof Error
+							? err
+							: new Error(`Failed to load articles for ${currentView} view`),
 					);
 					// Return empty array to prevent stuck loading state
 					setArticles([]);
@@ -179,8 +185,12 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			if (isMounted && isLoading) {
 				console.warn(`Loading articles for ${currentView} view timed out`);
 				setIsLoading(false);
-				setError(new Error(`Loading ${currentView} articles timed out. Please try again.`));
-				
+				setError(
+					new Error(
+						`Loading ${currentView} articles timed out. Please try again.`,
+					),
+				);
+
 				toast({
 					title: "Loading Timeout",
 					description: `Loading ${currentView} articles timed out. Please try again.`,
@@ -462,10 +472,10 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 	// Add retry function
 	const retryLoading = useCallback(async () => {
-		setRetryCount(prev => prev + 1);
+		setRetryCount((prev) => prev + 1);
 		setIsLoading(true);
 		setError(null);
-		
+
 		toast({
 			title: "Retrying",
 			description: `Retrying to load ${currentView} articles...`,
