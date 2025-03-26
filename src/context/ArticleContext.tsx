@@ -121,17 +121,18 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	}, [isInitialized, toast]);
 
 	// Load articles based on current view
-	// eslint-disable-next-line react-hooks/exhaustive-deps
 	useEffect(() => {
 		if (!isInitialized) return;
 
 		// Use fetch lock to prevent concurrent fetches
 		if (fetchLockRef.current) {
-			console.log("Fetch operation already in progress, skipping");
+			console.log('Fetch operation already in progress, skipping');
 			return;
 		}
 
 		let isMounted = true;
+		let isLoadingInProgress = true; // Track loading state for timeout
+		
 		// Set fetch lock and loading state
 		fetchLockRef.current = true;
 		setIsLoading(true);
@@ -161,8 +162,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				if (isMounted) {
 					setArticles(fetchedArticles);
 					setError(null);
-					// Mark loading as done for timeout
-					loadingTimeoutRef.current = false;
+					isLoadingInProgress = false; // Mark loading as complete
 				}
 			} catch (err) {
 				console.error(`Failed to load articles for ${currentView} view:`, err);
@@ -189,7 +189,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				// Always clean up, even if there's an error
 				if (isMounted) {
 					setIsLoading(false);
-					loadingTimeoutRef.current = false; // Mark loading as done for timeout
+					isLoadingInProgress = false;
 				}
 				// Reset fetch lock when done
 				fetchLockRef.current = false;
@@ -197,11 +197,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		};
 
 		// Add timeout to prevent indefinite loading state
-		const loadingTimeoutRef = useRef<boolean>(true);
-		loadingTimeoutRef.current = true;
-		
 		const timeoutId = setTimeout(() => {
-			if (isMounted && loadingTimeoutRef.current) {
+			if (isMounted && isLoadingInProgress) {
 				console.warn(`Loading articles for ${currentView} view timed out`);
 				setIsLoading(false);
 				fetchLockRef.current = false; // Reset fetch lock on timeout
@@ -235,7 +232,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 		// Use fetch lock to prevent concurrent fetches
 		if (fetchLockRef.current) {
-			console.log("Refresh operation already in progress, skipping");
+			console.log('Refresh operation already in progress, skipping');
 			return articles; // Return current articles
 		}
 
@@ -243,7 +240,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Set fetch lock and loading state
 			fetchLockRef.current = true;
 			setIsLoading(true);
-
+			
 			const options: Parameters<typeof getAllArticles>[0] = {
 				sortBy: "savedAt",
 				sortDirection: "desc",
@@ -507,10 +504,10 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	const retryLoading = useCallback(async () => {
 		// Only proceed if not already loading
 		if (fetchLockRef.current) {
-			console.log("Retry operation already in progress, skipping");
+			console.log('Retry operation already in progress, skipping');
 			return;
 		}
-
+		
 		setIsLoading(true);
 		setError(null);
 
