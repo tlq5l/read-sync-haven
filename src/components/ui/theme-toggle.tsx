@@ -1,7 +1,7 @@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
 import { useTheme } from "@/context/ThemeContext";
+import { useToast } from "@/hooks/use-toast";
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -37,6 +37,7 @@ export function ThemeToggle({ showLabel = true }: ThemeToggleProps) {
 
 			return () => clearTimeout(timer);
 		}
+		return undefined; // Add explicit return for when isChanging is false
 	}, [isChanging]);
 
 	return (

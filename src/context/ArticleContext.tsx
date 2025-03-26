@@ -54,7 +54,6 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	>("all");
 	const [isInitialized, setIsInitialized] = useState<boolean>(false);
 	const { toast } = useToast();
-	const [retryCount, setRetryCount] = useState<number>(0);
 
 	// Initialize database on component mount
 	useEffect(() => {
@@ -151,9 +150,6 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					setArticles(fetchedArticles);
 					setError(null);
 					setIsLoading(false);
-
-					// Reset retry count on successful fetch
-					setRetryCount(0);
 				}
 			} catch (err) {
 				console.error(`Failed to load articles for ${currentView} view:`, err);
@@ -205,7 +201,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			isMounted = false;
 			clearTimeout(timeoutId);
 		};
-	}, [currentView, isInitialized, toast, retryCount]);
+	}, [currentView, isInitialized, toast, isLoading]);
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {
@@ -472,7 +468,6 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 	// Add retry function
 	const retryLoading = useCallback(async () => {
-		setRetryCount((prev) => prev + 1);
 		setIsLoading(true);
 		setError(null);
 
@@ -480,7 +475,10 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			title: "Retrying",
 			description: `Retrying to load ${currentView} articles...`,
 		});
-	}, [currentView, toast]);
+
+		// Force refetch by calling refreshArticles
+		await refreshArticles();
+	}, [currentView, toast, refreshArticles]);
 
 	// Create context value
 	const contextValue = useMemo(
@@ -503,7 +501,6 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			isLoading,
 			error,
 			currentView,
-			setCurrentView,
 			refreshArticles,
 			addArticleByUrl,
 			addArticleByFile,
