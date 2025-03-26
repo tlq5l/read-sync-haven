@@ -154,6 +154,7 @@ async function initializeIndexes() {
 
 // Initialize database
 export async function initializeDatabase() {
+	return executeWithRetry(async () => {
 	try {
 		console.log("Starting database initialization...");
 
@@ -223,6 +224,7 @@ export async function initializeDatabase() {
 		// Don't throw the error here, just report it
 		return false;
 	}
+});
 }
 
 // Articles CRUD operations
@@ -505,6 +507,10 @@ export async function deleteArticle(id: string, rev: string): Promise<boolean> {
 	}
 }
 
+// Query cache to reduce database operations
+const recentQueriesCache = new Map<string, {data: Article[], timestamp: number}>();
+const CACHE_TTL = 5000; // 5 seconds cache TTL
+
 export async function getAllArticles(options?: {
 	limit?: number;
 	skip?: number;
@@ -514,7 +520,17 @@ export async function getAllArticles(options?: {
 	sortBy?: "savedAt" | "title" | "readAt";
 	sortDirection?: "asc" | "desc";
 }): Promise<Article[]> {
+	return executeWithRetry(async () => {
 	try {
+		// Generate cache key from options
+		const cacheKey = JSON.stringify(options || {});
+		
+		// Check cache first
+		const cached = recentQueriesCache.get(cacheKey);
+		if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+			console.log(`Using cached articles for query: ${cacheKey}`);
+			return cached.data;
+		}
 		// Ensure database is ready
 		const dbInfo = await articlesDb.info();
 		console.log(`Database has ${dbInfo.doc_count} documents`);
@@ -652,13 +668,22 @@ export async function getAllArticles(options?: {
 			// Apply limit and skip
 			const start = options?.skip || 0;
 			const end = options?.limit ? start + options.limit : undefined;
-
+				
+			const resultDocs = docs.slice(start, end || docs.length);
+			
 			console.log(
-				`Found ${docs.length} articles, returning ${start} to ${
-					end || docs.length
-				}`,
-			);
-			return docs.slice(start, end || docs.length);
+			`Found ${docs.length} articles, returning ${start} to ${
+			  end || docs.length
+			 }`,
+				);
+				
+				// Update cache
+				recentQueriesCache.set(cacheKey, {
+					data: resultDocs,
+					timestamp: Date.now()
+				});
+				
+				return resultDocs;
 		} catch (allDocsError) {
 			console.error("Error using allDocs, falling back to find:", allDocsError);
 
@@ -687,6 +712,13 @@ export async function getAllArticles(options?: {
 			});
 
 			console.log(`Found ${docs.length} articles using find fallback`);
+			
+			// Update cache even for this fallback path
+			recentQueriesCache.set(cacheKey, {
+				data: docs,
+				timestamp: Date.now()
+			});
+			
 			return docs;
 		}
 	} catch (error) {
@@ -694,6 +726,7 @@ export async function getAllArticles(options?: {
 		// Return empty array instead of throwing to avoid breaking the UI
 		return [];
 	}
+});
 }
 
 // Highlights CRUD operations
@@ -879,6 +912,51 @@ export function registerOfflineListeners(
 		window.removeEventListener("online", updateStatus);
 		window.removeEventListener("offline", updateStatus);
 	};
+}
+
+// Helper function to identify transient errors that can be retried
+function isTransientError(error: any): boolean {
+	if (!error) return false;
+	
+	// Network or connection related errors are usually transient
+	if (error.name === 'NetworkError') return true;
+	if (error.name === 'timeout' || error.message?.includes('timeout')) return true;
+	if (error.name === 'connection_error' || error.message?.includes('connection')) return true;
+	if (error.status === 500 || error.status === 502 || error.status === 503 || error.status === 504) return true;
+	
+	// PouchDB specific retry conditions
+	if (error.name === 'unknown_error') return true;
+	if (error.message?.includes('conflict')) return false; // Don't retry conflicts
+	if (error.message?.includes('network') || error.message?.includes('offline')) return true;
+	
+	return false;
+}
+
+// Execute operation with retry logic for transient failures
+async function executeWithRetry<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
+	let lastError: any;
+
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			return await operation();
+		} catch (err) {
+			console.warn(`Operation failed (attempt ${attempt}/${maxRetries}):`, err);
+			lastError = err;
+
+			// Only retry on transient errors
+			if (!isTransientError(err)) throw err;
+
+			// Don't wait on the last attempt
+			if (attempt < maxRetries) {
+				// Wait before retry (exponential backoff)
+				const delay = Math.min(300 * Math.pow(2, attempt - 1), 3000);
+				console.log(`Retrying after ${delay}ms...`);
+				await new Promise(r => setTimeout(r, delay));
+			}
+		}
+	}
+
+	throw lastError;
 }
 
 // Export databases (for advanced usage)

@@ -19,6 +19,7 @@ import {
 	useContext,
 	useEffect,
 	useMemo,
+	useRef,
 	useState,
 } from "react";
 
@@ -53,6 +54,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		"all" | "unread" | "favorites"
 	>("all");
 	const [isInitialized, setIsInitialized] = useState<boolean>(false);
+	// Add fetch lock to prevent concurrent fetches
+	const fetchLockRef = useRef<boolean>(false);
 	const { toast } = useToast();
 
 	// Initialize database on component mount
@@ -121,7 +124,15 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	useEffect(() => {
 		if (!isInitialized) return;
 
+		// Use fetch lock to prevent concurrent fetches
+		if (fetchLockRef.current) {
+			console.log('Fetch operation already in progress, skipping');
+			return;
+		}
+
 		let isMounted = true;
+		// Set fetch lock and loading state
+		fetchLockRef.current = true;
 		setIsLoading(true);
 
 		const loadArticles = async () => {
@@ -149,7 +160,6 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				if (isMounted) {
 					setArticles(fetchedArticles);
 					setError(null);
-					setIsLoading(false);
 				}
 			} catch (err) {
 				console.error(`Failed to load articles for ${currentView} view:`, err);
@@ -165,7 +175,6 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					);
 					// Return empty array to prevent stuck loading state
 					setArticles([]);
-					setIsLoading(false);
 
 					toast({
 						title: `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Loading Error`,
@@ -173,6 +182,13 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 						variant: "destructive",
 					});
 				}
+			} finally {
+				// Always clean up, even if there's an error
+				if (isMounted) {
+					setIsLoading(false);
+				}
+				// Reset fetch lock when done
+				fetchLockRef.current = false;
 			}
 		};
 
@@ -181,6 +197,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			if (isMounted && isLoading) {
 				console.warn(`Loading articles for ${currentView} view timed out`);
 				setIsLoading(false);
+				fetchLockRef.current = false; // Reset fetch lock on timeout
 				setError(
 					new Error(
 						`Loading ${currentView} articles timed out. Please try again.`,
@@ -200,15 +217,26 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		return () => {
 			isMounted = false;
 			clearTimeout(timeoutId);
+			// Reset fetch lock on cleanup to prevent deadlocks
+			fetchLockRef.current = false;
 		};
-	}, [currentView, isInitialized, toast, isLoading]);
+	}, [currentView, isInitialized, toast]); // Removed isLoading from dependencies
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {
 		if (!isInitialized) return [];
 
+		// Use fetch lock to prevent concurrent fetches
+		if (fetchLockRef.current) {
+			console.log('Refresh operation already in progress, skipping');
+			return articles; // Return current articles
+		}
+
 		try {
+			// Set fetch lock and loading state
+			fetchLockRef.current = true;
 			setIsLoading(true);
+			
 			const options: Parameters<typeof getAllArticles>[0] = {
 				sortBy: "savedAt",
 				sortDirection: "desc",
@@ -245,6 +273,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			return articles; // Return current articles instead of null
 		} finally {
 			setIsLoading(false);
+			// Reset fetch lock when done
+			fetchLockRef.current = false;
 		}
 	}, [currentView, isInitialized, articles]);
 
@@ -468,6 +498,12 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 	// Add retry function
 	const retryLoading = useCallback(async () => {
+		// Only proceed if not already loading
+		if (fetchLockRef.current) {
+			console.log('Retry operation already in progress, skipping');
+			return;
+		}
+		
 		setIsLoading(true);
 		setError(null);
 
