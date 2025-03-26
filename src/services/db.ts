@@ -155,76 +155,79 @@ async function initializeIndexes() {
 // Initialize database
 export async function initializeDatabase() {
 	return executeWithRetry(async () => {
-	try {
-		console.log("Starting database initialization...");
-
-		// First ensure PouchDB is properly configured
-		if (!PouchDB) {
-			console.error("PouchDB is not available");
-			return false;
-		}
-
-		let initSuccess = true;
-
-		// Test database connections
 		try {
-			console.log("Testing database connections...");
-			const articlesInfo = await articlesDb.info();
-			const highlightsInfo = await highlightsDb.info();
-			const tagsInfo = await tagsDb.info();
+			console.log("Starting database initialization...");
 
-			console.log("Database connection successful", {
-				articles: articlesInfo.doc_count,
-				highlights: highlightsInfo.doc_count,
-				tags: tagsInfo.doc_count,
-			});
-		} catch (dbError) {
-			console.error("Error connecting to database:", dbError);
-			initSuccess = false;
-
-			// Try to recreate the databases with different options
-			try {
-				console.log(
-					"Attempting to recreate databases with memory adapter as fallback...",
-				);
-				articlesDb = new PouchDB<Article>("bondwise_articles", {
-					adapter: "memory",
-				});
-				highlightsDb = new PouchDB<Highlight>("bondwise_highlights", {
-					adapter: "memory",
-				});
-				tagsDb = new PouchDB<Tag>("bondwise_tags", { adapter: "memory" });
-
-				// Test if memory databases are working
-				console.log("Testing memory database connections...");
-				await articlesDb.info();
-				await highlightsDb.info();
-				await tagsDb.info();
-				console.log("Memory database connections successful");
-			} catch (recreateError) {
-				console.error("Failed to recreate databases:", recreateError);
+			// First ensure PouchDB is properly configured
+			if (!PouchDB) {
+				console.error("PouchDB is not available");
 				return false;
 			}
-		}
 
-		// Now create indexes
-		try {
-			console.log("Creating database indexes...");
-			await initializeIndexes();
-			console.log("Database indexes created successfully");
-		} catch (indexError) {
-			console.error("Error creating indexes, but continuing:", indexError);
-			initSuccess = false;
-		}
+			let initSuccess = true;
 
-		console.log("Database initialization completed with status:", initSuccess);
-		return initSuccess;
-	} catch (error) {
-		console.error("Failed to initialize database:", error);
-		// Don't throw the error here, just report it
-		return false;
-	}
-});
+			// Test database connections
+			try {
+				console.log("Testing database connections...");
+				const articlesInfo = await articlesDb.info();
+				const highlightsInfo = await highlightsDb.info();
+				const tagsInfo = await tagsDb.info();
+
+				console.log("Database connection successful", {
+					articles: articlesInfo.doc_count,
+					highlights: highlightsInfo.doc_count,
+					tags: tagsInfo.doc_count,
+				});
+			} catch (dbError) {
+				console.error("Error connecting to database:", dbError);
+				initSuccess = false;
+
+				// Try to recreate the databases with different options
+				try {
+					console.log(
+						"Attempting to recreate databases with memory adapter as fallback...",
+					);
+					articlesDb = new PouchDB<Article>("bondwise_articles", {
+						adapter: "memory",
+					});
+					highlightsDb = new PouchDB<Highlight>("bondwise_highlights", {
+						adapter: "memory",
+					});
+					tagsDb = new PouchDB<Tag>("bondwise_tags", { adapter: "memory" });
+
+					// Test if memory databases are working
+					console.log("Testing memory database connections...");
+					await articlesDb.info();
+					await highlightsDb.info();
+					await tagsDb.info();
+					console.log("Memory database connections successful");
+				} catch (recreateError) {
+					console.error("Failed to recreate databases:", recreateError);
+					return false;
+				}
+			}
+
+			// Now create indexes
+			try {
+				console.log("Creating database indexes...");
+				await initializeIndexes();
+				console.log("Database indexes created successfully");
+			} catch (indexError) {
+				console.error("Error creating indexes, but continuing:", indexError);
+				initSuccess = false;
+			}
+
+			console.log(
+				"Database initialization completed with status:",
+				initSuccess,
+			);
+			return initSuccess;
+		} catch (error) {
+			console.error("Failed to initialize database:", error);
+			// Don't throw the error here, just report it
+			return false;
+		}
+	});
 }
 
 // Articles CRUD operations
@@ -508,7 +511,10 @@ export async function deleteArticle(id: string, rev: string): Promise<boolean> {
 }
 
 // Query cache to reduce database operations
-const recentQueriesCache = new Map<string, {data: Article[], timestamp: number}>();
+const recentQueriesCache = new Map<
+	string,
+	{ data: Article[]; timestamp: number }
+>();
 const CACHE_TTL = 5000; // 5 seconds cache TTL
 
 export async function getAllArticles(options?: {
@@ -521,212 +527,222 @@ export async function getAllArticles(options?: {
 	sortDirection?: "asc" | "desc";
 }): Promise<Article[]> {
 	return executeWithRetry(async () => {
-	try {
-		// Generate cache key from options
-		const cacheKey = JSON.stringify(options || {});
-		
-		// Check cache first
-		const cached = recentQueriesCache.get(cacheKey);
-		if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-			console.log(`Using cached articles for query: ${cacheKey}`);
-			return cached.data;
-		}
-		// Ensure database is ready
-		const dbInfo = await articlesDb.info();
-		console.log(`Database has ${dbInfo.doc_count} documents`);
+		try {
+			// Generate cache key from options
+			const cacheKey = JSON.stringify(options || {});
 
-		// If we have no documents at all, return empty array immediately
-		if (dbInfo.doc_count === 0) {
-			console.warn("No documents in database");
-			return [];
-		}
+			// Check cache first
+			const cached = recentQueriesCache.get(cacheKey);
+			if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+				console.log(`Using cached articles for query: ${cacheKey}`);
+				return cached.data;
+			}
+			// Ensure database is ready
+			const dbInfo = await articlesDb.info();
+			console.log(`Database has ${dbInfo.doc_count} documents`);
 
-		// Initialize indexes if not done yet
-		if (!indexesCreated) {
-			await initializeIndexes();
-		}
+			// If we have no documents at all, return empty array immediately
+			if (dbInfo.doc_count === 0) {
+				console.warn("No documents in database");
+				return [];
+			}
 
-		// Create a selector object for filters
-		const selector: Record<string, unknown> = {};
+			// Initialize indexes if not done yet
+			if (!indexesCreated) {
+				await initializeIndexes();
+			}
 
-		// Add filters
-		if (options?.isRead !== undefined) selector.isRead = options.isRead;
-		if (options?.favorite !== undefined) selector.favorite = options.favorite;
-		if (options?.tag && typeof options.tag === "string")
-			selector.tags = { $elemMatch: { $eq: options.tag } };
+			// Create a selector object for filters
+			const selector: Record<string, unknown> = {};
 
-		// Fallback for when no records are found matching the selector
-		if (Object.keys(selector).length > 0) {
-			try {
-				const count = await articlesDb.find({
-					selector,
-					limit: 1,
-				});
+			// Add filters
+			if (options?.isRead !== undefined) selector.isRead = options.isRead;
+			if (options?.favorite !== undefined) selector.favorite = options.favorite;
+			if (options?.tag && typeof options.tag === "string")
+				selector.tags = { $elemMatch: { $eq: options.tag } };
 
-				if (count.docs.length === 0) {
-					console.warn(
-						"No records found with selector, falling back to allDocs",
-					);
-					// Fall back to allDocs which doesn't require indexes
-					const allDocs = await articlesDb.allDocs({ include_docs: true });
-					const docs = allDocs.rows
-						.map((row) => row.doc)
-						.filter((doc) => doc) as Article[];
-
-					console.log(
-						`Found ${docs.length} total articles, applying filters...`,
-					);
-
-					// Filter in memory
-					let filteredDocs = [...docs];
-					if (options?.isRead !== undefined) {
-						filteredDocs = filteredDocs.filter(
-							(doc) => doc.isRead === options.isRead,
-						);
-						console.log(`After isRead filter: ${filteredDocs.length} articles`);
-					}
-					if (options?.favorite !== undefined) {
-						filteredDocs = filteredDocs.filter(
-							(doc) => doc.favorite === options.favorite,
-						);
-						console.log(
-							`After favorite filter: ${filteredDocs.length} articles`,
-						);
-					}
-					if (options?.tag && typeof options.tag === "string") {
-						filteredDocs = filteredDocs.filter((doc) =>
-							doc.tags?.includes(options.tag as string),
-						);
-						console.log(`After tag filter: ${filteredDocs.length} articles`);
-					}
-
-					// Sort in memory
-					const sortField = options?.sortBy || "savedAt";
-					const sortDirection = options?.sortDirection || "desc";
-
-					filteredDocs.sort((a, b) => {
-						const aVal = (a[sortField as keyof Article] as any) || 0;
-						const bVal = (b[sortField as keyof Article] as any) || 0;
-
-						if (sortDirection === "asc") {
-							return aVal > bVal ? 1 : -1;
-						}
-						return aVal < bVal ? 1 : -1;
+			// Fallback for when no records are found matching the selector
+			if (Object.keys(selector).length > 0) {
+				try {
+					const count = await articlesDb.find({
+						selector,
+						limit: 1,
 					});
 
-					// Apply limit and skip
-					const start = options?.skip || 0;
-					const end = options?.limit ? start + options.limit : undefined;
-					return filteredDocs.slice(start, end);
+					if (count.docs.length === 0) {
+						console.warn(
+							"No records found with selector, falling back to allDocs",
+						);
+						// Fall back to allDocs which doesn't require indexes
+						const allDocs = await articlesDb.allDocs({ include_docs: true });
+						const docs = allDocs.rows
+							.map((row) => row.doc)
+							.filter((doc) => doc) as Article[];
+
+						console.log(
+							`Found ${docs.length} total articles, applying filters...`,
+						);
+
+						// Filter in memory
+						let filteredDocs = [...docs];
+						if (options?.isRead !== undefined) {
+							filteredDocs = filteredDocs.filter(
+								(doc) => doc.isRead === options.isRead,
+							);
+							console.log(
+								`After isRead filter: ${filteredDocs.length} articles`,
+							);
+						}
+						if (options?.favorite !== undefined) {
+							filteredDocs = filteredDocs.filter(
+								(doc) => doc.favorite === options.favorite,
+							);
+							console.log(
+								`After favorite filter: ${filteredDocs.length} articles`,
+							);
+						}
+						if (options?.tag && typeof options.tag === "string") {
+							filteredDocs = filteredDocs.filter((doc) =>
+								doc.tags?.includes(options.tag as string),
+							);
+							console.log(`After tag filter: ${filteredDocs.length} articles`);
+						}
+
+						// Sort in memory
+						const sortField = options?.sortBy || "savedAt";
+						const sortDirection = options?.sortDirection || "desc";
+
+						filteredDocs.sort((a, b) => {
+							const aVal = (a[sortField as keyof Article] as any) || 0;
+							const bVal = (b[sortField as keyof Article] as any) || 0;
+
+							if (sortDirection === "asc") {
+								return aVal > bVal ? 1 : -1;
+							}
+							return aVal < bVal ? 1 : -1;
+						});
+
+						// Apply limit and skip
+						const start = options?.skip || 0;
+						const end = options?.limit ? start + options.limit : undefined;
+						return filteredDocs.slice(start, end);
+					}
+				} catch (findError) {
+					console.error(
+						"Error using find, falling back to allDocs:",
+						findError,
+					);
 				}
-			} catch (findError) {
-				console.error("Error using find, falling back to allDocs:", findError);
-			}
-		}
-
-		// Standard query using allDocs (more reliable than find)
-		try {
-			// Try using allDocs first which is more reliable
-			const allDocs = await articlesDb.allDocs({ include_docs: true });
-			let docs = allDocs.rows
-				.map((row) => row.doc)
-				.filter((doc) => doc) as Article[];
-
-			console.log(
-				`Retrieved ${docs.length} articles via allDocs, applying filters`,
-			);
-
-			// Filter in memory
-			if (options?.isRead !== undefined) {
-				docs = docs.filter((doc) => doc.isRead === options.isRead);
-				console.log(`After isRead filter: ${docs.length} articles remain`);
-			}
-			if (options?.favorite !== undefined) {
-				// Make sure favorite property exists and is explicitly true
-				docs = docs.filter((doc) => doc.favorite === true);
-				console.log(`After favorite filter: ${docs.length} articles remain`);
-			}
-			if (options?.tag && typeof options.tag === "string") {
-				docs = docs.filter((doc) => doc.tags?.includes(options.tag as string));
-				console.log(`After tag filter: ${docs.length} articles remain`);
 			}
 
-			// Sort in memory
-			const sortField = options?.sortBy || "savedAt";
-			const sortDirection = options?.sortDirection || "desc";
+			// Standard query using allDocs (more reliable than find)
+			try {
+				// Try using allDocs first which is more reliable
+				const allDocs = await articlesDb.allDocs({ include_docs: true });
+				let docs = allDocs.rows
+					.map((row) => row.doc)
+					.filter((doc) => doc) as Article[];
 
-			docs.sort((a, b) => {
-				const aVal = (a[sortField as keyof Article] as any) || 0;
-				const bVal = (b[sortField as keyof Article] as any) || 0;
-
-				if (sortDirection === "asc") {
-					return aVal > bVal ? 1 : -1;
-				}
-				return aVal < bVal ? 1 : -1;
-			});
-
-			// Apply limit and skip
-			const start = options?.skip || 0;
-			const end = options?.limit ? start + options.limit : undefined;
-				
-			const resultDocs = docs.slice(start, end || docs.length);
-			
-			console.log(
-			`Found ${docs.length} articles, returning ${start} to ${
-			  end || docs.length
-			 }`,
+				console.log(
+					`Retrieved ${docs.length} articles via allDocs, applying filters`,
 				);
-				
+
+				// Filter in memory
+				if (options?.isRead !== undefined) {
+					docs = docs.filter((doc) => doc.isRead === options.isRead);
+					console.log(`After isRead filter: ${docs.length} articles remain`);
+				}
+				if (options?.favorite !== undefined) {
+					// Make sure favorite property exists and is explicitly true
+					docs = docs.filter((doc) => doc.favorite === true);
+					console.log(`After favorite filter: ${docs.length} articles remain`);
+				}
+				if (options?.tag && typeof options.tag === "string") {
+					docs = docs.filter((doc) =>
+						doc.tags?.includes(options.tag as string),
+					);
+					console.log(`After tag filter: ${docs.length} articles remain`);
+				}
+
+				// Sort in memory
+				const sortField = options?.sortBy || "savedAt";
+				const sortDirection = options?.sortDirection || "desc";
+
+				docs.sort((a, b) => {
+					const aVal = (a[sortField as keyof Article] as any) || 0;
+					const bVal = (b[sortField as keyof Article] as any) || 0;
+
+					if (sortDirection === "asc") {
+						return aVal > bVal ? 1 : -1;
+					}
+					return aVal < bVal ? 1 : -1;
+				});
+
+				// Apply limit and skip
+				const start = options?.skip || 0;
+				const end = options?.limit ? start + options.limit : undefined;
+
+				const resultDocs = docs.slice(start, end || docs.length);
+
+				console.log(
+					`Found ${docs.length} articles, returning ${start} to ${
+						end || docs.length
+					}`,
+				);
+
 				// Update cache
 				recentQueriesCache.set(cacheKey, {
 					data: resultDocs,
-					timestamp: Date.now()
+					timestamp: Date.now(),
 				});
-				
+
 				return resultDocs;
-		} catch (allDocsError) {
-			console.error("Error using allDocs, falling back to find:", allDocsError);
+			} catch (allDocsError) {
+				console.error(
+					"Error using allDocs, falling back to find:",
+					allDocsError,
+				);
 
-			// Last resort - try find query with no sorting
-			const findQuery: PouchDB.Find.FindRequest<Article> = {
-				selector,
-				limit: options?.limit || 1000,
-				skip: options?.skip || 0,
-			};
+				// Last resort - try find query with no sorting
+				const findQuery: PouchDB.Find.FindRequest<Article> = {
+					selector,
+					limit: options?.limit || 1000,
+					skip: options?.skip || 0,
+				};
 
-			const result = await articlesDb.find(findQuery);
-			const docs = result?.docs || [];
+				const result = await articlesDb.find(findQuery);
+				const docs = result?.docs || [];
 
-			// Manual sort since we can't rely on PouchDB sort
-			const sortField = options?.sortBy || "savedAt";
-			const sortDirection = options?.sortDirection || "desc";
+				// Manual sort since we can't rely on PouchDB sort
+				const sortField = options?.sortBy || "savedAt";
+				const sortDirection = options?.sortDirection || "desc";
 
-			docs.sort((a, b) => {
-				const aVal = (a[sortField as keyof Article] as any) || 0;
-				const bVal = (b[sortField as keyof Article] as any) || 0;
+				docs.sort((a, b) => {
+					const aVal = (a[sortField as keyof Article] as any) || 0;
+					const bVal = (b[sortField as keyof Article] as any) || 0;
 
-				if (sortDirection === "asc") {
-					return aVal > bVal ? 1 : -1;
-				}
-				return aVal < bVal ? 1 : -1;
-			});
+					if (sortDirection === "asc") {
+						return aVal > bVal ? 1 : -1;
+					}
+					return aVal < bVal ? 1 : -1;
+				});
 
-			console.log(`Found ${docs.length} articles using find fallback`);
-			
-			// Update cache even for this fallback path
-			recentQueriesCache.set(cacheKey, {
-				data: docs,
-				timestamp: Date.now()
-			});
-			
-			return docs;
+				console.log(`Found ${docs.length} articles using find fallback`);
+
+				// Update cache even for this fallback path
+				recentQueriesCache.set(cacheKey, {
+					data: docs,
+					timestamp: Date.now(),
+				});
+
+				return docs;
+			}
+		} catch (error) {
+			console.error("Error getting articles:", error);
+			// Return empty array instead of throwing to avoid breaking the UI
+			return [];
 		}
-	} catch (error) {
-		console.error("Error getting articles:", error);
-		// Return empty array instead of throwing to avoid breaking the UI
-		return [];
-	}
-});
+	});
 }
 
 // Highlights CRUD operations
@@ -917,23 +933,38 @@ export function registerOfflineListeners(
 // Helper function to identify transient errors that can be retried
 function isTransientError(error: any): boolean {
 	if (!error) return false;
-	
+
 	// Network or connection related errors are usually transient
-	if (error.name === 'NetworkError') return true;
-	if (error.name === 'timeout' || error.message?.includes('timeout')) return true;
-	if (error.name === 'connection_error' || error.message?.includes('connection')) return true;
-	if (error.status === 500 || error.status === 502 || error.status === 503 || error.status === 504) return true;
-	
+	if (error.name === "NetworkError") return true;
+	if (error.name === "timeout" || error.message?.includes("timeout"))
+		return true;
+	if (
+		error.name === "connection_error" ||
+		error.message?.includes("connection")
+	)
+		return true;
+	if (
+		error.status === 500 ||
+		error.status === 502 ||
+		error.status === 503 ||
+		error.status === 504
+	)
+		return true;
+
 	// PouchDB specific retry conditions
-	if (error.name === 'unknown_error') return true;
-	if (error.message?.includes('conflict')) return false; // Don't retry conflicts
-	if (error.message?.includes('network') || error.message?.includes('offline')) return true;
-	
+	if (error.name === "unknown_error") return true;
+	if (error.message?.includes("conflict")) return false; // Don't retry conflicts
+	if (error.message?.includes("network") || error.message?.includes("offline"))
+		return true;
+
 	return false;
 }
 
 // Execute operation with retry logic for transient failures
-async function executeWithRetry<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
+async function executeWithRetry<T>(
+	operation: () => Promise<T>,
+	maxRetries = 3,
+): Promise<T> {
 	let lastError: any;
 
 	for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -949,9 +980,9 @@ async function executeWithRetry<T>(operation: () => Promise<T>, maxRetries = 3):
 			// Don't wait on the last attempt
 			if (attempt < maxRetries) {
 				// Wait before retry (exponential backoff)
-				const delay = Math.min(300 * Math.pow(2, attempt - 1), 3000);
+				const delay = Math.min(300 * 2 ** (attempt - 1), 3000);
 				console.log(`Retrying after ${delay}ms...`);
-				await new Promise(r => setTimeout(r, delay));
+				await new Promise((r) => setTimeout(r, delay));
 			}
 		}
 	}
