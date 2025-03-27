@@ -3,7 +3,7 @@ import { useUser } from '@clerk/clerk-react';
 import { importCloudItems } from '../services/cloudSync';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { AlertCircle, CheckCircle2, CloudSyncIcon } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Cloud } from 'lucide-react';
 
 export function CloudImportSection() {
   const { user } = useUser();
@@ -51,7 +51,7 @@ export function CloudImportSection() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <CloudSyncIcon className="h-5 w-5" />
+          <Cloud className="h-5 w-5" />
           Extension Sync
         </CardTitle>
         <CardDescription>

@@ -23,28 +23,31 @@ interface ApiResponse {
 // Function to get or prompt for user ID
 async function getUserId(): Promise<string | null> {
 	// Try to get stored user ID
-	const result = await chrome.storage.local.get(['userId']);
-	
+	const result = await chrome.storage.local.get(["userId"]);
+
 	if (result.userId) {
 		return result.userId;
 	}
-	
+
 	// If no stored userId, prompt the user with a notification
-	chrome.notifications.create({
-		type: 'basic',
-		iconUrl: 'icons/icon128.png',
-		title: 'BondWise Setup Required',
-		message: 'Please set your email address to start saving content',
-		buttons: [{ title: 'Setup Now' }]
-	}, (notificationId) => {
-		// Listen for button click
-		chrome.notifications.onButtonClicked.addListener((id) => {
-			if (id === notificationId) {
-				chrome.runtime.openOptionsPage();
-			}
-		});
-	});
-	
+	chrome.notifications.create(
+		{
+			type: "basic",
+			iconUrl: "icons/icon128.png",
+			title: "BondWise Setup Required",
+			message: "Please set your email address to start saving content",
+			buttons: [{ title: "Setup Now" }],
+		},
+		(notificationId) => {
+			// Listen for button click
+			chrome.notifications.onButtonClicked.addListener((id) => {
+				if (id === notificationId) {
+					chrome.runtime.openOptionsPage();
+				}
+			});
+		},
+	);
+
 	return null;
 }
 
@@ -84,18 +87,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 								"Received data from content script:",
 								scrapeResponse.data,
 							);
-							
+
 							// Get user ID
 							const userId = await getUserId();
-							
+
 							if (!userId) {
 								sendResponse({
 									status: "error",
-									message: "User ID not set. Please set up your email in the extension options.",
+									message:
+										"User ID not set. Please set up your email in the extension options.",
 								});
 								return;
 							}
-							
+
 							const newItem: SavedItem = {
 								id: uuidv4(),
 								url: scrapeResponse.data.url,

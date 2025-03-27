@@ -169,7 +169,7 @@ export default function SettingsPage() {
 						<div className="pr-4 space-y-6">
 							{/* Cloud Import Section */}
 							<CloudImportSection />
-							
+
 							<Card>
 								<CardHeader>
 									<CardTitle>Data</CardTitle>
