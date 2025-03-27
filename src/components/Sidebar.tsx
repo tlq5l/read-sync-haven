@@ -32,7 +32,7 @@ export default function Sidebar() {
 	const { currentView, setCurrentView } = useArticles();
 	const { theme, setTheme } = useTheme();
 	const { synchronizeAnimations } = useAnimation();
-	const { isSignedIn, isLoaded } = useAuth();
+	const { isSignedIn } = useAuth();
 	const { user } = useUser();
 	const [isDarkMode, setIsDarkMode] = useState(false);
 
