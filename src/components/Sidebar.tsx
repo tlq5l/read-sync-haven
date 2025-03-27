@@ -154,63 +154,61 @@ export default function Sidebar() {
 			)}
 
 			<div className="flex-grow overflow-y-auto py-4">
-				{isSignedIn && (
-					<TransitionGroup
-						groupId="sidebar-items"
-						className="px-2 space-y-1"
-						staggerChildren={true}
-						staggerDelay={30}
-						autoAnimate={true}
-					>
-						<TransitionItem showFrom="left" className="w-full">
-							<Button
-								variant="ghost"
-								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
-								onClick={() => setCurrentView("all")}
-								style={isViewActive("all") ? styles.activeLink : styles.link}
-							>
-								<Library size={20} />
-								{!collapsed && (
-									<span className="transition-opacity duration-200">
-										All Articles
-									</span>
-								)}
-							</Button>
-						</TransitionItem>
+				<TransitionGroup
+					groupId="sidebar-items"
+					className="px-2 space-y-1"
+					staggerChildren={true}
+					staggerDelay={30}
+					autoAnimate={true}
+				>
+					<TransitionItem showFrom="left" className="w-full">
+						<Button
+							variant="ghost"
+							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
+							onClick={() => setCurrentView("all")}
+							style={isViewActive("all") ? styles.activeLink : styles.link}
+						>
+							<Library size={20} />
+							{!collapsed && (
+								<span className="transition-opacity duration-200">
+									All Articles
+								</span>
+							)}
+						</Button>
+					</TransitionItem>
 
-						<TransitionItem showFrom="left" className="w-full">
-							<Button
-								variant="ghost"
-								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
-								onClick={() => setCurrentView("unread")}
-								style={isViewActive("unread") ? styles.activeLink : styles.link}
-							>
-								<Clock size={20} />
-								{!collapsed && (
-									<span className="transition-opacity duration-200">
-										Unread
-									</span>
-								)}
-							</Button>
-						</TransitionItem>
+					<TransitionItem showFrom="left" className="w-full">
+						<Button
+							variant="ghost"
+							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
+							onClick={() => setCurrentView("unread")}
+							style={isViewActive("unread") ? styles.activeLink : styles.link}
+						>
+							<Clock size={20} />
+							{!collapsed && (
+								<span className="transition-opacity duration-200">
+									Unread
+								</span>
+							)}
+						</Button>
+					</TransitionItem>
 
-						<TransitionItem showFrom="left" className="w-full">
-							<Button
-								variant="ghost"
-								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
-								onClick={() => setCurrentView("favorites")}
-								style={isViewActive("favorites") ? styles.activeLink : styles.link}
-							>
-								<Bookmark size={20} />
-								{!collapsed && (
-									<span className="transition-opacity duration-200">
-										Favorites
-									</span>
-								)}
-							</Button>
-						</TransitionItem>
-					</TransitionGroup>
-				)}
+					<TransitionItem showFrom="left" className="w-full">
+						<Button
+							variant="ghost"
+							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
+							onClick={() => setCurrentView("favorites")}
+							style={isViewActive("favorites") ? styles.activeLink : styles.link}
+						>
+							<Bookmark size={20} />
+							{!collapsed && (
+								<span className="transition-opacity duration-200">
+									Favorites
+								</span>
+							)}
+						</Button>
+					</TransitionItem>
+				</TransitionGroup>
 
 				<div className="mt-8 px-3">
 					{!collapsed && (
@@ -242,43 +240,40 @@ export default function Sidebar() {
 							</Button>
 						</TransitionItem>
 
-						{isSignedIn && (
-							<>
-								<TransitionItem showFrom="left" className="w-full">
-									<Button
-										variant="ghost"
-										className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
-										asChild
-									>
-										<Link to="/search" style={isActive("/search") ? styles.activeLink : styles.link}>
-											<SearchIcon size={20} />
-											{!collapsed && (
-												<span className="transition-opacity duration-200">
-													Search
-												</span>
-											)}
-										</Link>
-									</Button>
-								</TransitionItem>
+						{/* Show these navigation items regardless of authentication state */}
+						<TransitionItem showFrom="left" className="w-full">
+							<Button
+								variant="ghost"
+								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
+								asChild
+							>
+								<Link to="/search" style={isActive("/search") ? styles.activeLink : styles.link}>
+									<SearchIcon size={20} />
+									{!collapsed && (
+										<span className="transition-opacity duration-200">
+											Search
+										</span>
+									)}
+								</Link>
+							</Button>
+						</TransitionItem>
 
-								<TransitionItem showFrom="left" className="w-full">
-									<Button
-										variant="ghost"
-										className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
-										asChild
-									>
-										<Link to="/settings" style={isActive("/settings") ? styles.activeLink : styles.link}>
-											<Settings size={20} />
-											{!collapsed && (
-												<span className="transition-opacity duration-200">
-													Settings
-												</span>
-											)}
-										</Link>
-									</Button>
-								</TransitionItem>
-							</>
-						)}
+						<TransitionItem showFrom="left" className="w-full">
+							<Button
+								variant="ghost"
+								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
+								asChild
+							>
+								<Link to="/settings" style={isActive("/settings") ? styles.activeLink : styles.link}>
+									<Settings size={20} />
+									{!collapsed && (
+										<span className="transition-opacity duration-200">
+											Settings
+										</span>
+									)}
+								</Link>
+							</Button>
+						</TransitionItem>
 
 						<TransitionItem showFrom="left" className="w-full">
 							<Button
