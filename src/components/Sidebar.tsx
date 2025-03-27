@@ -45,20 +45,22 @@ export default function Sidebar() {
 
 	useEffect(() => {
 		// Update dark mode state when theme changes
-		const darkMode = theme === "dark" || 
-			(theme === "system" && window.matchMedia('(prefers-color-scheme: dark)').matches);
+		const darkMode =
+			theme === "dark" ||
+			(theme === "system" &&
+				window.matchMedia("(prefers-color-scheme: dark)").matches);
 		setIsDarkMode(darkMode);
-		
+
 		// Add listener for system preference changes
-		const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+		const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 		const handleChange = (e: MediaQueryListEvent) => {
 			if (theme === "system") {
 				setIsDarkMode(e.matches);
 			}
 		};
-		
-		mediaQuery.addEventListener('change', handleChange);
-		return () => mediaQuery.removeEventListener('change', handleChange);
+
+		mediaQuery.addEventListener("change", handleChange);
+		return () => mediaQuery.removeEventListener("change", handleChange);
 	}, [theme]);
 
 	const isActive = (path: string) => location.pathname === path;
@@ -79,27 +81,27 @@ export default function Sidebar() {
 	// Define styles directly to ensure visibility
 	const styles = {
 		container: {
-			backgroundColor: isDarkMode ? '#131825' : '#ffffff',
-			color: isDarkMode ? '#e1e7ef' : '#333333',
-			borderColor: isDarkMode ? '#1f2937' : '#e5e7eb',
+			backgroundColor: isDarkMode ? "#131825" : "#ffffff",
+			color: isDarkMode ? "#e1e7ef" : "#333333",
+			borderColor: isDarkMode ? "#1f2937" : "#e5e7eb",
 		},
 		header: {
-			color: isDarkMode ? '#ffffff' : '#111827',
-			fontWeight: 'bold',
+			color: isDarkMode ? "#ffffff" : "#111827",
+			fontWeight: "bold",
 		},
 		navLabel: {
-			color: isDarkMode ? '#9ca3af' : '#6b7280',
+			color: isDarkMode ? "#9ca3af" : "#6b7280",
 			fontWeight: 500,
 		},
 		link: {
-			color: isDarkMode ? '#e1e7ef' : '#4b5563',
+			color: isDarkMode ? "#e1e7ef" : "#4b5563",
 		},
 		activeLink: {
-			backgroundColor: isDarkMode ? '#1e293b' : '#f3f4f6',
-			color: isDarkMode ? '#ffffff' : '#111827',
+			backgroundColor: isDarkMode ? "#1e293b" : "#f3f4f6",
+			color: isDarkMode ? "#ffffff" : "#111827",
 		},
 		userGreeting: {
-			color: isDarkMode ? '#d1d5db' : '#4b5563',
+			color: isDarkMode ? "#d1d5db" : "#4b5563",
 		},
 	};
 
@@ -113,9 +115,15 @@ export default function Sidebar() {
 			)}
 			style={styles.container}
 		>
-			<div className="flex items-center p-4 border-b" style={{ borderColor: styles.container.borderColor }}>
+			<div
+				className="flex items-center p-4 border-b"
+				style={{ borderColor: styles.container.borderColor }}
+			>
 				{!collapsed && (
-					<h1 className="text-xl font-bold transition-opacity duration-200" style={styles.header}>
+					<h1
+						className="text-xl font-bold transition-opacity duration-200"
+						style={styles.header}
+					>
 						Read Sync Haven
 					</h1>
 				)}
@@ -146,10 +154,11 @@ export default function Sidebar() {
 
 			{/* User greeting */}
 			{isSignedIn && !collapsed && (
-				<div className="px-4 py-2 text-sm border-b" style={{ borderColor: styles.container.borderColor }}>
-					<p style={styles.userGreeting}>
-						Hello, {user?.firstName || "User"}
-					</p>
+				<div
+					className="px-4 py-2 text-sm border-b"
+					style={{ borderColor: styles.container.borderColor }}
+				>
+					<p style={styles.userGreeting}>Hello, {user?.firstName || "User"}</p>
 				</div>
 			)}
 
@@ -186,9 +195,7 @@ export default function Sidebar() {
 						>
 							<Clock size={20} />
 							{!collapsed && (
-								<span className="transition-opacity duration-200">
-									Unread
-								</span>
+								<span className="transition-opacity duration-200">Unread</span>
 							)}
 						</Button>
 					</TransitionItem>
@@ -198,7 +205,9 @@ export default function Sidebar() {
 							variant="ghost"
 							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
 							onClick={() => setCurrentView("favorites")}
-							style={isViewActive("favorites") ? styles.activeLink : styles.link}
+							style={
+								isViewActive("favorites") ? styles.activeLink : styles.link
+							}
 						>
 							<Bookmark size={20} />
 							{!collapsed && (
@@ -212,7 +221,10 @@ export default function Sidebar() {
 
 				<div className="mt-8 px-3">
 					{!collapsed && (
-						<h3 className="text-sm font-medium mb-2 transition-opacity duration-200" style={styles.navLabel}>
+						<h3
+							className="text-sm font-medium mb-2 transition-opacity duration-200"
+							style={styles.navLabel}
+						>
 							Navigation
 						</h3>
 					)}
@@ -229,7 +241,10 @@ export default function Sidebar() {
 								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
 								asChild
 							>
-								<Link to="/" style={isActive("/") ? styles.activeLink : styles.link}>
+								<Link
+									to="/"
+									style={isActive("/") ? styles.activeLink : styles.link}
+								>
 									<BookOpen size={20} />
 									{!collapsed && (
 										<span className="transition-opacity duration-200">
@@ -247,7 +262,10 @@ export default function Sidebar() {
 								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
 								asChild
 							>
-								<Link to="/search" style={isActive("/search") ? styles.activeLink : styles.link}>
+								<Link
+									to="/search"
+									style={isActive("/search") ? styles.activeLink : styles.link}
+								>
 									<SearchIcon size={20} />
 									{!collapsed && (
 										<span className="transition-opacity duration-200">
@@ -264,7 +282,12 @@ export default function Sidebar() {
 								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
 								asChild
 							>
-								<Link to="/settings" style={isActive("/settings") ? styles.activeLink : styles.link}>
+								<Link
+									to="/settings"
+									style={
+										isActive("/settings") ? styles.activeLink : styles.link
+									}
+								>
 									<Settings size={20} />
 									{!collapsed && (
 										<span className="transition-opacity duration-200">
@@ -314,7 +337,10 @@ export default function Sidebar() {
 			</div>
 
 			{isSignedIn && (
-				<div className="p-4 border-t" style={{ borderColor: styles.container.borderColor }}>
+				<div
+					className="p-4 border-t"
+					style={{ borderColor: styles.container.borderColor }}
+				>
 					<Button className="w-full gap-2 transition-all duration-200" asChild>
 						<Link to="/add">
 							<Plus size={18} />
