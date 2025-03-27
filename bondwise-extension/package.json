@@ -4,9 +4,7 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"clean": "rm -rf dist",
-		"copy-static": "copyfiles manifest.json dist && copyfiles -u 1 \"popup/**/*\" dist/popup && copyfiles -u 1 \"icons/**/*\" dist/icons",
-		"build": "bun run clean && tsc -p tsconfig.json && bun run copy-static",
+		"build": "vite build --config vite.config.ts",
 		"lint": "biome lint .",
 		"format": "biome format --write .",
 		"check": "biome check ."
@@ -15,7 +13,9 @@
 		"@biomejs/biome": "^1.9.4",
 		"@types/bun": "latest",
 		"@types/chrome": "^0.0.312",
-		"copyfiles": "^2.4.1"
+		"copyfiles": "^2.4.1",
+		"vite": "^6.2.3",
+		"vite-plugin-static-copy": "^2.3.0"
 	},
 	"peerDependencies": {
 		"typescript": "^5.8.2"
