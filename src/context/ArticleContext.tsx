@@ -12,6 +12,7 @@ import {
 import { isValidEpub } from "@/services/epub";
 import { parseArticle } from "@/services/parser";
 import { isValidPdf } from "@/services/pdf";
+import { useAuth } from "@clerk/clerk-react";
 import type React from "react";
 import {
 	createContext,
@@ -57,11 +58,12 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	// Add fetch lock to prevent concurrent fetches
 	const fetchLockRef = useRef<boolean>(false);
 	const { toast } = useToast();
+	const { userId, isSignedIn, isLoaded } = useAuth();
 
 	// Initialize database on component mount
 	useEffect(() => {
-		// Skip if already initialized
-		if (isInitialized) return;
+		// Skip if already initialized or auth not loaded
+		if (isInitialized || !isLoaded) return;
 
 		const init = async () => {
 			try {
@@ -118,11 +120,11 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		init();
 
 		return () => clearTimeout(timeoutId);
-	}, [isInitialized, toast]);
+	}, [isInitialized, toast, isLoaded]);
 
-	// Load articles based on current view
+	// Load articles based on current view and user ID
 	useEffect(() => {
-		if (!isInitialized) return;
+		if (!isInitialized || !isLoaded) return;
 
 		// Use fetch lock to prevent concurrent fetches
 		if (fetchLockRef.current) {
@@ -142,6 +144,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				const options: Parameters<typeof getAllArticles>[0] = {
 					sortBy: "savedAt",
 					sortDirection: "desc",
+					userId: isSignedIn ? userId : undefined, // Filter by user ID when signed in
 				};
 
 				if (currentView === "unread") {
@@ -224,11 +227,11 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Reset fetch lock on cleanup to prevent deadlocks
 			fetchLockRef.current = false;
 		};
-	}, [currentView, isInitialized, toast]); // Removed isLoading from dependencies
+	}, [currentView, isInitialized, toast, userId, isSignedIn, isLoaded]); // Added userId, isSignedIn, isLoaded
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {
-		if (!isInitialized) return [];
+		if (!isInitialized || !isLoaded) return [];
 
 		// Use fetch lock to prevent concurrent fetches
 		if (fetchLockRef.current) {
@@ -244,6 +247,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			const options: Parameters<typeof getAllArticles>[0] = {
 				sortBy: "savedAt",
 				sortDirection: "desc",
+				userId: isSignedIn ? userId : undefined, // Filter by user ID when signed in
 			};
 
 			if (currentView === "unread") {
@@ -280,15 +284,31 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Reset fetch lock when done
 			fetchLockRef.current = false;
 		}
-	}, [currentView, isInitialized, articles]);
+	}, [currentView, isInitialized, articles, userId, isSignedIn, isLoaded]); // Added userId, isSignedIn, isLoaded
 
 	// Add article by URL
 	const addArticleByUrl = useCallback(
 		async (url: string): Promise<Article | null> => {
+			if (!isSignedIn) {
+				toast({
+					title: "Authentication Required",
+					description: "Please sign in to save articles.",
+					variant: "destructive",
+				});
+				return null;
+			}
+
 			setIsLoading(true);
 			try {
 				const parsedArticle = await parseArticle(url);
-				const savedArticle = await saveArticle(parsedArticle);
+				
+				// Add user ID to the article
+				const articleWithUser = {
+					...parsedArticle,
+					userId,
+				};
+				
+				const savedArticle = await saveArticle(articleWithUser);
 
 				// Update articles list to include new article
 				setArticles((prevArticles) => [savedArticle, ...prevArticles]);
@@ -319,18 +339,27 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				setIsLoading(false);
 			}
 		},
-		[toast],
+		[toast, userId, isSignedIn],
 	);
 
 	// Add article by file (EPUB or PDF)
 	const addArticleByFile = useCallback(
 		async (file: File): Promise<Article | null> => {
+			if (!isSignedIn) {
+				toast({
+					title: "Authentication Required",
+					description: "Please sign in to save files.",
+					variant: "destructive",
+				});
+				return null;
+			}
+
 			setIsLoading(true);
 			try {
 				// Check file type and validate
 				if (isValidEpub(file)) {
-					// Save EPUB file
-					const savedArticle = await saveEpubFile(file);
+					// Save EPUB file with user ID
+					const savedArticle = await saveEpubFile(file, userId);
 
 					// Update articles list to include new article
 					setArticles((prevArticles) => [savedArticle, ...prevArticles]);
@@ -344,8 +373,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				}
 
 				if (isValidPdf(file)) {
-					// Save PDF file
-					const savedArticle = await savePdfFile(file);
+					// Save PDF file with user ID
+					const savedArticle = await savePdfFile(file, userId);
 
 					// Update articles list to include new article
 					setArticles((prevArticles) => [savedArticle, ...prevArticles]);
@@ -379,16 +408,30 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				setIsLoading(false);
 			}
 		},
-		[toast],
+		[toast, userId, isSignedIn],
 	);
 
 	// Update article read status and favorite status
 	const updateArticleStatus = useCallback(
 		async (id: string, isRead: boolean, favorite?: boolean) => {
+			if (!isSignedIn) {
+				toast({
+					title: "Authentication Required",
+					description: "Please sign in to update articles.",
+					variant: "destructive",
+				});
+				return;
+			}
+
 			try {
 				const article = articles.find((a) => a._id === id);
 				if (!article || !article._rev) {
 					throw new Error("Article not found");
+				}
+
+				// Check if article belongs to current user
+				if (article.userId && article.userId !== userId) {
+					throw new Error("You don't have permission to update this article");
 				}
 
 				const updates: Partial<Article> & { _id: string; _rev: string } = {
@@ -430,16 +473,23 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				});
 			}
 		},
-		[articles, toast],
+		[articles, toast, userId, isSignedIn],
 	);
 
 	// Update reading progress
 	const updateReadingProgress = useCallback(
 		async (id: string, progress: number) => {
+			if (!isSignedIn) return;
+
 			try {
 				const article = articles.find((a) => a._id === id);
 				if (!article || !article._rev) {
 					throw new Error("Article not found");
+				}
+
+				// Check if article belongs to current user
+				if (article.userId && article.userId !== userId) {
+					throw new Error("You don't have permission to update this article");
 				}
 
 				const updates: Partial<Article> & { _id: string; _rev: string } = {
@@ -465,13 +515,28 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				// Not showing toast for progress updates as they happen frequently
 			}
 		},
-		[articles],
+		[articles, userId, isSignedIn],
 	);
 
 	// Remove article
 	const removeArticle = useCallback(
 		async (id: string, rev: string) => {
+			if (!isSignedIn) {
+				toast({
+					title: "Authentication Required",
+					description: "Please sign in to remove articles.",
+					variant: "destructive",
+				});
+				return;
+			}
+
 			try {
+				// Check if article belongs to current user
+				const article = articles.find((a) => a._id === id);
+				if (article?.userId && article.userId !== userId) {
+					throw new Error("You don't have permission to remove this article");
+				}
+
 				await deleteArticle(id, rev);
 
 				// Update articles in state
@@ -497,7 +562,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				});
 			}
 		},
-		[toast],
+		[toast, articles, userId, isSignedIn],
 	);
 
 	// Add retry function

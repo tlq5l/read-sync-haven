@@ -1,8 +1,9 @@
 /// <reference types="vite/client" />
 
-// Ensure React is properly typed when using JSX
-declare namespace JSX {
-	interface IntrinsicElements {
-		[elemName: string]: any;
-	}
+interface ImportMetaEnv {
+  readonly VITE_CLERK_PUBLISHABLE_KEY: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
 }

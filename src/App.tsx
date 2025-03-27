@@ -8,11 +8,13 @@ import {
 	prefersReducedMotion,
 	setupGlobalAnimationTimings,
 } from "@/lib/animation";
+import { ClerkProvider } from "@clerk/clerk-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
+import ProtectedRoute from "./components/ProtectedRoute";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import AddPage from "./pages/AddPage";
 import HomePage from "./pages/HomePage";
@@ -20,6 +22,15 @@ import NotFound from "./pages/NotFound";
 import ReadPage from "./pages/ReadPage";
 import SearchPage from "./pages/SearchPage";
 import SettingsPage from "./pages/SettingsPage";
+import SignInPage from "./pages/SignInPage";
+import SignUpPage from "./pages/SignUpPage";
+
+// Import publishable key from environment variables
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+if (!PUBLISHABLE_KEY) {
+	throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
+}
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -68,13 +79,22 @@ const AppWithRouter = () => (
 	<BrowserRouter>
 		<KeyboardProvider>
 			<Routes>
-				<Route element={<Layout />}>
-					<Route path="/" element={<HomePage />} />
-					<Route path="/add" element={<AddPage />} />
-					<Route path="/read/:id" element={<ReadPage />} />
-					<Route path="/search" element={<SearchPage />} />
-					<Route path="/settings" element={<SettingsPage />} />
+				{/* Public auth routes */}
+				<Route path="/sign-in" element={<SignInPage />} />
+				<Route path="/sign-up" element={<SignUpPage />} />
+				
+				{/* Protected routes */}
+				<Route element={<ProtectedRoute />}>
+					<Route element={<Layout />}>
+						<Route path="/" element={<HomePage />} />
+						<Route path="/add" element={<AddPage />} />
+						<Route path="/read/:id" element={<ReadPage />} />
+						<Route path="/search" element={<SearchPage />} />
+						<Route path="/settings" element={<SettingsPage />} />
+					</Route>
 				</Route>
+				
+				{/* 404 route */}
 				<Route path="*" element={<NotFound />} />
 			</Routes>
 			<ShortcutsDialog />
@@ -83,20 +103,24 @@ const AppWithRouter = () => (
 );
 
 const App = () => (
-	<ThemeProvider defaultTheme="system" storageKey="bondwise-ui-theme">
-		<ThemeSupport />
-		<AnimationProvider>
-			<MotionPreferenceHandler>
-				<QueryClientProvider client={queryClient}>
-					<TooltipProvider>
-						<Toaster />
-						<Sonner />
-						<AppWithRouter />
-					</TooltipProvider>
-				</QueryClientProvider>
-			</MotionPreferenceHandler>
-		</AnimationProvider>
-	</ThemeProvider>
+	<ClerkProvider publishableKey={PUBLISHABLE_KEY} 
+								 signInUrl="/sign-in"
+								 signUpUrl="/sign-up">
+		<ThemeProvider defaultTheme="system" storageKey="bondwise-ui-theme">
+			<ThemeSupport />
+			<AnimationProvider>
+				<MotionPreferenceHandler>
+					<QueryClientProvider client={queryClient}>
+						<TooltipProvider>
+							<Toaster />
+							<Sonner />
+							<AppWithRouter />
+						</TooltipProvider>
+					</QueryClientProvider>
+				</MotionPreferenceHandler>
+			</AnimationProvider>
+		</ThemeProvider>
+	</ClerkProvider>
 );
 
 export default App;

@@ -16,15 +16,17 @@ import {
 	HelpCircle,
 	Keyboard,
 	Palette,
+	User,
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import UserProfileSection from "@/components/UserProfileSection";
 
 export default function SettingsPage() {
 	const { toast } = useToast();
 	const { theme } = useTheme();
 	const [isExportingData, setIsExportingData] = useState(false);
-	const [activeTab, setActiveTab] = useState("appearance");
+	const [activeTab, setActiveTab] = useState("profile");
 
 	const exportData = async () => {
 		setIsExportingData(true);
@@ -52,7 +54,7 @@ export default function SettingsPage() {
 			const url = URL.createObjectURL(dataBlob);
 			const link = document.createElement("a");
 			link.href = url;
-			link.download = `bondwise-export-${
+			link.download = `read-sync-haven-export-${
 				new Date().toISOString().split("T")[0]
 			}.json`;
 			document.body.appendChild(link);
@@ -92,12 +94,16 @@ export default function SettingsPage() {
 			</div>
 
 			<Tabs
-				defaultValue="appearance"
+				defaultValue="profile"
 				value={activeTab}
 				onValueChange={setActiveTab}
 				className="space-y-6"
 			>
-				<TabsList className="grid grid-cols-3 mb-4">
+				<TabsList className="grid grid-cols-4 mb-4">
+					<TabsTrigger value="profile" className="flex items-center gap-1">
+						<User className="h-4 w-4" />
+						<span>Profile</span>
+					</TabsTrigger>
 					<TabsTrigger value="appearance" className="flex items-center gap-1">
 						<Palette className="h-4 w-4" />
 						<span>Appearance</span>
@@ -111,6 +117,14 @@ export default function SettingsPage() {
 						<span>Shortcuts</span>
 					</TabsTrigger>
 				</TabsList>
+
+				<TabsContent value="profile" className="space-y-6">
+					<ScrollArea className="h-[70vh]">
+						<div className="pr-4">
+							<UserProfileSection />
+						</div>
+					</ScrollArea>
+				</TabsContent>
 
 				<TabsContent value="appearance" className="space-y-6">
 					<ScrollArea className="h-[70vh]">
@@ -200,7 +214,7 @@ export default function SettingsPage() {
 							</CardHeader>
 							<CardContent className="space-y-4">
 								<div className="space-y-2">
-									<h3 className="text-sm font-medium">BondWise</h3>
+									<h3 className="text-sm font-medium">Read Sync Haven</h3>
 									<p className="text-sm text-muted-foreground">
 										Version 0.1.0 (MVP)
 									</p>
