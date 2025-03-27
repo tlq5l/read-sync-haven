@@ -55,7 +55,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 								type: scrapeResponse.data.type || "other",
 							};
 
-							// Save the data using chrome.storage.local
+							const workerUrl =
+								"https://bondwise-sync-api.vikione.workers.dev/items";
+
+							// --- Try saving to Cloudflare Worker first ---
+							let apiSuccess = false;
+							try {
+								console.log(
+									`Attempting to POST item to Worker: ${workerUrl}`,
+									newItem,
+								);
+								const response = await fetch(workerUrl, {
+									method: "POST",
+									headers: {
+										"Content-Type": "application/json",
+									},
+									body: JSON.stringify(newItem),
+								});
+
+								if (!response.ok) {
+									const errorText = await response.text();
+									throw new Error(
+										`API Error (${response.status}): ${errorText}`,
+									);
+								}
+
+								const responseData = await response.json();
+								console.log(
+									"Successfully saved item via Worker API:",
+									responseData,
+								);
+								apiSuccess = true;
+							} catch (apiError) {
+								console.error("Error saving item via Worker API:", apiError);
+								// Don't send response yet, try local save first
+							}
+
+							// --- Save locally (cache/fallback) regardless of API success for now ---
+							// (In a more robust system, you might only save locally if API fails, or sync later)
 							try {
 								console.log(
 									"Attempting to save item to chrome.storage.local:",
@@ -66,23 +103,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 									"chrome.storage.local.set completed for ID:",
 									newItem.id,
 								);
-								// Verify save (optional but good for debugging)
-								chrome.storage.local.get(newItem.id, (result) => {
-									if (chrome.runtime.lastError) {
-										console.error(
-											"Error verifying save:",
-											chrome.runtime.lastError,
-										);
-									} else {
-										console.log("Verification - Retrieved item:", result);
-									}
-								});
+							} catch (localError) {
+								console.error("Error saving to local storage:", localError);
+								// If API also failed, report local error, otherwise API success takes precedence
+								if (!apiSuccess) {
+									sendResponse({
+										status: "error",
+										message: `Local storage error: ${localError instanceof Error ? localError.message : "Unknown error"}`,
+									});
+									return; // Exit early if both failed
+								}
+							}
+
+							// --- Send final response ---
+							if (apiSuccess) {
 								sendResponse({ status: "success" });
-							} catch (error) {
-								console.error("Error saving to storage:", error);
+							} else {
+								// If API failed but local save might have succeeded (or also failed)
 								sendResponse({
 									status: "error",
-									message: `Storage error: ${error instanceof Error ? error.message : "Unknown error"}`,
+									message: "Failed to save to API. Saved locally (maybe).", // Inform user API failed
 								});
 							}
 						} else {

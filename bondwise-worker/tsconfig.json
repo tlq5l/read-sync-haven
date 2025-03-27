@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "lib": ["ESNext"],
+    "types": ["@cloudflare/workers-types"], // Use Cloudflare Workers types
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    "outDir": "dist", // Specify an output directory (though Wrangler often handles build)
+    "rootDir": "src", // Specify root directory
+    "baseUrl": ".", // Base directory for module resolution
+    "paths": {
+      "src/*": ["src/*"] // Path mapping for cleaner imports
+    }
+  },
+  "include": ["src/**/*.ts"], // Include all TS files in src
+  "exclude": ["node_modules", "dist"] // Exclude node_modules and dist
+}
