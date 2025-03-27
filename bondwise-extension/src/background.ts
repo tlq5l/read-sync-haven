@@ -55,12 +55,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 								type: scrapeResponse.data.type || "other",
 							};
 
-							// Save the data using chrome.storage.local
-							try {
-								await chrome.storage.local.set({ [newItem.id]: newItem });
-								console.log("Item saved successfully with ID:", newItem.id);
-								sendResponse({ status: "success" });
-							} catch (error) {
+						// Save the data using chrome.storage.local
+						try {
+							console.log("Attempting to save item to chrome.storage.local:", newItem);
+							await chrome.storage.local.set({ [newItem.id]: newItem });
+							console.log("chrome.storage.local.set completed for ID:", newItem.id);
+							// Verify save (optional but good for debugging)
+							chrome.storage.local.get(newItem.id, (result) => {
+								if (chrome.runtime.lastError) {
+									console.error("Error verifying save:", chrome.runtime.lastError);
+								} else {
+									console.log("Verification - Retrieved item:", result);
+								}
+							});
+							sendResponse({ status: "success" });
+						} catch (error) {
 								console.error("Error saving to storage:", error);
 								sendResponse({
 									status: "error",
@@ -91,11 +100,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 			});
 
 		// Return true to indicate that the response will be sent asynchronously
+		// Return true to indicate that the response will be sent asynchronously
 		return true;
 	}
 
-	// Handle other potential messages if needed
-	// ...
+	// Handle message to log storage contents
+	if (message.action === "logStorage") {
+		chrome.storage.local.get(null, (items) => { // Get all items
+			if (chrome.runtime.lastError) {
+				console.error("Error retrieving storage:", chrome.runtime.lastError.message);
+				sendResponse({ status: "error", message: "Failed to retrieve storage" });
+			} else {
+				console.log("Current chrome.storage.local contents:", items);
+				sendResponse({ status: "success" });
+			}
+		});
+		// Return true for async response
+		return true;
+	}
 
 	// Return false or undefined if not handling the message asynchronously
 });

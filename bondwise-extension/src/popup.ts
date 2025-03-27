@@ -2,6 +2,7 @@ const saveButton = document.getElementById("saveButton") as HTMLButtonElement;
 const statusMessage = document.getElementById(
 	"statusMessage",
 ) as HTMLParagraphElement;
+const debugLogStorageButton = document.getElementById("debugLogStorage") as HTMLButtonElement; // Get debug button
 
 // Function to update status message and button state
 function updateStatus(message: string, disableButton = false, isError = false) {
@@ -75,6 +76,24 @@ if (saveButton) {
 } else {
 	updateStatus("Initialization error: Button not found.", false, true);
 }
+
+// Add click listener for the debug button
+if (debugLogStorageButton) {
+	debugLogStorageButton.addEventListener("click", () => {
+		updateStatus("Requesting storage log...", false);
+		chrome.runtime.sendMessage({ action: "logStorage" }, (response) => {
+			if (chrome.runtime.lastError) {
+				console.error("Error sending logStorage message:", chrome.runtime.lastError.message);
+				updateStatus(`Error: ${chrome.runtime.lastError.message}`, false, true);
+			} else if (response?.status === "success") {
+				updateStatus("Storage log requested. Check background console.", false);
+			} else {
+				updateStatus("Failed to request storage log.", false, true);
+			}
+		});
+	});
+}
+
 
 // Optional: Listen for messages pushed from background (e.g., progress updates)
 // chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
