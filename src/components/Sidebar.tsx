@@ -57,19 +57,29 @@ export default function Sidebar() {
 		});
 	};
 
+	// Get system or user-selected theme
+	const isDarkMode = theme === "dark" || 
+	  (theme === "system" && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
 	return (
 		<div
 			ref={sidebarAnimation.ref}
 			className={cn(
 				"h-screen flex flex-col border-r gpu-accelerated",
 				"transition-all ease-in-out duration-200",
-				"bg-background text-foreground",
+				isDarkMode ? "bg-gray-900 text-white" : "bg-white text-gray-900",
 				collapsed ? "w-16" : "w-64",
 			)}
 		>
-			<div className="flex items-center p-4 border-b">
+			<div className={cn(
+				"flex items-center p-4 border-b",
+				isDarkMode ? "border-gray-700" : "border-gray-200"
+			)}>
 				{!collapsed && (
-					<h1 className="text-xl font-bold text-foreground transition-opacity duration-200">
+					<h1 className={cn(
+						"text-xl font-bold transition-opacity duration-200",
+						isDarkMode ? "text-white" : "text-gray-900"
+					)}>
 						Read Sync Haven
 					</h1>
 				)}
@@ -100,8 +110,11 @@ export default function Sidebar() {
 
 			{/* User greeting */}
 			{isSignedIn && !collapsed && (
-				<div className="px-4 py-2 text-sm border-b">
-					<p className="text-foreground">
+				<div className={cn(
+					"px-4 py-2 text-sm border-b",
+					isDarkMode ? "border-gray-700" : "border-gray-200"
+				)}>
+					<p className={isDarkMode ? "text-gray-300" : "text-gray-700"}>
 						Hello, {user?.firstName || "User"}
 					</p>
 				</div>
@@ -122,7 +135,11 @@ export default function Sidebar() {
 									variant="ghost"
 									className={cn(
 										"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-										isViewActive("all") && "bg-accent text-accent-foreground",
+										isViewActive("all") && isDarkMode
+											? "bg-gray-800 text-white"
+											: isViewActive("all") && !isDarkMode
+											? "bg-gray-100 text-gray-900"
+											: "",
 									)}
 									onClick={() => setCurrentView("all")}
 								>
@@ -140,8 +157,11 @@ export default function Sidebar() {
 									variant="ghost"
 									className={cn(
 										"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-										isViewActive("unread") &&
-											"bg-accent text-accent-foreground",
+										isViewActive("unread") && isDarkMode
+											? "bg-gray-800 text-white"
+											: isViewActive("unread") && !isDarkMode
+											? "bg-gray-100 text-gray-900"
+											: "",
 									)}
 									onClick={() => setCurrentView("unread")}
 								>
@@ -159,8 +179,11 @@ export default function Sidebar() {
 									variant="ghost"
 									className={cn(
 										"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-										isViewActive("favorites") &&
-											"bg-accent text-accent-foreground",
+										isViewActive("favorites") && isDarkMode
+											? "bg-gray-800 text-white"
+											: isViewActive("favorites") && !isDarkMode
+											? "bg-gray-100 text-gray-900"
+											: "",
 									)}
 									onClick={() => setCurrentView("favorites")}
 								>
@@ -178,7 +201,10 @@ export default function Sidebar() {
 
 				<div className="mt-8 px-3">
 					{!collapsed && (
-						<h3 className="text-sm font-medium text-foreground mb-2 transition-opacity duration-200">
+						<h3 className={cn(
+							"text-sm font-medium mb-2 transition-opacity duration-200",
+							isDarkMode ? "text-gray-400" : "text-gray-500",
+						)}>
 							Navigation
 						</h3>
 					)}
@@ -194,14 +220,21 @@ export default function Sidebar() {
 								variant="ghost"
 								className={cn(
 									"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-									isActive("/") && "bg-accent text-accent-foreground",
+									isActive("/") && isDarkMode
+										? "bg-gray-800 text-white"
+										: isActive("/") && !isDarkMode
+										? "bg-gray-100 text-gray-900"
+										: "",
 								)}
 								asChild
 							>
 								<Link to="/">
 									<BookOpen size={20} />
 									{!collapsed && (
-										<span className="transition-opacity duration-200">
+										<span className={cn(
+											"transition-opacity duration-200",
+											isDarkMode ? "text-gray-100" : "text-gray-800",
+										)}>
 											Home
 										</span>
 									)}
@@ -216,14 +249,21 @@ export default function Sidebar() {
 										variant="ghost"
 										className={cn(
 											"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-											isActive("/search") && "bg-accent text-accent-foreground",
+											isActive("/search") && isDarkMode
+												? "bg-gray-800 text-white"
+												: isActive("/search") && !isDarkMode
+												? "bg-gray-100 text-gray-900"
+												: "",
 										)}
 										asChild
 									>
 										<Link to="/search">
 											<SearchIcon size={20} />
 											{!collapsed && (
-												<span className="transition-opacity duration-200">
+												<span className={cn(
+													"transition-opacity duration-200",
+													isDarkMode ? "text-gray-100" : "text-gray-800",
+												)}>
 													Search
 												</span>
 											)}
@@ -236,15 +276,21 @@ export default function Sidebar() {
 										variant="ghost"
 										className={cn(
 											"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-											isActive("/settings") &&
-												"bg-accent text-accent-foreground",
+											isActive("/settings") && isDarkMode
+												? "bg-gray-800 text-white"
+												: isActive("/settings") && !isDarkMode
+												? "bg-gray-100 text-gray-900"
+												: "",
 										)}
 										asChild
 									>
 										<Link to="/settings">
 											<Settings size={20} />
 											{!collapsed && (
-												<span className="transition-opacity duration-200">
+												<span className={cn(
+													"transition-opacity duration-200",
+													isDarkMode ? "text-gray-100" : "text-gray-800",
+												)}>
 													Settings
 												</span>
 											)}
@@ -262,7 +308,10 @@ export default function Sidebar() {
 							>
 								{theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
 								{!collapsed && (
-									<span className="transition-opacity duration-200">
+									<span className={cn(
+										"transition-opacity duration-200",
+										isDarkMode ? "text-gray-100" : "text-gray-800",
+									)}>
 										{theme === "dark" ? "Dark Mode" : "Light Mode"}
 									</span>
 								)}
@@ -279,7 +328,10 @@ export default function Sidebar() {
 									<Link to="/sign-in">
 										<LogIn size={20} />
 										{!collapsed && (
-											<span className="transition-opacity duration-200">
+											<span className={cn(
+												"transition-opacity duration-200",
+												isDarkMode ? "text-gray-100" : "text-gray-800",
+											)}>
 												Sign In
 											</span>
 										)}
@@ -292,7 +344,10 @@ export default function Sidebar() {
 			</div>
 
 			{isSignedIn && (
-				<div className="p-4 border-t">
+				<div className={cn(
+					"p-4 border-t",
+					isDarkMode ? "border-gray-700" : "border-gray-200",
+				)}>
 					<Button className="w-full gap-2 transition-all duration-200" asChild>
 						<Link to="/add">
 							<Plus size={18} />
