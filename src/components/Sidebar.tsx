@@ -63,12 +63,13 @@ export default function Sidebar() {
 			className={cn(
 				"h-screen flex flex-col border-r gpu-accelerated",
 				"transition-all ease-in-out duration-200",
+				"bg-background text-foreground",
 				collapsed ? "w-16" : "w-64",
 			)}
 		>
 			<div className="flex items-center p-4 border-b">
 				{!collapsed && (
-					<h1 className="text-xl font-bold text-primary transition-opacity duration-200">
+					<h1 className="text-xl font-bold text-foreground transition-opacity duration-200">
 						Read Sync Haven
 					</h1>
 				)}
@@ -100,7 +101,7 @@ export default function Sidebar() {
 			{/* User greeting */}
 			{isSignedIn && !collapsed && (
 				<div className="px-4 py-2 text-sm border-b">
-					<p className="text-muted-foreground">
+					<p className="text-foreground">
 						Hello, {user?.firstName || "User"}
 					</p>
 				</div>
@@ -177,7 +178,7 @@ export default function Sidebar() {
 
 				<div className="mt-8 px-3">
 					{!collapsed && (
-						<h3 className="text-sm font-medium text-muted-foreground mb-2 transition-opacity duration-200">
+						<h3 className="text-sm font-medium text-foreground mb-2 transition-opacity duration-200">
 							Navigation
 						</h3>
 					)}
