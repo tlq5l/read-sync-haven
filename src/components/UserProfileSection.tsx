@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { UserProfile, useUser } from "@clerk/clerk-react";
+import { useUser, useClerk } from "@clerk/clerk-react";
 
 export default function UserProfileSection() {
   const { user, isLoaded } = useUser();
+  const { openUserProfile } = useClerk();
   
   if (!isLoaded) {
     return <div>Loading user profile...</div>;
@@ -26,7 +27,7 @@ export default function UserProfileSection() {
               <p className="text-sm text-muted-foreground">Email</p>
               <p>{user?.primaryEmailAddress?.emailAddress || 'Not set'}</p>
             </div>
-            <Button variant="outline" onClick={() => window.Clerk?.openUserProfile()}>
+            <Button variant="outline" onClick={() => openUserProfile()}>
               Edit Profile
             </Button>
           </div>

@@ -65,6 +65,7 @@ export interface Article {
 	fileSize?: number; // Size of the file in bytes
 	fileName?: string; // Original filename
 	pageCount?: number; // Number of pages (for PDF)
+	userId?: string; // User ID from Clerk
 }
 
 export interface Highlight {
@@ -126,6 +127,13 @@ async function initializeIndexes() {
 				index: { fields: ["favorite"] },
 			})
 			.catch((err) => console.warn("Error creating favorite index:", err));
+
+		// Add userId index
+		await articlesDb
+			.createIndex({
+				index: { fields: ["userId"] },
+			})
+			.catch((err) => console.warn("Error creating userId index:", err));
 
 		// Wait a bit between index creation to avoid concurrency issues
 		await new Promise((resolve) => setTimeout(resolve, 100));
@@ -235,6 +243,7 @@ export async function saveArticle(
 	article: Omit<Article, "_id" | "savedAt" | "isRead" | "favorite" | "tags"> & {
 		_id?: string;
 		tags?: string[];
+		userId?: string;
 	},
 ): Promise<Article> {
 	const newArticle: Article = {
@@ -256,6 +265,7 @@ export async function saveArticle(
 		fileSize: article.fileSize,
 		fileName: article.fileName,
 		pageCount: article.pageCount,
+		userId: article.userId,
 	};
 
 	try {
@@ -277,7 +287,7 @@ import {
 } from "./pdf";
 
 // Function to save an EPUB file
-export async function saveEpubFile(file: File): Promise<Article> {
+export async function saveEpubFile(file: File, userId?: string): Promise<Article> {
 	try {
 		console.log(
 			`Processing EPUB file: ${file.name}, size: ${(file.size / 1024).toFixed(
@@ -356,6 +366,7 @@ export async function saveEpubFile(file: File): Promise<Article> {
 			fileName: file.name,
 			estimatedReadTime: getEstimatedReadingTime(file.size),
 			siteName: metadata.publisher || "EPUB Book",
+			userId: userId,
 		};
 
 		// Log the fileData length for debugging
@@ -375,7 +386,7 @@ export async function saveEpubFile(file: File): Promise<Article> {
 }
 
 // Function to save a PDF file
-export async function savePdfFile(file: File): Promise<Article> {
+export async function savePdfFile(file: File, userId?: string): Promise<Article> {
 	try {
 		console.log(
 			`Processing PDF file: ${file.name}, size: ${(file.size / 1024).toFixed(
@@ -456,6 +467,7 @@ export async function savePdfFile(file: File): Promise<Article> {
 			pageCount: pageCount,
 			estimatedReadTime: getPdfReadingTime(file.size, pageCount),
 			siteName: "PDF Document",
+			userId: userId,
 		};
 
 		// Log the fileData length for debugging
@@ -525,6 +537,7 @@ export async function getAllArticles(options?: {
 	tag?: string;
 	sortBy?: "savedAt" | "title" | "readAt";
 	sortDirection?: "asc" | "desc";
+	userId?: string;
 }): Promise<Article[]> {
 	return executeWithRetry(async () => {
 		try {
@@ -560,6 +573,8 @@ export async function getAllArticles(options?: {
 			if (options?.favorite !== undefined) selector.favorite = options.favorite;
 			if (options?.tag && typeof options.tag === "string")
 				selector.tags = { $elemMatch: { $eq: options.tag } };
+			// Add userId filter
+			if (options?.userId) selector.userId = options.userId;
 
 			// Fallback for when no records are found matching the selector
 			if (Object.keys(selector).length > 0) {
@@ -606,6 +621,13 @@ export async function getAllArticles(options?: {
 								doc.tags?.includes(options.tag as string),
 							);
 							console.log(`After tag filter: ${filteredDocs.length} articles`);
+						}
+						// Add userId filter
+						if (options?.userId) {
+							filteredDocs = filteredDocs.filter(
+								(doc) => doc.userId === options.userId,
+							);
+							console.log(`After userId filter: ${filteredDocs.length} articles`);
 						}
 
 						// Sort in memory
@@ -662,6 +684,11 @@ export async function getAllArticles(options?: {
 						doc.tags?.includes(options.tag as string),
 					);
 					console.log(`After tag filter: ${docs.length} articles remain`);
+				}
+				// Add userId filter
+				if (options?.userId) {
+					docs = docs.filter((doc) => doc.userId === options.userId);
+					console.log(`After userId filter: ${docs.length} articles remain`);
 				}
 
 				// Sort in memory
