@@ -11,6 +11,7 @@ export default defineConfig({
 			input: {
 				// Define entry points
 				popup: resolve(__dirname, "popup/popup.html"),
+				options: resolve(__dirname, "options.html"),
 				background: resolve(__dirname, "src/background.ts"),
 				content: resolve(__dirname, "src/content.ts"),
 			},
@@ -50,6 +51,7 @@ export default defineConfig({
 					src: "popup/popup.css", // Copy popup CSS
 					dest: "popup",
 				},
+				// No need to copy options.html as it's now an entry point
 			],
 		}),
 	],
