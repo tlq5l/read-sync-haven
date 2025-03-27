@@ -1,5 +1,5 @@
-import UserProfileSection from "@/components/UserProfileSection";
 import { CloudImportSection } from "@/components/CloudImportSection";
+import UserProfileSection from "@/components/UserProfileSection";
 import { KeyboardShortcutsTab } from "@/components/keyboard-shortcuts-tab";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -169,7 +169,7 @@ export default function SettingsPage() {
 						<div className="pr-4 space-y-6">
 							{/* Cloud Import Section */}
 							<CloudImportSection />
-
+							
 							<Card>
 								<CardHeader>
 									<CardTitle>Data</CardTitle>
