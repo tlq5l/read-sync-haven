@@ -8,12 +8,16 @@
   </head>
   <body>
     <div class="container">
-      <h1>Save Page</h1>
+      <h1>Bondwise Saver</h1>
       <button id="saveButton">Save Current Page</button>
       <p id="statusMessage"></p>
-      <button id="debugLogStorage" style="margin-top: 10px; background-color: #6c757d;">Log Storage Contents</button> <!-- Debug Button -->
+      
+      <div class="storage-info">
+        <span id="storageStatus">Storage: Ready</span>
+      </div>
+      
+      <button id="debugLogStorage" style="margin-top: 10px; background-color: #6c757d;">Log Storage Contents</button>
     </div>
-    <!-- Reference the TS entry point; Vite will replace this during build -->
     <script src="../src/popup.ts" type="module"></script>
   </body>
 </html>

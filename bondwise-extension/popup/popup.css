@@ -72,3 +72,36 @@ button:disabled {
 .warning {
   color: #ffc107 !important;
 }
+
+.storage-info {
+  font-size: 12px;
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+  text-align: center;
+  color: #666;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  margin-left: 4px;
+}
+
+.badge-cloud {
+  background-color: #28a745;
+  color: white;
+}
+
+.badge-local {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.badge-failed {
+  background-color: #dc3545;
+  color: white;
+}
