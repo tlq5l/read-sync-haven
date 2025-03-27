@@ -68,7 +68,7 @@ export default function Sidebar() {
 		>
 			<div className="flex items-center p-4 border-b">
 				{!collapsed && (
-					<h1 className="text-xl font-bold text-bondwise-600 transition-opacity duration-200">
+					<h1 className="text-xl font-bold text-primary transition-opacity duration-200">
 						Read Sync Haven
 					</h1>
 				)}
@@ -122,7 +122,7 @@ export default function Sidebar() {
 									className={cn(
 										"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
 										isViewActive("all") &&
-											"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+											"bg-accent text-accent-foreground",
 									)}
 									onClick={() => setCurrentView("all")}
 								>
@@ -141,7 +141,7 @@ export default function Sidebar() {
 									className={cn(
 										"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
 										isViewActive("unread") &&
-											"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+											"bg-accent text-accent-foreground",
 									)}
 									onClick={() => setCurrentView("unread")}
 								>
@@ -160,7 +160,7 @@ export default function Sidebar() {
 									className={cn(
 										"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
 										isViewActive("favorites") &&
-											"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+											"bg-accent text-accent-foreground",
 									)}
 									onClick={() => setCurrentView("favorites")}
 								>
@@ -195,7 +195,7 @@ export default function Sidebar() {
 								className={cn(
 									"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
 									isActive("/") &&
-										"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+										"bg-accent text-accent-foreground",
 								)}
 								asChild
 							>
@@ -218,7 +218,7 @@ export default function Sidebar() {
 										className={cn(
 											"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
 											isActive("/search") &&
-												"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+												"bg-accent text-accent-foreground",
 										)}
 										asChild
 									>
@@ -239,7 +239,7 @@ export default function Sidebar() {
 										className={cn(
 											"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
 											isActive("/settings") &&
-												"bg-bondwise-50 text-bondwise-600 dark:bg-bondwise-900 dark:text-bondwise-300",
+												"bg-accent text-accent-foreground",
 										)}
 										asChild
 									>
