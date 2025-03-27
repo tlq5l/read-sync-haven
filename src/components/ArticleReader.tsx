@@ -33,7 +33,10 @@ export default function ArticleReader() {
 			if (!id) return;
 
 			try {
+				console.log("Fetching article with ID:", id);
 				const articleData = await getArticle(id);
+				console.log("Article data:", articleData);
+				
 				if (!articleData) {
 					setError("Article not found");
 					return;
@@ -132,6 +135,9 @@ export default function ArticleReader() {
 	// Check if article is a PDF file
 	const isPdf = article.type === "pdf" && article.fileData;
 
+	// Set text color class
+	const textColorClass = "text-foreground";
+
 	return (
 		<div
 			className={cn(
@@ -167,7 +173,7 @@ export default function ArticleReader() {
 					className="flex-1 overflow-hidden flex flex-col"
 					style={{ height: "calc(100vh - 64px)" }}
 				>
-					<div className="px-4 md:px-8 py-4 border-b">
+					<div className={`px-4 md:px-8 py-4 border-b ${textColorClass}`}>
 						<h1 className="text-2xl font-bold mb-2">{article.title}</h1>
 						{article.author && (
 							<p className="text-muted-foreground mb-1">By {article.author}</p>
@@ -192,7 +198,7 @@ export default function ArticleReader() {
 					className="flex-1 overflow-hidden flex flex-col"
 					style={{ height: "calc(100vh - 64px)" }}
 				>
-					<div className="px-4 md:px-8 py-4 border-b">
+					<div className={`px-4 md:px-8 py-4 border-b ${textColorClass}`}>
 						<h1 className="text-2xl font-bold mb-2">{article.title}</h1>
 						{article.author && (
 							<p className="text-muted-foreground mb-1">By {article.author}</p>
@@ -216,7 +222,7 @@ export default function ArticleReader() {
 				// Otherwise, render the regular article content
 				<div
 					ref={contentRef}
-					className="flex-1 overflow-y-auto px-4 md:px-8 py-6"
+					className={`flex-1 overflow-y-auto px-4 md:px-8 py-6 ${textColorClass}`}
 				>
 					<div className="reader-content">
 						<h1 className="text-3xl font-bold mb-4">{article.title}</h1>
