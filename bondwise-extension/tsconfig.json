@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", // Target modern JavaScript features supported by Chrome
+    "module": "ESNext", // Use ES modules
+    "moduleResolution": "node", // How modules are resolved
+    "outDir": "./dist", // Output directory for compiled JavaScript
+    "rootDir": "./src", // Specify the root directory of input files
+    "strict": true, // Enable all strict type-checking options
+    "esModuleInterop": true, // Enables compatibility with CommonJS modules
+    "skipLibCheck": true, // Skip type checking of declaration files
+    "forceConsistentCasingInFileNames": true, // Disallow inconsistently-cased references to the same file
+    "resolveJsonModule": true, // Allow importing JSON files
+    "lib": ["ES2020", "DOM", "DOM.Iterable"], // Include necessary libraries for web and DOM APIs
+    "types": ["chrome"] // Include Chrome extension type definitions
+  },
+  "include": ["src/**/*"], // Include all files in the src directory
+  "exclude": ["node_modules", "dist"] // Exclude node_modules and the output directory
+}

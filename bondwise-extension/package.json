@@ -1,0 +1,26 @@
+{
+	"name": "bondwise-extension",
+	"module": "index.ts",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"clean": "rm -rf dist",
+		"copy-static": "copyfiles manifest.json dist && copyfiles -u 1 \"popup/**/*\" dist/popup && copyfiles -u 1 \"icons/**/*\" dist/icons",
+		"build": "bun run clean && tsc -p tsconfig.json && bun run copy-static",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"check": "biome check ."
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@types/bun": "latest",
+		"@types/chrome": "^0.0.312",
+		"copyfiles": "^2.4.1"
+	},
+	"peerDependencies": {
+		"typescript": "^5.8.2"
+	},
+	"dependencies": {
+		"@mozilla/readability": "^0.6.0"
+	}
+}
