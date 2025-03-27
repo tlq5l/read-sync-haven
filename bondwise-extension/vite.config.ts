@@ -4,6 +4,7 @@ import { viteStaticCopy } from "vite-plugin-static-copy";
 
 // https://vitejs.dev/config/
 export default defineConfig({
+	base: "./", // This ensures assets are loaded with relative paths
 	build: {
 		outDir: resolve(__dirname, "dist"),
 		emptyOutDir: true, // Clean the output directory before building
