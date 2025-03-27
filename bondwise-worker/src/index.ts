@@ -1,4 +1,4 @@
-import { Router, type IRequest } from "itty-router"; // Use IRequest and import type
+import { type IRequest, Router } from "itty-router"; // Use IRequest and import type (Sorted)
 
 // Define the environment expected by the Worker
 // This includes the KV namespace binding defined in wrangler.toml
