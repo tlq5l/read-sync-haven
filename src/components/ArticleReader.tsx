@@ -36,7 +36,7 @@ export default function ArticleReader() {
 				console.log("Fetching article with ID:", id);
 				const articleData = await getArticle(id);
 				console.log("Article data:", articleData);
-				
+
 				if (!articleData) {
 					setError("Article not found");
 					return;
