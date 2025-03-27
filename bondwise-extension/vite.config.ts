@@ -1,5 +1,5 @@
-import { defineConfig } from "vite";
 import { resolve } from "node:path"; // Add node: prefix
+import { defineConfig } from "vite";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 
 // https://vitejs.dev/config/

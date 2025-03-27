@@ -20,7 +20,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 		chrome.scripting
 			.executeScript({
 				target: { tabId: tabId },
-				files: ["dist/content.js"], // Path to the compiled content script
+				files: ["content.js"], // Correct path relative to extension root (dist/)
 			})
 			.then(() => {
 				console.log("Injected content script.");
