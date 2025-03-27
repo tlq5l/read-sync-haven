@@ -7,7 +7,12 @@ const debugLogStorageButton = document.getElementById(
 ) as HTMLButtonElement; // Get debug button
 
 // Function to update status message and button state
-function updateStatus(message: string, disableButton = false, isError = false, isPartial = false) {
+function updateStatus(
+	message: string,
+	disableButton = false,
+	isError = false,
+	isPartial = false,
+) {
 	if (statusMessage) {
 		statusMessage.textContent = message;
 		statusMessage.style.color = isError ? "red" : isPartial ? "orange" : "#555";
@@ -46,7 +51,10 @@ if (saveButton) {
 								true,
 							);
 						} else if (response?.status === "success") {
-							updateStatus(response.message || "Page saved successfully!", false);
+							updateStatus(
+								response.message || "Page saved successfully!",
+								false,
+							);
 							// Optionally close the popup after a short delay
 							// setTimeout(() => window.close(), 1500);
 						} else if (response?.status === "partial") {
@@ -55,7 +63,7 @@ if (saveButton) {
 								response.message || "Saved locally only (cloud failed)",
 								false,
 								false,
-								true
+								true,
 							);
 						} else if (response?.status === "error") {
 							console.error("Error saving page:", response.message);
