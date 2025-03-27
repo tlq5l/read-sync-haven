@@ -80,9 +80,9 @@ const AppWithRouter = () => (
 		<KeyboardProvider>
 			<Routes>
 				{/* Public auth routes */}
-				<Route path="/sign-in" element={<SignInPage />} />
-				<Route path="/sign-up" element={<SignUpPage />} />
-
+				<Route path="/sign-in/*" element={<SignInPage />} />
+				<Route path="/sign-up/*" element={<SignUpPage />} />
+				
 				{/* Protected routes */}
 				<Route element={<ProtectedRoute />}>
 					<Route element={<Layout />}>
@@ -93,7 +93,7 @@ const AppWithRouter = () => (
 						<Route path="/settings" element={<SettingsPage />} />
 					</Route>
 				</Route>
-
+				
 				{/* 404 route */}
 				<Route path="*" element={<NotFound />} />
 			</Routes>
@@ -103,11 +103,9 @@ const AppWithRouter = () => (
 );
 
 const App = () => (
-	<ClerkProvider
-		publishableKey={PUBLISHABLE_KEY}
-		signInUrl="/sign-in"
-		signUpUrl="/sign-up"
-	>
+	<ClerkProvider publishableKey={PUBLISHABLE_KEY} 
+								 signInUrl="/sign-in"
+								 signUpUrl="/sign-up">
 		<ThemeProvider defaultTheme="system" storageKey="bondwise-ui-theme">
 			<ThemeSupport />
 			<AnimationProvider>
