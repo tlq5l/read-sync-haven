@@ -1,3 +1,4 @@
+import UserProfileSection from "@/components/UserProfileSection";
 import { KeyboardShortcutsTab } from "@/components/keyboard-shortcuts-tab";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +21,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import UserProfileSection from "@/components/UserProfileSection";
 
 export default function SettingsPage() {
 	const { toast } = useToast();
