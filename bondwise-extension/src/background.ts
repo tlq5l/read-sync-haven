@@ -10,6 +10,15 @@ interface SavedItem {
 	type: "article" | "youtube" | "other"; // Add more types later
 }
 
+// API response interface
+interface ApiResponse {
+	status: string;
+	message: string;
+	item?: SavedItem;
+	savedAt?: string;
+	[key: string]: any; // For any other properties
+}
+
 // Listen for messages from other parts of the extension (e.g., popup)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 	if (message.action === "savePage" && message.tabId) {
@@ -75,7 +84,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 								// Capture full response text for diagnostics
 								const responseText = await response.text();
-								console.log(`Worker API response (${response.status}): ${responseText}`);
+								console.log(
+									`Worker API response (${response.status}): ${responseText}`,
+								);
 
 								if (!response.ok) {
 									throw new Error(
@@ -84,15 +95,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 								}
 
 								// Try to parse the response as JSON
-								let responseData;
+								let responseData: ApiResponse | null = null;
 								try {
-									responseData = JSON.parse(responseText);
-									console.log("Successfully saved item via Worker API:", responseData);
+									responseData = JSON.parse(responseText) as ApiResponse;
+									console.log(
+										"Successfully saved item via Worker API:",
+										responseData,
+									);
 								} catch (parseError) {
-									console.warn("Could not parse API response as JSON:", responseText);
-									console.log("Item saved successfully but response wasn't valid JSON");
+									console.warn(
+										"Could not parse API response as JSON:",
+										responseText,
+									);
+									console.log(
+										"Item saved successfully but response wasn't valid JSON",
+									);
 								}
-								
+
 								apiSuccess = true;
 							} catch (apiError) {
 								console.error("Error saving item via Worker API:", apiError);
@@ -125,15 +144,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 							// --- Send final response ---
 							if (apiSuccess) {
-								sendResponse({ 
+								sendResponse({
 									status: "success",
-									message: "Saved item to cloud storage"
+									message: "Saved item to cloud storage",
 								});
 							} else {
 								// If API failed but local save might have succeeded (or also failed)
 								sendResponse({
 									status: "partial",
-									message: "Failed to save to cloud API. Saved locally as fallback.", 
+									message:
+										"Failed to save to cloud API. Saved locally as fallback.",
 								});
 							}
 						} else {
@@ -159,7 +179,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 				});
 			});
 
-		// Return true to indicate that the response will be sent asynchronously
 		// Return true to indicate that the response will be sent asynchronously
 		return true;
 	}
