@@ -121,8 +121,7 @@ export default function Sidebar() {
 									variant="ghost"
 									className={cn(
 										"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-										isViewActive("all") &&
-											"bg-accent text-accent-foreground",
+										isViewActive("all") && "bg-accent text-accent-foreground",
 									)}
 									onClick={() => setCurrentView("all")}
 								>
@@ -194,8 +193,7 @@ export default function Sidebar() {
 								variant="ghost"
 								className={cn(
 									"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-									isActive("/") &&
-										"bg-accent text-accent-foreground",
+									isActive("/") && "bg-accent text-accent-foreground",
 								)}
 								asChild
 							>
@@ -217,8 +215,7 @@ export default function Sidebar() {
 										variant="ghost"
 										className={cn(
 											"w-full flex items-center justify-start gap-3 py-2 transition-all duration-200",
-											isActive("/search") &&
-												"bg-accent text-accent-foreground",
+											isActive("/search") && "bg-accent text-accent-foreground",
 										)}
 										asChild
 									>
