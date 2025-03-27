@@ -1,14 +1,11 @@
-name = "bondwise-sync-api" # Name of the worker
-main = "src/index.ts" # Entry point for the worker code
-compatibility_date = "2024-03-27" # Use a recent compatibility date
+name = "bondwise-sync-api"
+main = "src/index.ts"
+compatibility_date = "2023-10-30"  # Using an older, stable date
 
-# KV Namespace binding
-# This makes the 'BONDWISE_SAVED_ITEMS' KV namespace available
-# inside the worker code via the variable 'SAVED_ITEMS_KV'.
-kv_namespaces = [
-  { binding = "SAVED_ITEMS_KV", id = "19a1b73a994f4e99b583d29485bf6d26" }
-]
+# Temporarily comment out the KV namespace
+# kv_namespaces = [
+#   { binding = "SAVED_ITEMS_KV", id = "19a1b73a994f4e99b583d29485bf6d26" }
+# ]
 
-# Optional: Add build configuration if needed (e.g., for custom build steps)
-# [build]
-# command = "bun run build" # Example if using a separate build script
+[observability.logs]
+enabled = true
