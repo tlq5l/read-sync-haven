@@ -56,7 +56,7 @@ function corsify(response: Response): Response {
 // --- API Routes ---
 
 // POST /items - Save a new item
-router.post("/items", async (request: IRequest, env: Env) => {
+router.post("/items", async (request: IRequest, env: Env, ctx: ExecutionContext) => { // Add ctx parameter
 	try {
 		const item = (await request.json()) as SavedItem; // Assuming body is a SavedItem
 
@@ -67,7 +67,8 @@ router.post("/items", async (request: IRequest, env: Env) => {
 
 		// Store in KV using the item's ID as the key
 		// We store the full object as a JSON string
-		await env.SAVED_ITEMS_KV.put(item.id, JSON.stringify(item));
+		// Use waitUntil to ensure the KV write completes even after the response is sent
+		ctx.waitUntil(env.SAVED_ITEMS_KV.put(item.id, JSON.stringify(item)));
 
 		console.log(`Saved item ${item.id}`);
 		return corsify(new Response(JSON.stringify(item), { status: 201 }));
