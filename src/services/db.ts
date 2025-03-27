@@ -287,7 +287,10 @@ import {
 } from "./pdf";
 
 // Function to save an EPUB file
-export async function saveEpubFile(file: File, userId?: string): Promise<Article> {
+export async function saveEpubFile(
+	file: File,
+	userId?: string,
+): Promise<Article> {
 	try {
 		console.log(
 			`Processing EPUB file: ${file.name}, size: ${(file.size / 1024).toFixed(
@@ -386,7 +389,10 @@ export async function saveEpubFile(file: File, userId?: string): Promise<Article
 }
 
 // Function to save a PDF file
-export async function savePdfFile(file: File, userId?: string): Promise<Article> {
+export async function savePdfFile(
+	file: File,
+	userId?: string,
+): Promise<Article> {
 	try {
 		console.log(
 			`Processing PDF file: ${file.name}, size: ${(file.size / 1024).toFixed(
@@ -627,7 +633,9 @@ export async function getAllArticles(options?: {
 							filteredDocs = filteredDocs.filter(
 								(doc) => doc.userId === options.userId,
 							);
-							console.log(`After userId filter: ${filteredDocs.length} articles`);
+							console.log(
+								`After userId filter: ${filteredDocs.length} articles`,
+							);
 						}
 
 						// Sort in memory

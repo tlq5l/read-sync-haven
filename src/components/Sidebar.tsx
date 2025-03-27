@@ -74,20 +74,23 @@ export default function Sidebar() {
 				)}
 				<div className="ml-auto flex items-center">
 					{isSignedIn && (
-						<UserButton 
+						<UserButton
 							afterSignOutUrl="/sign-in"
 							appearance={{
 								elements: {
-									userButtonAvatarBox: "w-8 h-8"
-								}
-							}} 
+									userButtonAvatarBox: "w-8 h-8",
+								},
+							}}
 						/>
 					)}
 					<Button
 						variant="ghost"
 						size="icon"
 						onClick={toggleCollapsed}
-						className={cn("transition-transform duration-200", isSignedIn ? "ml-2" : "ml-auto")}
+						className={cn(
+							"transition-transform duration-200",
+							isSignedIn ? "ml-2" : "ml-auto",
+						)}
 					>
 						{collapsed ? <MenuIcon size={20} /> : <ChevronLeft size={20} />}
 					</Button>
@@ -97,7 +100,9 @@ export default function Sidebar() {
 			{/* User greeting */}
 			{isSignedIn && !collapsed && (
 				<div className="px-4 py-2 text-sm border-b">
-					<p className="text-muted-foreground">Hello, {user?.firstName || 'User'}</p>
+					<p className="text-muted-foreground">
+						Hello, {user?.firstName || "User"}
+					</p>
 				</div>
 			)}
 
@@ -142,7 +147,9 @@ export default function Sidebar() {
 								>
 									<Clock size={20} />
 									{!collapsed && (
-										<span className="transition-opacity duration-200">Unread</span>
+										<span className="transition-opacity duration-200">
+											Unread
+										</span>
 									)}
 								</Button>
 							</TransitionItem>
@@ -194,7 +201,11 @@ export default function Sidebar() {
 							>
 								<Link to="/">
 									<BookOpen size={20} />
-									{!collapsed && <span className="transition-opacity duration-200">Home</span>}
+									{!collapsed && (
+										<span className="transition-opacity duration-200">
+											Home
+										</span>
+									)}
 								</Link>
 							</Button>
 						</TransitionItem>
@@ -213,7 +224,11 @@ export default function Sidebar() {
 									>
 										<Link to="/search">
 											<SearchIcon size={20} />
-											{!collapsed && <span className="transition-opacity duration-200">Search</span>}
+											{!collapsed && (
+												<span className="transition-opacity duration-200">
+													Search
+												</span>
+											)}
 										</Link>
 									</Button>
 								</TransitionItem>
@@ -230,7 +245,11 @@ export default function Sidebar() {
 									>
 										<Link to="/settings">
 											<Settings size={20} />
-											{!collapsed && <span className="transition-opacity duration-200">Settings</span>}
+											{!collapsed && (
+												<span className="transition-opacity duration-200">
+													Settings
+												</span>
+											)}
 										</Link>
 									</Button>
 								</TransitionItem>
@@ -261,7 +280,11 @@ export default function Sidebar() {
 								>
 									<Link to="/sign-in">
 										<LogIn size={20} />
-										{!collapsed && <span className="transition-opacity duration-200">Sign In</span>}
+										{!collapsed && (
+											<span className="transition-opacity duration-200">
+												Sign In
+											</span>
+										)}
 									</Link>
 								</Button>
 							</TransitionItem>

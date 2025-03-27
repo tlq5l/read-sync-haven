@@ -301,13 +301,13 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			setIsLoading(true);
 			try {
 				const parsedArticle = await parseArticle(url);
-				
+
 				// Add user ID to the article
 				const articleWithUser = {
 					...parsedArticle,
 					userId,
 				};
-				
+
 				const savedArticle = await saveArticle(articleWithUser);
 
 				// Update articles list to include new article
