@@ -16,15 +16,23 @@ interface CloudItem {
  */
 export async function fetchCloudItems(userId: string): Promise<Article[]> {
 	try {
-		const response = await fetch(
-			`https://bondwise-sync-api.vikione.workers.dev/items?userId=${encodeURIComponent(userId)}`,
-		);
+		const url = `https://bondwise-sync-api.vikione.workers.dev/items?userId=${encodeURIComponent(userId)}`;
+		console.log(`Fetching cloud items from: ${url}`);
+		
+		const response = await fetch(url);
 
 		if (!response.ok) {
+			const errorText = await response.text();
+			console.error(`Worker API error response: ${response.status} ${response.statusText}`, errorText);
 			throw new Error(`API error: ${response.status} ${response.statusText}`);
 		}
 
-		const items = (await response.json()) as CloudItem[];
+		const responseText = await response.text();
+		console.log("Worker API response text:", responseText);
+		
+		// Parse the JSON response
+		const items = JSON.parse(responseText) as CloudItem[];
+		console.log(`Retrieved ${items.length} items from worker`);
 
 		// Convert to PouchDB Article format
 		return items.map((item) => ({
@@ -88,7 +96,9 @@ export async function saveItemToCloud(article: Article): Promise<boolean> {
  */
 export async function importCloudItems(userId: string): Promise<number> {
 	try {
+		console.log(`Starting import process for user: ${userId}`);
 		const cloudItems = await fetchCloudItems(userId);
+		console.log(`Fetched ${cloudItems.length} items from cloud for import`);
 		let importedCount = 0;
 
 		for (const item of cloudItems) {
@@ -97,14 +107,18 @@ export async function importCloudItems(userId: string): Promise<number> {
 				const existingItem = await getArticle(item._id);
 
 				if (!existingItem) {
+					console.log(`Importing new item: ${item._id} - ${item.title}`);
 					await saveArticle(item);
 					importedCount++;
+				} else {
+					console.log(`Item already exists, skipping: ${item._id} - ${item.title}`);
 				}
 			} catch (error) {
 				console.error(`Error importing item ${item._id}:`, error);
 			}
 		}
 
+		console.log(`Import finished: ${importedCount} new items added`);
 		return importedCount;
 	} catch (error) {
 		console.error("Error importing cloud items:", error);

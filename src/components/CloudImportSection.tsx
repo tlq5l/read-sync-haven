@@ -34,7 +34,9 @@ export function CloudImportSection() {
 
 		try {
 			const userId = user.primaryEmailAddress.emailAddress;
+			console.log("Importing cloud items for user:", userId);
 			const importedCount = await importCloudItems(userId);
+			console.log(`Import completed: ${importedCount} items imported`);
 
 			setResult({
 				status: "success",
@@ -42,6 +44,7 @@ export function CloudImportSection() {
 				count: importedCount,
 			});
 		} catch (error) {
+			console.error("Error during import:", error);
 			setResult({
 				status: "error",
 				message: `Error importing items: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -68,7 +71,7 @@ export function CloudImportSection() {
 				<p className="text-sm text-muted-foreground">
 					If you've saved articles using the BondWise browser extension, you can
 					import them into your account. The extension should be configured with
-					the same email address as your account.
+					the same email address as your account: <strong>{user.primaryEmailAddress?.emailAddress}</strong>
 				</p>
 
 				<Button
