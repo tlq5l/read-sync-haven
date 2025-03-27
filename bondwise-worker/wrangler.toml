@@ -1,11 +1,11 @@
 name = "bondwise-sync-api"
 main = "src/index.ts"
-compatibility_date = "2023-10-30"  # Using an older, stable date
+compatibility_date = "2023-10-30"
 
-# Temporarily comment out the KV namespace
-# kv_namespaces = [
-#   { binding = "SAVED_ITEMS_KV", id = "19a1b73a994f4e99b583d29485bf6d26" }
-# ]
+# Use the existing KV namespace
+kv_namespaces = [
+  { binding = "SAVED_ITEMS_KV", id = "19a1b73a994f4e99b583d29485bf6d26" }
+]
 
 [observability.logs]
 enabled = true

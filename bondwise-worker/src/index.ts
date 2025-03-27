@@ -1,3 +1,8 @@
+// Define the environment interface for TypeScript
+export interface Env {
+  SAVED_ITEMS_KV: KVNamespace;
+}
+
 // Define the structure for saved items (consistent with extension)
 interface SavedItem {
   id: string;
@@ -9,7 +14,7 @@ interface SavedItem {
 }
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
     // Simple CORS headers
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
@@ -31,6 +36,12 @@ export default {
       
       console.log(`Processing ${request.method} request to ${path}`);
       
+      // Check if KV namespace is available
+      if (!env.SAVED_ITEMS_KV) {
+        console.error("KV namespace is not available");
+        throw new Error("Storage unavailable");
+      }
+      
       // Basic router implementation
       if (path === "/" && request.method === "GET") {
         // Root path handler
@@ -47,16 +58,42 @@ export default {
         });
       } 
       else if (path === "/items" && request.method === "POST") {
-        // POST /items - just echo back the received item for testing
-        const item = await request.json();
+        // POST /items - Save a new item
+        const item = await request.json() as SavedItem;
         
-        console.log("Received item:", item);
+        // Validate the item
+        if (!item || !item.id || !item.url || !item.title) {
+          return new Response(JSON.stringify({
+            status: "error",
+            message: "Invalid item data"
+          }), {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders
+            }
+          });
+        }
+        
+        console.log(`Processing item: ${item.id} for URL: ${item.url}`);
+        
+        // Save to KV
+        const kvPromise = env.SAVED_ITEMS_KV.put(item.id, JSON.stringify(item));
+        
+        // Use waitUntil to ensure operation completes
+        ctx.waitUntil(kvPromise.then(
+          () => console.log(`Successfully wrote item ${item.id} to KV.`),
+          (err) => console.error(`Error writing item ${item.id} to KV:`, err)
+        ));
+        
+        // Wait for KV operation before responding
+        await kvPromise;
         
         return new Response(JSON.stringify({
           status: "success",
-          message: "Item received (but not saved to KV yet)",
+          message: "Item saved successfully",
           item: item,
-          receivedAt: new Date().toISOString()
+          savedAt: new Date().toISOString()
         }), {
           status: 201,
           headers: {
@@ -66,13 +103,34 @@ export default {
         });
       }
       else if (path === "/items" && request.method === "GET") {
-        // GET /items - return empty array for now
-        return new Response(JSON.stringify([]), {
-          headers: {
-            "Content-Type": "application/json",
-            ...corsHeaders
+        // GET /items - Retrieve all items
+        try {
+          const listResult = await env.SAVED_ITEMS_KV.list();
+          const keys = listResult.keys.map((key) => key.name);
+          
+          const items: SavedItem[] = [];
+          
+          for (const key of keys) {
+            const value = await env.SAVED_ITEMS_KV.get(key);
+            if (value) {
+              try {
+                items.push(JSON.parse(value));
+              } catch (parseError) {
+                console.error(`Failed to parse item with key ${key}:`, parseError);
+              }
+            }
           }
-        });
+          
+          return new Response(JSON.stringify(items), {
+            headers: {
+              "Content-Type": "application/json",
+              ...corsHeaders
+            }
+          });
+        } catch (kvError) {
+          console.error("Error retrieving items from KV:", kvError);
+          throw new Error("Failed to retrieve items");
+        }
       }
       else {
         // Not found handler
