@@ -11,6 +11,22 @@ interface SavedItem {
 	content?: string;
 	scrapedAt: string;
 	type: "article" | "youtube" | "other";
+	userId: string; // Added userId field
+}
+
+// Helper function to create user-specific keys
+function createUserItemKey(userId: string, itemId: string): string {
+	return `${userId}:${itemId}`;
+}
+
+// Helper function to parse user-specific keys
+function parseUserItemKey(key: string): { userId: string, itemId: string } | null {
+	const parts = key.split(':');
+	if (parts.length !== 2) return null;
+	return {
+		userId: parts[0],
+		itemId: parts[1]
+	};
 }
 
 export default {
@@ -63,27 +79,49 @@ export default {
 
 			// Items collection endpoints
 			if (pathParts[0] === "items") {
-				// GET /items - List all items
+				// GET /items?userId=email@example.com - List all items for a user
 				if (pathParts.length === 1 && request.method === "GET") {
+					// Get userId from query parameter
+					const userId = url.searchParams.get('userId');
+					
+					if (!userId) {
+						return new Response(
+							JSON.stringify({
+								status: "error",
+								message: "userId parameter is required",
+							}),
+							{
+								status: 400,
+								headers: {
+									"Content-Type": "application/json",
+									...corsHeaders,
+								},
+							},
+						);
+					}
+					
 					try {
+						// List all keys in the KV namespace
 						const listResult = await env.SAVED_ITEMS_KV.list();
-						const keys = listResult.keys.map((key) => key.name);
-
+						
+						// Filter keys that belong to the requested user
+						const userKeys = listResult.keys
+							.map(key => key.name)
+							.filter(key => key.startsWith(`${userId}:`));
+						
+						// Get all values for the user's keys
 						const items: SavedItem[] = [];
-						for (const key of keys) {
+						for (const key of userKeys) {
 							const value = await env.SAVED_ITEMS_KV.get(key);
 							if (value) {
 								try {
 									items.push(JSON.parse(value));
 								} catch (parseError) {
-									console.error(
-										`Failed to parse item with key ${key}:`,
-										parseError,
-									);
+									console.error(`Failed to parse item with key ${key}:`, parseError);
 								}
 							}
 						}
-
+						
 						return new Response(JSON.stringify(items), {
 							headers: {
 								"Content-Type": "application/json",
@@ -100,12 +138,12 @@ export default {
 				if (pathParts.length === 1 && request.method === "POST") {
 					const item = (await request.json()) as SavedItem;
 
-					// Validate required fields
-					if (!item || !item.id || !item.url || !item.title) {
+					// Validate required fields including userId
+					if (!item || !item.id || !item.url || !item.title || !item.userId) {
 						return new Response(
 							JSON.stringify({
 								status: "error",
-								message: "Invalid item data - missing required fields",
+								message: "Invalid item data - missing required fields (including userId)",
 							}),
 							{
 								status: 400,
@@ -117,21 +155,24 @@ export default {
 						);
 					}
 
-					console.log(`Processing item: ${item.id} for URL: ${item.url}`);
+					console.log(`Processing item: ${item.id} for user: ${item.userId}`);
 
 					try {
-						// Store the item in KV
+						// Create a user-specific key
+						const key = createUserItemKey(item.userId, item.id);
+						
+						// Store the item in KV with the user-specific key
 						const kvPromise = env.SAVED_ITEMS_KV.put(
-							item.id,
+							key,
 							JSON.stringify(item),
 						);
 
 						// Use waitUntil to ensure operation completes even if response is sent
 						ctx.waitUntil(
 							kvPromise.then(
-								() => console.log(`Successfully wrote item ${item.id} to KV.`),
+								() => console.log(`Successfully wrote item ${key} to KV.`),
 								(err) =>
-									console.error(`Error writing item ${item.id} to KV:`, err),
+									console.error(`Error writing item ${key} to KV:`, err),
 							),
 						);
 
@@ -159,12 +200,30 @@ export default {
 					}
 				}
 
-				// GET /items/:id - Get a specific item
+				// GET /items/:id?userId=email@example.com - Get a specific item for a user
 				if (pathParts.length === 2 && request.method === "GET") {
 					const id = pathParts[1];
+					const userId = url.searchParams.get('userId');
+					
+					if (!userId) {
+						return new Response(
+							JSON.stringify({
+								status: "error",
+								message: "userId parameter is required",
+							}),
+							{
+								status: 400,
+								headers: {
+									"Content-Type": "application/json",
+									...corsHeaders,
+								},
+							},
+						);
+					}
 
 					try {
-						const value = await env.SAVED_ITEMS_KV.get(id);
+						const key = createUserItemKey(userId, id);
+						const value = await env.SAVED_ITEMS_KV.get(key);
 
 						if (value === null) {
 							return new Response(
@@ -194,12 +253,30 @@ export default {
 					}
 				}
 
-				// DELETE /items/:id - Delete a specific item
+				// DELETE /items/:id?userId=email@example.com - Delete a specific item for a user
 				if (pathParts.length === 2 && request.method === "DELETE") {
 					const id = pathParts[1];
+					const userId = url.searchParams.get('userId');
+					
+					if (!userId) {
+						return new Response(
+							JSON.stringify({
+								status: "error",
+								message: "userId parameter is required",
+							}),
+							{
+								status: 400,
+								headers: {
+									"Content-Type": "application/json",
+									...corsHeaders,
+								},
+							},
+						);
+					}
 
 					try {
-						await env.SAVED_ITEMS_KV.delete(id);
+						const key = createUserItemKey(userId, id);
+						await env.SAVED_ITEMS_KV.delete(key);
 
 						return new Response(
 							JSON.stringify({

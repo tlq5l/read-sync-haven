@@ -8,6 +8,7 @@ interface SavedItem {
 	content?: string; // Main content for articles
 	scrapedAt: string;
 	type: "article" | "youtube" | "other"; // Add more types later
+	userId: string; // Added userId field
 }
 
 // API response interface
@@ -17,6 +18,34 @@ interface ApiResponse {
 	item?: SavedItem;
 	savedAt?: string;
 	[key: string]: any; // For any other properties
+}
+
+// Function to get or prompt for user ID
+async function getUserId(): Promise<string | null> {
+	// Try to get stored user ID
+	const result = await chrome.storage.local.get(['userId']);
+	
+	if (result.userId) {
+		return result.userId;
+	}
+	
+	// If no stored userId, prompt the user with a notification
+	chrome.notifications.create({
+		type: 'basic',
+		iconUrl: 'icons/icon128.png',
+		title: 'BondWise Setup Required',
+		message: 'Please set your email address to start saving content',
+		buttons: [{ title: 'Setup Now' }]
+	}, (notificationId) => {
+		// Listen for button click
+		chrome.notifications.onButtonClicked.addListener((id) => {
+			if (id === notificationId) {
+				chrome.runtime.openOptionsPage();
+			}
+		});
+	});
+	
+	return null;
 }
 
 // Listen for messages from other parts of the extension (e.g., popup)
@@ -55,6 +84,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 								"Received data from content script:",
 								scrapeResponse.data,
 							);
+							
+							// Get user ID
+							const userId = await getUserId();
+							
+							if (!userId) {
+								sendResponse({
+									status: "error",
+									message: "User ID not set. Please set up your email in the extension options.",
+								});
+								return;
+							}
+							
 							const newItem: SavedItem = {
 								id: uuidv4(),
 								url: scrapeResponse.data.url,
@@ -62,6 +103,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 								content: scrapeResponse.data.content,
 								scrapedAt: new Date().toISOString(),
 								type: scrapeResponse.data.type || "other",
+								userId: userId, // Include user ID
 							};
 
 							const workerUrl =
@@ -213,5 +255,6 @@ console.log("Background service worker started.");
 // Optional: Add listeners for extension installation/update
 chrome.runtime.onInstalled.addListener(() => {
 	console.log("Bondwise Saver extension installed or updated.");
-	// Perform any setup tasks here if needed
+	// Prompt user to set up their email on install
+	chrome.runtime.openOptionsPage();
 });

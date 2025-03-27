@@ -3,7 +3,7 @@
 	"name": "Bondwise Saver",
 	"version": "0.1.0",
 	"description": "Save articles, videos, and posts for later reading.",
-	"permissions": ["activeTab", "scripting", "storage"],
+	"permissions": ["activeTab", "scripting", "storage", "notifications"],
 	"action": {
 		"default_popup": "popup/popup.html",
 		"default_icon": "icons/icon.svg"
@@ -21,5 +21,9 @@
 			"matches": ["<all_urls>"],
 			"js": ["content.js"]
 		}
-	]
+	],
+	"options_ui": {
+		"page": "options.html",
+		"open_in_tab": false
+	}
 }
