@@ -1,46 +1,74 @@
 body {
-	font-family: sans-serif;
-	width: 250px; /* Set a fixed width for the popup */
-	padding: 10px;
-	margin: 0;
-	background-color: #f9f9f9;
+  width: 320px;
+  padding: 16px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-size: 14px;
+  color: #333;
+  margin: 0;
+  background-color: #f5f5f5;
 }
 
 .container {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 h1 {
-	font-size: 1.2em;
-	margin-bottom: 15px;
-	color: #333;
+  margin: 0;
+  font-size: 20px;
+  color: #333;
+  text-align: center;
 }
 
 button {
-	padding: 10px 15px;
-	font-size: 1em;
-	cursor: pointer;
-	background-color: #007bff;
-	color: white;
-	border: none;
-	border-radius: 4px;
-	transition: background-color 0.2s ease;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: #4285f4;
+  color: white;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
 button:hover {
-	background-color: #0056b3;
+  background-color: #3b78e7;
 }
 
 button:disabled {
-	background-color: #cccccc;
-	cursor: not-allowed;
+  background-color: #cccccc;
+  cursor: not-allowed;
 }
 
 #statusMessage {
-	margin-top: 15px;
-	font-size: 0.9em;
-	color: #555;
-	min-height: 1.2em; /* Reserve space for messages */
+  min-height: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: #555;
+}
+
+#debugLogStorage {
+  background-color: #6c757d;
+  font-size: 12px;
+}
+
+#debugLogStorage:hover {
+  background-color: #5a6268;
+}
+
+.success {
+  color: #28a745 !important;
+}
+
+.error {
+  color: #dc3545 !important;
+}
+
+.warning {
+  color: #ffc107 !important;
 }

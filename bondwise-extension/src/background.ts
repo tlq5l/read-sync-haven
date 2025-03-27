@@ -73,18 +73,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 									body: JSON.stringify(newItem),
 								});
 
+								// Capture full response text for diagnostics
+								const responseText = await response.text();
+								console.log(`Worker API response (${response.status}): ${responseText}`);
+
 								if (!response.ok) {
-									const errorText = await response.text();
 									throw new Error(
-										`API Error (${response.status}): ${errorText}`,
+										`API Error (${response.status}): ${responseText}`,
 									);
 								}
 
-								const responseData = await response.json();
-								console.log(
-									"Successfully saved item via Worker API:",
-									responseData,
-								);
+								// Try to parse the response as JSON
+								let responseData;
+								try {
+									responseData = JSON.parse(responseText);
+									console.log("Successfully saved item via Worker API:", responseData);
+								} catch (parseError) {
+									console.warn("Could not parse API response as JSON:", responseText);
+									console.log("Item saved successfully but response wasn't valid JSON");
+								}
+								
 								apiSuccess = true;
 							} catch (apiError) {
 								console.error("Error saving item via Worker API:", apiError);
@@ -117,12 +125,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 							// --- Send final response ---
 							if (apiSuccess) {
-								sendResponse({ status: "success" });
+								sendResponse({ 
+									status: "success",
+									message: "Saved item to cloud storage"
+								});
 							} else {
 								// If API failed but local save might have succeeded (or also failed)
 								sendResponse({
-									status: "error",
-									message: "Failed to save to API. Saved locally (maybe).", // Inform user API failed
+									status: "partial",
+									message: "Failed to save to cloud API. Saved locally as fallback.", 
 								});
 							}
 						} else {
