@@ -4,19 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
 	Sheet,
-	SheetClose,
 	SheetContent,
 	SheetHeader,
 	SheetTitle,
 	SheetTrigger,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useArticles } from "@/context/ArticleContext";
 import { cn } from "@/lib/utils";
 import { type Article, getArticle } from "@/services/db";

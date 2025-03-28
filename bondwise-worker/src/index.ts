@@ -309,7 +309,9 @@ export default {
 				try {
 					const apiKey = env.GEMINI_API_KEY;
 					if (!apiKey) {
-						console.error("GEMINI_API_KEY is not configured in environment variables.");
+						console.error(
+							"GEMINI_API_KEY is not configured in environment variables.",
+						);
 						throw new Error("AI service is not configured.");
 					}
 
@@ -328,7 +330,9 @@ export default {
 					}
 
 					const genAI = new GoogleGenerativeAI(apiKey);
-					const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro-exp-03-25" });
+					const model = genAI.getGenerativeModel({
+						model: "gemini-2.5-pro-exp-03-25",
+					});
 					const prompt = `Summarize the following text concisely:
 
 ${content}`;
