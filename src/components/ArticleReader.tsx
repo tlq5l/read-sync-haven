@@ -230,6 +230,58 @@ export default function ArticleReader() {
 								<PanelRightOpen className="h-5 w-5" />
 							</Button>
 						</SheetTrigger>
+						{/* Sidebar Content - Moved inside Sheet */}
+						<SheetContent side="right" className="w-[400px] sm:w-[540px]">
+							<SheetHeader>
+								<SheetTitle>Article Details</SheetTitle>
+							</SheetHeader>
+							<Tabs defaultValue="summary" className="mt-4">
+								<TabsList>
+									<TabsTrigger value="summary">Summary</TabsTrigger>
+									<TabsTrigger value="notes">Notes</TabsTrigger>
+									<TabsTrigger value="metadata">Metadata</TabsTrigger>
+								</TabsList>
+								<TabsContent value="summary" className="mt-4 space-y-4">
+									<Button
+										onClick={() => {
+											const textContent = contentRef.current?.textContent;
+											if (textContent) {
+												summarizeMutation.mutate(textContent);
+											} else {
+												setSummaryError("Could not extract article text.");
+											}
+										}}
+										disabled={isSummarizing}
+									>
+										{isSummarizing ? (
+											<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+										) : null}
+										Summarize Article
+									</Button>
+									{isSummarizing && (
+										<div className="space-y-2">
+											<Skeleton className="h-4 w-full" />
+											<Skeleton className="h-4 w-full" />
+											<Skeleton className="h-4 w-3/4" />
+										</div>
+									)}
+									{summaryError && (
+										<p className="text-sm text-destructive">Error: {summaryError}</p>
+									)}
+									{summary && (
+										<div className="prose prose-sm max-w-none">
+											<p>{summary}</p>
+										</div>
+									)}
+								</TabsContent>
+								<TabsContent value="notes" className="mt-4">
+									<p>Notes functionality to be added.</p>
+								</TabsContent>
+								<TabsContent value="metadata" className="mt-4">
+									<p>Metadata display to be added.</p>
+								</TabsContent>
+							</Tabs>
+						</SheetContent>
 					</Sheet>
 				</div>
 			</div>
@@ -322,59 +374,6 @@ export default function ArticleReader() {
 					</div>
 				</div>
 			)}
-
-			{/* Sidebar Content */}
-			<SheetContent side="right" className="w-[400px] sm:w-[540px]">
-				<SheetHeader>
-					<SheetTitle>Article Details</SheetTitle>
-				</SheetHeader>
-				<Tabs defaultValue="summary" className="mt-4">
-					<TabsList>
-						<TabsTrigger value="summary">Summary</TabsTrigger>
-						<TabsTrigger value="notes">Notes</TabsTrigger>
-						<TabsTrigger value="metadata">Metadata</TabsTrigger>
-					</TabsList>
-					<TabsContent value="summary" className="mt-4 space-y-4">
-						<Button
-							onClick={() => {
-								const textContent = contentRef.current?.textContent;
-								if (textContent) {
-									summarizeMutation.mutate(textContent);
-								} else {
-									setSummaryError("Could not extract article text.");
-								}
-							}}
-							disabled={isSummarizing}
-						>
-							{isSummarizing ? (
-								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-							) : null}
-							Summarize Article
-						</Button>
-						{isSummarizing && (
-							<div className="space-y-2">
-								<Skeleton className="h-4 w-full" />
-								<Skeleton className="h-4 w-full" />
-								<Skeleton className="h-4 w-3/4" />
-							</div>
-						)}
-						{summaryError && (
-							<p className="text-sm text-destructive">Error: {summaryError}</p>
-						)}
-						{summary && (
-							<div className="prose prose-sm max-w-none">
-								<p>{summary}</p>
-							</div>
-						)}
-					</TabsContent>
-					<TabsContent value="notes" className="mt-4">
-						<p>Notes functionality to be added.</p>
-					</TabsContent>
-					<TabsContent value="metadata" className="mt-4">
-						<p>Metadata display to be added.</p>
-					</TabsContent>
-				</Tabs>
-			</SheetContent>
 		</div>
 	);
 }
