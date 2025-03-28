@@ -544,6 +544,7 @@ export async function getAllArticles(options?: {
 	sortBy?: "savedAt" | "title" | "readAt";
 	sortDirection?: "asc" | "desc";
 	userId?: string;
+	userIds?: string[]; // Add support for multiple user IDs
 }): Promise<Article[]> {
 	return executeWithRetry(async () => {
 		try {
@@ -579,15 +580,7 @@ export async function getAllArticles(options?: {
 			if (options?.favorite !== undefined) selector.favorite = options.favorite;
 			if (options?.tag && typeof options.tag === "string")
 				selector.tags = { $elemMatch: { $eq: options.tag } };
-			// Add userId filter
-			if (options?.userId) {
-				// Don't add to selector, we'll filter by userId more flexibly in memory
-			}
-
-			// Debug log for userId filter
-			if (options?.userId) {
-				console.log(`Filtering by userId: ${options.userId}`);
-			}
+			// Don't add userId to selector, we'll filter by userIds more flexibly in memory
 
 			// Fallback for when no records are found matching the selector
 			if (Object.keys(selector).length > 0) {
@@ -636,13 +629,19 @@ export async function getAllArticles(options?: {
 							console.log(`After tag filter: ${filteredDocs.length} articles`);
 						}
 
+						// Create a list of userIds to check from both userId and userIds parameters
+						const idsToCheck = [
+							...(options?.userIds || []),
+							...(options?.userId ? [options.userId] : []),
+						].filter(Boolean);
+
 						// Handle userId filter with debugging
-						if (options?.userId) {
+						if (idsToCheck.length > 0) {
 							// Log before filtering
 							console.log(
 								`Before userId filter: ${filteredDocs.length} articles`,
 							);
-							console.log(`Filter value: ${options.userId}`);
+							console.log(`Filtering by user IDs: ${idsToCheck.join(", ")}`);
 
 							// Show some userIds for debugging
 							if (filteredDocs.length > 0) {
@@ -661,7 +660,7 @@ export async function getAllArticles(options?: {
 									return false;
 								}
 
-								const isMatch = doc.userId === options.userId;
+								const isMatch = idsToCheck.includes(doc.userId);
 								console.log(
 									`Article ${doc._id} userId: ${doc.userId}, match: ${isMatch}`,
 								);
@@ -728,11 +727,17 @@ export async function getAllArticles(options?: {
 					console.log(`After tag filter: ${docs.length} articles remain`);
 				}
 
+				// Create a list of userIds to check from both userId and userIds parameters
+				const idsToCheck = [
+					...(options?.userIds || []),
+					...(options?.userId ? [options.userId] : []),
+				].filter(Boolean);
+
 				// Handle userId filter with more debugging
-				if (options?.userId) {
+				if (idsToCheck.length > 0) {
 					// Log before filtering
 					console.log(`Before userId filter: ${docs.length} articles`);
-					console.log(`Filter value: ${options.userId}`);
+					console.log(`Filtering by user IDs: ${idsToCheck.join(", ")}`);
 
 					// Show all userIds for debugging
 					if (docs.length > 0) {
@@ -749,7 +754,7 @@ export async function getAllArticles(options?: {
 							return false;
 						}
 
-						const isMatch = doc.userId === options.userId;
+						const isMatch = idsToCheck.includes(doc.userId);
 						console.log(
 							`Article ${doc._id} userId: ${doc.userId}, match: ${isMatch}`,
 						);
@@ -807,10 +812,17 @@ export async function getAllArticles(options?: {
 				const result = await articlesDb.find(findQuery);
 				const docs = result?.docs || [];
 
+				// Create a list of userIds to check from both userId and userIds parameters
+				const idsToCheck = [
+					...(options?.userIds || []),
+					...(options?.userId ? [options.userId] : []),
+				].filter(Boolean);
+
 				// Apply userId filter manually
 				let filteredDocs = docs;
-				if (options?.userId) {
-					filteredDocs = docs.filter((doc) => doc.userId === options.userId);
+				if (idsToCheck.length > 0) {
+					console.log(`Filtering by user IDs: ${idsToCheck.join(", ")}`);
+					filteredDocs = docs.filter((doc) => doc.userId && idsToCheck.includes(doc.userId));
 					console.log(
 						`After userId filter: ${filteredDocs.length} articles remain`,
 					);

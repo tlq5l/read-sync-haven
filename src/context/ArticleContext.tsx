@@ -12,7 +12,7 @@ import {
 import { isValidEpub } from "@/services/epub";
 import { parseArticle } from "@/services/parser";
 import { isValidPdf } from "@/services/pdf";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react"; // Import useUser
 import type React from "react";
 import {
 	createContext,
@@ -59,6 +59,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	const fetchLockRef = useRef<boolean>(false);
 	const { toast } = useToast();
 	const { userId, isSignedIn, isLoaded } = useAuth();
+	const { user } = useUser(); // Add this to get the user's email
 
 	// Initialize database on component mount
 	useEffect(() => {
@@ -141,10 +142,15 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 		const loadArticles = async () => {
 			try {
+				// Get the user's email if available
+				const userEmail = user?.primaryEmailAddress?.emailAddress;
+
 				const options: Parameters<typeof getAllArticles>[0] = {
 					sortBy: "savedAt",
 					sortDirection: "desc",
-					userId: isSignedIn ? userId : undefined, // Filter by user ID when signed in
+					userIds: isSignedIn ? 
+						[userId, userEmail].filter(Boolean) as string[] : 
+						undefined, // Filter by both Clerk ID and email when signed in
 				};
 
 				if (currentView === "unread") {
@@ -227,7 +233,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Reset fetch lock on cleanup to prevent deadlocks
 			fetchLockRef.current = false;
 		};
-	}, [currentView, isInitialized, toast, userId, isSignedIn, isLoaded]); // Added userId, isSignedIn, isLoaded
+	}, [currentView, isInitialized, toast, userId, isSignedIn, isLoaded, user]); // Added userId, isSignedIn, isLoaded, user
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {
@@ -244,10 +250,15 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			fetchLockRef.current = true;
 			setIsLoading(true);
 
+			// Get the user's email if available
+			const userEmail = user?.primaryEmailAddress?.emailAddress;
+
 			const options: Parameters<typeof getAllArticles>[0] = {
 				sortBy: "savedAt",
 				sortDirection: "desc",
-				userId: isSignedIn ? userId : undefined, // Filter by user ID when signed in
+				userIds: isSignedIn ? 
+					[userId, userEmail].filter(Boolean) as string[] : 
+					undefined, // Filter by both Clerk ID and email when signed in
 			};
 
 			if (currentView === "unread") {
@@ -284,7 +295,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Reset fetch lock when done
 			fetchLockRef.current = false;
 		}
-	}, [currentView, isInitialized, articles, userId, isSignedIn, isLoaded]); // Added userId, isSignedIn, isLoaded
+	}, [currentView, isInitialized, articles, userId, isSignedIn, isLoaded, user]); // Added userId, isSignedIn, isLoaded, user
 
 	// Add article by URL
 	const addArticleByUrl = useCallback(
@@ -431,7 +442,12 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 				// Check if article belongs to current user
 				if (article.userId && article.userId !== userId) {
-					throw new Error("You don't have permission to update this article");
+					// Get user email for checking 
+					const userEmail = user?.primaryEmailAddress?.emailAddress;
+					// Check if article belongs to user's email
+					if (userEmail && article.userId !== userEmail) {
+						throw new Error("You don't have permission to update this article");
+					}
 				}
 
 				const updates: Partial<Article> & { _id: string; _rev: string } = {
@@ -473,7 +489,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				});
 			}
 		},
-		[articles, toast, userId, isSignedIn],
+		[articles, toast, userId, isSignedIn, user],
 	);
 
 	// Update reading progress
@@ -489,7 +505,12 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 				// Check if article belongs to current user
 				if (article.userId && article.userId !== userId) {
-					throw new Error("You don't have permission to update this article");
+					// Get user email for checking
+					const userEmail = user?.primaryEmailAddress?.emailAddress;
+					// Check if article belongs to user's email
+					if (userEmail && article.userId !== userEmail) {
+						throw new Error("You don't have permission to update this article");
+					}
 				}
 
 				const updates: Partial<Article> & { _id: string; _rev: string } = {
@@ -515,7 +536,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				// Not showing toast for progress updates as they happen frequently
 			}
 		},
-		[articles, userId, isSignedIn],
+		[articles, userId, isSignedIn, user],
 	);
 
 	// Remove article
@@ -534,7 +555,12 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				// Check if article belongs to current user
 				const article = articles.find((a) => a._id === id);
 				if (article?.userId && article.userId !== userId) {
-					throw new Error("You don't have permission to remove this article");
+					// Get user email for checking
+					const userEmail = user?.primaryEmailAddress?.emailAddress;
+					// Check if article belongs to user's email
+					if (userEmail && article.userId !== userEmail) {
+						throw new Error("You don't have permission to remove this article");
+					}
 				}
 
 				await deleteArticle(id, rev);
@@ -562,7 +588,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				});
 			}
 		},
-		[toast, articles, userId, isSignedIn],
+		[toast, articles, userId, isSignedIn, user],
 	);
 
 	// Add retry function
