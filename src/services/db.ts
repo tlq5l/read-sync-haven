@@ -579,10 +579,15 @@ export async function getAllArticles(options?: {
 			if (options?.favorite !== undefined) selector.favorite = options.favorite;
 			if (options?.tag && typeof options.tag === "string")
 				selector.tags = { $elemMatch: { $eq: options.tag } };
+			// Add userId filter
+			if (options?.userId) {
+				// Don't add to selector, we'll filter by userId more flexibly in memory
+			}
 
-			// Modified userId filter approach - we'll handle it in memory instead
-			// to work with both Clerk IDs and email addresses
-			const userIdFilter = options?.userId;
+			// Debug log for userId filter
+			if (options?.userId) {
+				console.log(`Filtering by userId: ${options.userId}`);
+			}
 
 			// Fallback for when no records are found matching the selector
 			if (Object.keys(selector).length > 0) {
@@ -631,24 +636,32 @@ export async function getAllArticles(options?: {
 							console.log(`After tag filter: ${filteredDocs.length} articles`);
 						}
 
-						// Enhanced userId filter to support both Clerk IDs and email addresses
-						if (userIdFilter) {
+						// Handle userId filter with debugging
+						if (options?.userId) {
+							// Log before filtering
+							console.log(`Before userId filter: ${filteredDocs.length} articles`);
+							console.log(`Filter value: ${options.userId}`);
+							
+							// Show some userIds for debugging
+							if (filteredDocs.length > 0) {
+								console.log("Sample userIds in articles:");
+								for (let i = 0; i < Math.min(5, filteredDocs.length); i++) {
+									console.log(`  Article ${i}: userId = ${filteredDocs[i].userId}`);
+								}
+							}
+							
 							filteredDocs = filteredDocs.filter((doc) => {
-								// If document has no userId, it shouldn't appear in filtered results
-								if (!doc.userId) return false;
+								// Important: handle articles with no userId
+								if (!doc.userId) {
+									console.log(`Article ${doc._id} has no userId`);
+									return false;
+								}
 
-								// Match if either:
-								// 1. The document userId matches exactly
-								// 2. The document userId is an email and matches the filter (for extension imports)
-								return (
-									doc.userId === userIdFilter ||
-									(doc.userId.includes("@") && userIdFilter.includes("@"))
-								);
+								const isMatch = doc.userId === options.userId;
+								console.log(`Article ${doc._id} userId: ${doc.userId}, match: ${isMatch}`);
+								return isMatch;
 							});
-
-							console.log(
-								`After userId filter: ${filteredDocs.length} articles`,
-							);
+							console.log(`After userId filter: ${filteredDocs.length} articles`);
 						}
 
 						// Sort in memory
@@ -707,21 +720,31 @@ export async function getAllArticles(options?: {
 					console.log(`After tag filter: ${docs.length} articles remain`);
 				}
 
-				// Enhanced userId filter to support both Clerk IDs and email addresses
-				if (userIdFilter) {
+				// Handle userId filter with more debugging
+				if (options?.userId) {
+					// Log before filtering
+					console.log(`Before userId filter: ${docs.length} articles`);
+					console.log(`Filter value: ${options.userId}`);
+					
+					// Show all userIds for debugging
+					if (docs.length > 0) {
+						console.log("All userIds in articles:");
+						for (const doc of docs) {
+							console.log(`  Article ${doc._id}: userId = ${doc.userId}`);
+						}
+					}
+					
 					docs = docs.filter((doc) => {
-						// If document has no userId, it shouldn't appear in filtered results
-						if (!doc.userId) return false;
+						// Important: handle articles with no userId
+						if (!doc.userId) {
+							console.log(`Article ${doc._id} has no userId`);
+							return false;
+						}
 
-						// Match if either:
-						// 1. The document userId matches exactly
-						// 2. The document userId is an email and matches the filter (for extension imports)
-						return (
-							doc.userId === userIdFilter ||
-							(doc.userId.includes("@") && userIdFilter.includes("@"))
-						);
+						const isMatch = doc.userId === options.userId;
+						console.log(`Article ${doc._id} userId: ${doc.userId}, match: ${isMatch}`);
+						return isMatch;
 					});
-
 					console.log(`After userId filter: ${docs.length} articles remain`);
 				}
 
@@ -774,11 +797,18 @@ export async function getAllArticles(options?: {
 				const result = await articlesDb.find(findQuery);
 				const docs = result?.docs || [];
 
+				// Apply userId filter manually
+				let filteredDocs = docs;
+				if (options?.userId) {
+					filteredDocs = docs.filter((doc) => doc.userId === options.userId);
+					console.log(`After userId filter: ${filteredDocs.length} articles remain`);
+				}
+
 				// Manual sort since we can't rely on PouchDB sort
 				const sortField = options?.sortBy || "savedAt";
 				const sortDirection = options?.sortDirection || "desc";
 
-				docs.sort((a, b) => {
+				filteredDocs.sort((a, b) => {
 					const aVal = (a[sortField as keyof Article] as any) || 0;
 					const bVal = (b[sortField as keyof Article] as any) || 0;
 
@@ -788,15 +818,15 @@ export async function getAllArticles(options?: {
 					return aVal < bVal ? 1 : -1;
 				});
 
-				console.log(`Found ${docs.length} articles using find fallback`);
+				console.log(`Found ${filteredDocs.length} articles using find fallback`);
 
 				// Update cache even for this fallback path
 				recentQueriesCache.set(cacheKey, {
-					data: docs,
+					data: filteredDocs,
 					timestamp: Date.now(),
 				});
 
-				return docs;
+				return filteredDocs;
 			}
 		} catch (error) {
 			console.error("Error getting articles:", error);
