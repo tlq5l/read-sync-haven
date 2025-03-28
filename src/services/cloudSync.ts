@@ -107,8 +107,9 @@ export async function importCloudItems(email: string, clerkUserId: string): Prom
           await saveArticle(articleToSave);
           importedCount++;
         }
-      } catch (error) {
-        if (error.name === 'not_found') {
+      } catch (error: unknown) {
+        // Type check the error before accessing properties
+        if (typeof error === 'object' && error !== null && 'name' in error && error.name === 'not_found') {
           // This is expected - article doesn't exist yet
           console.log(`Importing new item: ${item._id} - ${item.title}`);
           
