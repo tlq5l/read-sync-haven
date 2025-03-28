@@ -579,7 +579,7 @@ export async function getAllArticles(options?: {
 			if (options?.favorite !== undefined) selector.favorite = options.favorite;
 			if (options?.tag && typeof options.tag === "string")
 				selector.tags = { $elemMatch: { $eq: options.tag } };
-			
+
 			// Modified userId filter approach - we'll handle it in memory instead
 			// to work with both Clerk IDs and email addresses
 			const userIdFilter = options?.userId;
@@ -630,20 +630,22 @@ export async function getAllArticles(options?: {
 							);
 							console.log(`After tag filter: ${filteredDocs.length} articles`);
 						}
-						
+
 						// Enhanced userId filter to support both Clerk IDs and email addresses
 						if (userIdFilter) {
 							filteredDocs = filteredDocs.filter((doc) => {
 								// If document has no userId, it shouldn't appear in filtered results
 								if (!doc.userId) return false;
-								
+
 								// Match if either:
 								// 1. The document userId matches exactly
 								// 2. The document userId is an email and matches the filter (for extension imports)
-								return doc.userId === userIdFilter || 
-								       (doc.userId.includes('@') && userIdFilter.includes('@'));
+								return (
+									doc.userId === userIdFilter ||
+									(doc.userId.includes("@") && userIdFilter.includes("@"))
+								);
 							});
-							
+
 							console.log(
 								`After userId filter: ${filteredDocs.length} articles`,
 							);
@@ -704,20 +706,22 @@ export async function getAllArticles(options?: {
 					);
 					console.log(`After tag filter: ${docs.length} articles remain`);
 				}
-				
+
 				// Enhanced userId filter to support both Clerk IDs and email addresses
 				if (userIdFilter) {
 					docs = docs.filter((doc) => {
 						// If document has no userId, it shouldn't appear in filtered results
 						if (!doc.userId) return false;
-						
+
 						// Match if either:
 						// 1. The document userId matches exactly
 						// 2. The document userId is an email and matches the filter (for extension imports)
-						return doc.userId === userIdFilter || 
-						       (doc.userId.includes('@') && userIdFilter.includes('@'));
+						return (
+							doc.userId === userIdFilter ||
+							(doc.userId.includes("@") && userIdFilter.includes("@"))
+						);
 					});
-					
+
 					console.log(`After userId filter: ${docs.length} articles remain`);
 				}
 

@@ -18,18 +18,21 @@ export async function fetchCloudItems(userId: string): Promise<Article[]> {
 	try {
 		const url = `https://bondwise-sync-api.vikione.workers.dev/items?userId=${encodeURIComponent(userId)}`;
 		console.log(`Fetching cloud items from: ${url}`);
-		
+
 		const response = await fetch(url);
 
 		if (!response.ok) {
 			const errorText = await response.text();
-			console.error(`Worker API error response: ${response.status} ${response.statusText}`, errorText);
+			console.error(
+				`Worker API error response: ${response.status} ${response.statusText}`,
+				errorText,
+			);
 			throw new Error(`API error: ${response.status} ${response.statusText}`);
 		}
 
 		const responseText = await response.text();
 		console.log("Worker API response text:", responseText);
-		
+
 		// Parse the JSON response
 		const items = JSON.parse(responseText) as CloudItem[];
 		console.log(`Retrieved ${items.length} items from worker`);
@@ -111,7 +114,9 @@ export async function importCloudItems(userId: string): Promise<number> {
 					await saveArticle(item);
 					importedCount++;
 				} else {
-					console.log(`Item already exists, skipping: ${item._id} - ${item.title}`);
+					console.log(
+						`Item already exists, skipping: ${item._id} - ${item.title}`,
+					);
 				}
 			} catch (error) {
 				console.error(`Error importing item ${item._id}:`, error);
