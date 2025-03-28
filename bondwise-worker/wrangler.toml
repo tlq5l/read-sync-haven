@@ -8,5 +8,11 @@ kv_namespaces = [
   { binding = "SAVED_ITEMS_KV", id = "19a1b73a994f4e99b583d29485bf6d26" }
 ]
 
+# Declare environment variables used by the worker
+# Actual values are set in Cloudflare dashboard for deployment
+# and in .env file for local development
+[vars]
+GEMINI_API_KEY = "" # Value is ignored, just declares the variable
+
 [observability.logs]
 enabled = true
