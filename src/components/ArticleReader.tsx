@@ -7,6 +7,7 @@ import {
 	SheetContent,
 	SheetHeader,
 	SheetTitle,
+	SheetDescription, // Added for accessibility
 	SheetTrigger,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -234,6 +235,8 @@ export default function ArticleReader() {
 						<SheetContent side="right" className="w-[400px] sm:w-[540px]">
 							<SheetHeader>
 								<SheetTitle>Article Details</SheetTitle>
+								{/* Added empty description for accessibility */}
+								<SheetDescription />
 							</SheetHeader>
 							<Tabs defaultValue="summary" className="mt-4">
 								<TabsList>
