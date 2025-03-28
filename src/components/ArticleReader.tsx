@@ -266,7 +266,9 @@ export default function ArticleReader() {
 										</div>
 									)}
 									{summaryError && (
-										<p className="text-sm text-destructive">Error: {summaryError}</p>
+										<p className="text-sm text-destructive">
+											Error: {summaryError}
+										</p>
 									)}
 									{summary && (
 										<div className="prose prose-sm max-w-none">
