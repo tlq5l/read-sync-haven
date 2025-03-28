@@ -13,6 +13,8 @@ kv_namespaces = [
 # and in .env file for local development
 [vars]
 GEMINI_API_KEY = "" # Value is ignored, just declares the variable
+CF_ACCOUNT_ID = "" # Value is ignored, just declares the variable
+CF_GATEWAY_ID = "" # Value is ignored, just declares the variable
 
 [observability.logs]
 enabled = true

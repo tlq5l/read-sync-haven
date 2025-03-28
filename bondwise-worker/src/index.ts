@@ -3,7 +3,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // Define the environment interface for TypeScript
 export interface Env {
 	SAVED_ITEMS_KV: KVNamespace;
-	GEMINI_API_KEY: string; // Added for Gemini API
+	GEMINI_API_KEY: string;
+	CF_ACCOUNT_ID: string; // Added for AI Gateway
+	CF_GATEWAY_ID: string; // Added for AI Gateway
 }
 
 // Define the structure for saved items (consistent with extension)
@@ -308,9 +310,12 @@ export default {
 				console.log("Processing /api/summarize request");
 				try {
 					const apiKey = env.GEMINI_API_KEY;
-					if (!apiKey) {
+					const accountId = env.CF_ACCOUNT_ID;
+					const gatewayId = env.CF_GATEWAY_ID;
+
+					if (!apiKey || !accountId || !gatewayId) {
 						console.error(
-							"GEMINI_API_KEY is not configured in environment variables.",
+							"AI Gateway/API Key environment variables (GEMINI_API_KEY, CF_ACCOUNT_ID, CF_GATEWAY_ID) are not fully configured.",
 						);
 						throw new Error("AI service is not configured.");
 					}
@@ -330,9 +335,13 @@ export default {
 					}
 
 					const genAI = new GoogleGenerativeAI(apiKey);
-					const model = genAI.getGenerativeModel({
-						model: "gemini-2.5-pro-exp-03-25",
-					});
+					// Configure the model to use the AI Gateway baseUrl
+					const model = genAI.getGenerativeModel(
+						{ model: "gemini-1.5-flash-latest" }, // Using flash model as per CF example
+						{
+							baseUrl: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/google-ai-studio`,
+						},
+					);
 					const prompt = `Summarize the following text concisely:
 
 ${content}`;

@@ -7,8 +7,8 @@ import {
 	SheetContent,
 	SheetHeader,
 	SheetTitle,
-	SheetDescription, // Added for accessibility
-	SheetTrigger,
+	SheetDescription, // Added import
+	SheetTrigger
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,7 +48,7 @@ export default function ArticleReader() {
 	const summarizeMutation = useMutation({
 		mutationFn: async (textContent: string) => {
 			// TODO: Replace with actual worker URL
-			const workerUrl = "http://localhost:8787"; // Or your deployed worker URL
+			const workerUrl = import.meta.env.VITE_WORKER_URL; // Or your deployed worker URL
 			const response = await fetch(`${workerUrl}/api/summarize`, {
 				method: "POST",
 				headers: {
