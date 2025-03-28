@@ -2,7 +2,21 @@ import EpubReader from "@/components/EpubReader";
 import PdfReader from "@/components/PdfReader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+	Sheet,
+	SheetClose,
+	SheetContent,
+	SheetHeader,
+	SheetTitle,
+	SheetTrigger,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+	Tabs,
+	TabsContent,
+	TabsList,
+	TabsTrigger,
+} from "@/components/ui/tabs";
 import { useArticles } from "@/context/ArticleContext";
 import { cn } from "@/lib/utils";
 import { type Article, getArticle } from "@/services/db";
@@ -12,9 +26,12 @@ import {
 	ArrowLeft,
 	Bookmark,
 	BookmarkCheck,
+	Loader2,
 	Maximize2,
 	Minimize2,
+	PanelRightOpen,
 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -27,6 +44,54 @@ export default function ArticleReader() {
 	const [fullscreen, setFullscreen] = useState(false);
 	const contentRef = useRef<HTMLDivElement>(null);
 	const { updateArticleStatus, updateReadingProgress } = useArticles();
+	const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+	const [isSummarizing, setIsSummarizing] = useState(false);
+	const [summary, setSummary] = useState<string | null>(null);
+	const [summaryError, setSummaryError] = useState<string | null>(null);
+
+	// Mutation for summarizing content
+	const summarizeMutation = useMutation({
+		mutationFn: async (textContent: string) => {
+			// TODO: Replace with actual worker URL
+			const workerUrl = "http://localhost:8787"; // Or your deployed worker URL
+			const response = await fetch(`${workerUrl}/api/summarize`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ content: textContent }),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(
+					errorData.message || "Failed to fetch summary from worker",
+				);
+			}
+
+			const data = await response.json();
+			if (data.status !== "success" || !data.summary) {
+				throw new Error(data.message || "Invalid summary response from worker");
+			}
+
+			return data.summary as string;
+		},
+		onMutate: () => {
+			setIsSummarizing(true);
+			setSummary(null);
+			setSummaryError(null);
+		},
+		onSuccess: (data) => {
+			setSummary(data);
+			setIsSidebarOpen(true); // Open sidebar on success
+		},
+		onError: (error) => {
+			setSummaryError(error.message);
+		},
+		onSettled: () => {
+			setIsSummarizing(false);
+		},
+	});
 
 	useEffect(() => {
 		const fetchArticle = async () => {
@@ -164,6 +229,14 @@ export default function ArticleReader() {
 							<Maximize2 className="h-5 w-5" />
 						)}
 					</Button>
+					{/* Sidebar Trigger */}
+					<Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+						<SheetTrigger asChild>
+							<Button variant="ghost" size="icon">
+								<PanelRightOpen className="h-5 w-5" />
+							</Button>
+						</SheetTrigger>
+					</Sheet>
 				</div>
 			</div>
 
@@ -255,6 +328,59 @@ export default function ArticleReader() {
 					</div>
 				</div>
 			)}
+
+			{/* Sidebar Content */}
+			<SheetContent side="right" className="w-[400px] sm:w-[540px]">
+				<SheetHeader>
+					<SheetTitle>Article Details</SheetTitle>
+				</SheetHeader>
+				<Tabs defaultValue="summary" className="mt-4">
+					<TabsList>
+						<TabsTrigger value="summary">Summary</TabsTrigger>
+						<TabsTrigger value="notes">Notes</TabsTrigger>
+						<TabsTrigger value="metadata">Metadata</TabsTrigger>
+					</TabsList>
+					<TabsContent value="summary" className="mt-4 space-y-4">
+						<Button
+							onClick={() => {
+								const textContent = contentRef.current?.textContent;
+								if (textContent) {
+									summarizeMutation.mutate(textContent);
+								} else {
+									setSummaryError("Could not extract article text.");
+								}
+							}}
+							disabled={isSummarizing}
+						>
+							{isSummarizing ? (
+								<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+							) : null}
+							Summarize Article
+						</Button>
+						{isSummarizing && (
+							<div className="space-y-2">
+								<Skeleton className="h-4 w-full" />
+								<Skeleton className="h-4 w-full" />
+								<Skeleton className="h-4 w-3/4" />
+							</div>
+						)}
+						{summaryError && (
+							<p className="text-sm text-destructive">Error: {summaryError}</p>
+						)}
+						{summary && (
+							<div className="prose prose-sm max-w-none">
+								<p>{summary}</p>
+							</div>
+						)}
+					</TabsContent>
+					<TabsContent value="notes" className="mt-4">
+						<p>Notes functionality to be added.</p>
+					</TabsContent>
+					<TabsContent value="metadata" className="mt-4">
+						<p>Metadata display to be added.</p>
+					</TabsContent>
+				</Tabs>
+			</SheetContent>
 		</div>
 	);
 }

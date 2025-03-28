@@ -1,6 +1,9 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 // Define the environment interface for TypeScript
 export interface Env {
 	SAVED_ITEMS_KV: KVNamespace;
+	GEMINI_API_KEY: string; // Added for Gemini API
 }
 
 // Define the structure for saved items (consistent with extension)
@@ -297,6 +300,65 @@ export default {
 						console.error(`Error deleting item ${id}:`, deleteError);
 						throw new Error("Failed to delete item");
 					}
+				}
+			}
+
+			// POST /api/summarize - Summarize content using Gemini
+			if (path === "/api/summarize" && request.method === "POST") {
+				console.log("Processing /api/summarize request");
+				try {
+					const apiKey = env.GEMINI_API_KEY;
+					if (!apiKey) {
+						console.error("GEMINI_API_KEY is not configured in environment variables.");
+						throw new Error("AI service is not configured.");
+					}
+
+					const { content } = (await request.json()) as { content?: string };
+					if (!content) {
+						return new Response(
+							JSON.stringify({
+								status: "error",
+								message: "Missing 'content' in request body",
+							}),
+							{
+								status: 400,
+								headers: { "Content-Type": "application/json", ...corsHeaders },
+							},
+						);
+					}
+
+					const genAI = new GoogleGenerativeAI(apiKey);
+					const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro-exp-03-25" });
+					const prompt = `Summarize the following text concisely:
+
+${content}`;
+
+					const result = await model.generateContent(prompt);
+					const response = result.response;
+					const summary = response.text();
+
+					return new Response(
+						JSON.stringify({ status: "success", summary: summary }),
+						{
+							headers: { "Content-Type": "application/json", ...corsHeaders },
+						},
+					);
+				} catch (aiError) {
+					console.error("Error calling Gemini API:", aiError);
+					// Don't throw here, return a proper error response
+					return new Response(
+						JSON.stringify({
+							status: "error",
+							message:
+								aiError instanceof Error
+									? aiError.message
+									: "Failed to generate summary due to an AI service error.",
+						}),
+						{
+							status: 500,
+							headers: { "Content-Type": "application/json", ...corsHeaders },
+						},
+					);
 				}
 			}
 
