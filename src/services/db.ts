@@ -822,7 +822,9 @@ export async function getAllArticles(options?: {
 				let filteredDocs = docs;
 				if (idsToCheck.length > 0) {
 					console.log(`Filtering by user IDs: ${idsToCheck.join(", ")}`);
-					filteredDocs = docs.filter((doc) => doc.userId && idsToCheck.includes(doc.userId));
+					filteredDocs = docs.filter(
+						(doc) => doc.userId && idsToCheck.includes(doc.userId),
+					);
 					console.log(
 						`After userId filter: ${filteredDocs.length} articles remain`,
 					);

@@ -148,9 +148,9 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				const options: Parameters<typeof getAllArticles>[0] = {
 					sortBy: "savedAt",
 					sortDirection: "desc",
-					userIds: isSignedIn ? 
-						[userId, userEmail].filter(Boolean) as string[] : 
-						undefined, // Filter by both Clerk ID and email when signed in
+					userIds: isSignedIn
+						? ([userId, userEmail].filter(Boolean) as string[])
+						: undefined, // Filter by both Clerk ID and email when signed in
 				};
 
 				if (currentView === "unread") {
@@ -256,9 +256,9 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			const options: Parameters<typeof getAllArticles>[0] = {
 				sortBy: "savedAt",
 				sortDirection: "desc",
-				userIds: isSignedIn ? 
-					[userId, userEmail].filter(Boolean) as string[] : 
-					undefined, // Filter by both Clerk ID and email when signed in
+				userIds: isSignedIn
+					? ([userId, userEmail].filter(Boolean) as string[])
+					: undefined, // Filter by both Clerk ID and email when signed in
 			};
 
 			if (currentView === "unread") {
@@ -295,7 +295,15 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Reset fetch lock when done
 			fetchLockRef.current = false;
 		}
-	}, [currentView, isInitialized, articles, userId, isSignedIn, isLoaded, user]); // Added userId, isSignedIn, isLoaded, user
+	}, [
+		currentView,
+		isInitialized,
+		articles,
+		userId,
+		isSignedIn,
+		isLoaded,
+		user,
+	]); // Added userId, isSignedIn, isLoaded, user
 
 	// Add article by URL
 	const addArticleByUrl = useCallback(
@@ -442,7 +450,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 				// Check if article belongs to current user
 				if (article.userId && article.userId !== userId) {
-					// Get user email for checking 
+					// Get user email for checking
 					const userEmail = user?.primaryEmailAddress?.emailAddress;
 					// Check if article belongs to user's email
 					if (userEmail && article.userId !== userEmail) {
