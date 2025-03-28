@@ -639,17 +639,21 @@ export async function getAllArticles(options?: {
 						// Handle userId filter with debugging
 						if (options?.userId) {
 							// Log before filtering
-							console.log(`Before userId filter: ${filteredDocs.length} articles`);
+							console.log(
+								`Before userId filter: ${filteredDocs.length} articles`,
+							);
 							console.log(`Filter value: ${options.userId}`);
-							
+
 							// Show some userIds for debugging
 							if (filteredDocs.length > 0) {
 								console.log("Sample userIds in articles:");
 								for (let i = 0; i < Math.min(5, filteredDocs.length); i++) {
-									console.log(`  Article ${i}: userId = ${filteredDocs[i].userId}`);
+									console.log(
+										`  Article ${i}: userId = ${filteredDocs[i].userId}`,
+									);
 								}
 							}
-							
+
 							filteredDocs = filteredDocs.filter((doc) => {
 								// Important: handle articles with no userId
 								if (!doc.userId) {
@@ -658,10 +662,14 @@ export async function getAllArticles(options?: {
 								}
 
 								const isMatch = doc.userId === options.userId;
-								console.log(`Article ${doc._id} userId: ${doc.userId}, match: ${isMatch}`);
+								console.log(
+									`Article ${doc._id} userId: ${doc.userId}, match: ${isMatch}`,
+								);
 								return isMatch;
 							});
-							console.log(`After userId filter: ${filteredDocs.length} articles`);
+							console.log(
+								`After userId filter: ${filteredDocs.length} articles`,
+							);
 						}
 
 						// Sort in memory
@@ -725,7 +733,7 @@ export async function getAllArticles(options?: {
 					// Log before filtering
 					console.log(`Before userId filter: ${docs.length} articles`);
 					console.log(`Filter value: ${options.userId}`);
-					
+
 					// Show all userIds for debugging
 					if (docs.length > 0) {
 						console.log("All userIds in articles:");
@@ -733,7 +741,7 @@ export async function getAllArticles(options?: {
 							console.log(`  Article ${doc._id}: userId = ${doc.userId}`);
 						}
 					}
-					
+
 					docs = docs.filter((doc) => {
 						// Important: handle articles with no userId
 						if (!doc.userId) {
@@ -742,7 +750,9 @@ export async function getAllArticles(options?: {
 						}
 
 						const isMatch = doc.userId === options.userId;
-						console.log(`Article ${doc._id} userId: ${doc.userId}, match: ${isMatch}`);
+						console.log(
+							`Article ${doc._id} userId: ${doc.userId}, match: ${isMatch}`,
+						);
 						return isMatch;
 					});
 					console.log(`After userId filter: ${docs.length} articles remain`);
@@ -801,7 +811,9 @@ export async function getAllArticles(options?: {
 				let filteredDocs = docs;
 				if (options?.userId) {
 					filteredDocs = docs.filter((doc) => doc.userId === options.userId);
-					console.log(`After userId filter: ${filteredDocs.length} articles remain`);
+					console.log(
+						`After userId filter: ${filteredDocs.length} articles remain`,
+					);
 				}
 
 				// Manual sort since we can't rely on PouchDB sort
@@ -818,7 +830,9 @@ export async function getAllArticles(options?: {
 					return aVal < bVal ? 1 : -1;
 				});
 
-				console.log(`Found ${filteredDocs.length} articles using find fallback`);
+				console.log(
+					`Found ${filteredDocs.length} articles using find fallback`,
+				);
 
 				// Update cache even for this fallback path
 				recentQueriesCache.set(cacheKey, {
