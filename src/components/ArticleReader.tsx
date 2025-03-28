@@ -5,10 +5,10 @@ import { Card } from "@/components/ui/card";
 import {
 	Sheet,
 	SheetContent,
+	SheetDescription, // Added import
 	SheetHeader,
 	SheetTitle,
-	SheetDescription, // Added import
-	SheetTrigger
+	SheetTrigger,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
