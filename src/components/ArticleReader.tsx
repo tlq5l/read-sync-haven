@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useArticles } from "@/context/ArticleContext";
 import { cn } from "@/lib/utils";
 import { type Article, getArticle } from "@/services/db";
+import { useMutation } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
 import parse from "html-react-parser";
 import {
@@ -25,7 +26,6 @@ import {
 	Minimize2,
 	PanelRightOpen,
 } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
