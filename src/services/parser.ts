@@ -233,7 +233,10 @@ export async function parseArticle(
 
 	// Calculate estimated read time (average reading speed: 200 words per minute)
 	const wordCount = (article.textContent || "").split(/\s+/).length;
-	const estimatedReadTime = Math.ceil(wordCount / 200);
+	let finalEstimatedReadTime = Math.ceil(wordCount / 200);
+	if (finalEstimatedReadTime === 0) {
+		finalEstimatedReadTime = 1; // Ensure minimum 1 minute read time
+	}
 
 	return {
 		title: article.title || "Untitled Article",
@@ -242,7 +245,7 @@ export async function parseArticle(
 		excerpt,
 		author: article.byline || undefined,
 		siteName: article.siteName || new URL(normalizedUrl).hostname,
-		estimatedReadTime,
+		estimatedReadTime: finalEstimatedReadTime, // Use the adjusted value
 		type: "article",
 	};
 }

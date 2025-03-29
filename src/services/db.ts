@@ -422,7 +422,13 @@ export async function saveEpubFile(
 			fileData: base64Encoded,
 			fileSize: file.size,
 			fileName: file.name,
-			estimatedReadTime: getEstimatedReadingTime(file.size),
+			estimatedReadTime: (() => {
+				let epubReadTime = getEstimatedReadingTime(file.size);
+				if (!epubReadTime || epubReadTime <= 0) {
+					epubReadTime = 1; // Default to 1 min if calculation fails or is zero
+				}
+				return epubReadTime;
+			})(),
 			siteName: metadata.publisher || "EPUB Book",
 			userId: userId,
 		};
@@ -526,7 +532,13 @@ export async function savePdfFile(
 			fileSize: file.size,
 			fileName: file.name,
 			pageCount: pageCount,
-			estimatedReadTime: getPdfReadingTime(file.size, pageCount),
+			estimatedReadTime: (() => {
+				let pdfReadTime = getPdfReadingTime(file.size, pageCount);
+				if (!pdfReadTime || pdfReadTime <= 0) {
+					pdfReadTime = 1; // Default to 1 min if calculation fails or is zero
+				}
+				return pdfReadTime;
+			})(),
 			siteName: "PDF Document",
 			userId: userId,
 		};
