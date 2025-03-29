@@ -211,59 +211,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 								});
 							}
 
-							// --- Notify open web app tabs (Moved outside try...catch) ---
-							console.log(
-								"[EXT DEBUG] Checking apiSuccess value before notification block:",
-								apiSuccess,
-							); // DEBUG LOG
-							// Use setTimeout to push notification logic to next event loop tick
-							setTimeout(() => {
-								if (apiSuccess) {
-									console.log(
-										"[EXT DEBUG] Entering notification block (in setTimeout). Querying tabs...",
-									); // Updated DEBUG LOG
-									const webAppUrls = [
-										"http://localhost:8080/*",
-										"https://read-sync-haven.pages.dev/*",
-										"https://staging.read-sync-haven.pages.dev/*",
-									];
-									console.log("[EXT DEBUG] About to call chrome.tabs.query"); // DEBUG LOG
-									chrome.tabs.query({ url: webAppUrls }, (tabs) => {
-										console.log(
-											"[EXT DEBUG] chrome.tabs.query callback executed.",
-										); // DEBUG LOG
-										if (chrome.runtime.lastError) {
-											console.error(
-												"Error querying tabs:",
-												chrome.runtime.lastError.message,
-											);
-											return;
-										}
-										console.log("[EXT DEBUG] Found tabs:", tabs); // DEBUG LOG
-										for (const tab of tabs) {
-											// Use for...of loop
-											if (tab.id) {
-												console.log(
-													`[EXT DEBUG] Sending message to tab ${tab.id}`,
-												); // DEBUG LOG
-												chrome.tabs
-													.sendMessage(tab.id, { type: "NEW_CONTENT_SAVED" })
-													.catch((err) => {
-														// Catch errors if the tab cannot be reached (e.g., closed, content script not ready)
-														console.warn(
-															`Could not send message to tab ${tab.id}: ${err.message}`,
-														);
-													});
-											}
-										} // End of for...of loop
-									}); // End of chrome.tabs.query callback
-								}
-							}, 0); // End of setTimeout
-							// ----------------------------------------------------------
-
 							// --- Save locally (cache/fallback) regardless of API success for now ---
 							// (In a more robust system, you might only save locally if API fails, or sync later)
-							/* --- Temporarily Commented Out for Debugging ---
 							try {
 								console.log(
 									"Attempting to save item to chrome.storage.local:",
@@ -285,7 +234,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 									return; // Exit early if both failed
 								}
 							}
-							*/ // --- End of Temporarily Commented Out Block ---
 
 							// --- Send final response ---
 							if (apiSuccess) {
