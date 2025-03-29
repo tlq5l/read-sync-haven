@@ -170,7 +170,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 										"https://read-sync-haven.pages.dev/*",
 										"https://staging.read-sync-haven.pages.dev/*",
 									];
+									console.log("[EXT DEBUG] About to call chrome.tabs.query"); // DEBUG LOG
 									chrome.tabs.query({ url: webAppUrls }, (tabs) => {
+										console.log("[EXT DEBUG] chrome.tabs.query callback executed."); // DEBUG LOG
 										if (chrome.runtime.lastError) {
 											console.error(
 												"Error querying tabs:",
