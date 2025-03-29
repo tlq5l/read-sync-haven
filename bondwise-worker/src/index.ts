@@ -17,6 +17,7 @@ export interface Env {
 	// Secrets
 	CLERK_SECRET_KEY: string;
 	CLERK_PUBLISHABLE_KEY: string; // Added publishable key
+	GCF_AUTH_SECRET: string; // Added shared secret for GCF auth
 }
 
 // Define the structure for saved items (consistent with extension)
@@ -430,57 +431,13 @@ export default {
 						);
 					}
 
-					// --- 3. Generate Google OIDC Token via Workload Identity Federation ---
-					let googleOidcToken: string | null | undefined;
-					try {
-						// Log incoming headers for debugging WIF credential_source
-						const headersObject: { [key: string]: string } = {};
-						request.headers.forEach((value, key) => { headersObject[key] = value; });
-						console.log("DEBUG: Incoming Request Headers:", JSON.stringify(headersObject));
-						console.log(
-							"Attempting to get Google OIDC token via Workload Identity Federation (using getIdTokenClient)...", // Updated log
-						);
-						const googleAuth = new GoogleAuth({
-							// Keep the same WIF credentials configuration
-							credentials: {
-								type: "external_account",
-								audience: `//iam.googleapis.com/projects/${env.GCLOUD_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${env.GCLOUD_WORKLOAD_IDENTITY_POOL_ID}/providers/${env.GCLOUD_WORKLOAD_IDENTITY_PROVIDER_ID}`,
-								subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
-								token_url: "https://sts.googleapis.com/v1/token",
-								service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${env.GCLOUD_SERVICE_ACCOUNT_EMAIL}:generateIdToken`,
-								credential_source: {}, // Rely on auto-detection
-							},
-						});
-
-						// Try using getIdTokenClient specifically for the target audience (GCF URL)
-						const idTokenClient = await googleAuth.getIdTokenClient(gcfUrl);
-
-						// Get the ID token using the specialized client by making a dummy request
-						// The actual request isn't sent; we just extract the auth header it prepares.
-						const response = await idTokenClient.request({ url: gcfUrl });
-						const authHeader = response.config.headers?.Authorization;
-
-						if (authHeader?.startsWith("Bearer ")) {
-							// Use optional chaining
-							googleOidcToken = authHeader.split(" ")[1];
-						}
-
-						if (!googleOidcToken) {
-							throw new Error(
-								"Google Auth library returned an empty token via getIdTokenClient.", // Updated error message
-							);
-						}
-						console.log(
-							"Successfully obtained Google OIDC token via getIdTokenClient.",
-						); // Updated log
-					} catch (googleAuthError: any) {
-						// Log more details from the error object
-						console.error("Failed to get Google OIDC token. Full Error:", JSON.stringify(googleAuthError, Object.getOwnPropertyNames(googleAuthError)));
+					// --- 3. Prepare GCF Call with Shared Secret ---
+					if (!env.GCF_AUTH_SECRET) {
+						console.error("GCF_AUTH_SECRET is not configured in worker environment.");
 						return new Response(
 							JSON.stringify({
 								status: "error",
-								message: "Failed to authenticate with backend service.",
-								details: googleAuthError.message,
+								message: "Worker is missing configuration for backend authentication.",
 							}),
 							{
 								status: 500,
@@ -490,12 +447,13 @@ export default {
 					}
 
 					// --- 4. Call the Google Cloud Function ---
-					console.log(`Calling GCF at ${gcfUrl}...`);
+					console.log(`Calling GCF at ${gcfUrl} with shared secret...`); // Updated log
 					const gcfResponse = await fetch(gcfUrl, {
 						method: "POST",
 						headers: {
 							"Content-Type": "application/json",
-							Authorization: `Bearer ${googleOidcToken}`, // Use the generated Google OIDC token
+							// Add the shared secret header
+							"X-Worker-Authorization": `Bearer ${env.GCF_AUTH_SECRET}`,
 						},
 						body: JSON.stringify({ content: content }),
 					});
