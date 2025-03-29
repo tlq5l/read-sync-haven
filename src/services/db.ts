@@ -269,14 +269,69 @@ export async function saveArticle(
 	};
 
 	try {
-		const response = await articlesDb.put(newArticle);
-		if (response.ok) {
-			return { ...newArticle, _rev: response.rev };
+		// Attempt to get the existing document to retrieve the latest _rev
+		let existingRev: string | undefined;
+		try {
+			const existingDoc = await articlesDb.get(newArticle._id);
+			existingRev = existingDoc._rev;
+			console.log(
+				`Article ${newArticle._id} exists locally with rev ${existingRev}. Updating.`,
+			);
+		} catch (getErr: any) {
+			if (getErr.name === "not_found") {
+				console.log(
+					`Article ${newArticle._id} does not exist locally. Creating new.`,
+				);
+				// Document doesn't exist, proceed to create
+			} else {
+				// Rethrow other errors during get
+				throw getErr;
+			}
 		}
-		throw new Error("Failed to save article");
-	} catch (error) {
-		console.error("Error saving article:", error);
-		throw error;
+
+		// If it exists, add the _rev to the document we're saving
+		const docToSave = existingRev
+			? { ...newArticle, _rev: existingRev }
+			: newArticle;
+
+		// Now attempt the put operation
+		const response = await articlesDb.put(docToSave);
+
+		if (response.ok) {
+			// Return the saved article with the new revision
+			return { ...docToSave, _rev: response.rev };
+		}
+		// If put somehow fails without throwing an error
+		throw new Error("PouchDB put operation failed without throwing an error.");
+	} catch (error: any) {
+		// Handle potential conflict during the put (if doc was updated between get and put)
+		if (error.name === "conflict") {
+			console.warn(
+				`Conflict saving article ${newArticle._id}. Retrying...`,
+				error,
+			);
+			// Simple retry mechanism: fetch again and try putting immediately
+			// A more robust solution might involve a loop or exponential backoff
+			try {
+				const latestDoc = await articlesDb.get(newArticle._id);
+				const docToRetry = { ...newArticle, _rev: latestDoc._rev };
+				const retryResponse = await articlesDb.put(docToRetry);
+				if (retryResponse.ok) {
+					return { ...docToRetry, _rev: retryResponse.rev };
+				}
+				throw new Error("Retry save failed after conflict.");
+			} catch (retryError) {
+				console.error(
+					`Error saving article ${newArticle._id} after conflict retry:`,
+					retryError,
+				);
+				throw retryError; // Throw the error from the retry attempt
+			}
+		} else {
+			// Handle other errors
+			console.error(`Error saving article ${newArticle._id}:`, error);
+			throw error; // Rethrow other errors
+		}
 	}
 }
 
