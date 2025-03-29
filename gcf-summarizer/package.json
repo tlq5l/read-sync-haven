@@ -1,23 +1,23 @@
 {
-  "name": "gemini-summarizer-gcf",
-  "version": "1.0.0",
-  "description": "Google Cloud Function to summarize text using Gemini API",
-  "main": "dist/index.js",
-  "type": "module",
-  "scripts": {
-    "build": "tsc",
-    "start": "functions-framework --target=summarizeText",
-    "deploy": "gcloud functions deploy summarizeText --gen2 --runtime=nodejs20 --region=YOUR_REGION --source=. --entry-point=summarizeText --trigger-http --allow-unauthenticated --set-env-vars GEMINI_API_KEY=YOUR_GEMINI_KEY,WORKER_AUTH_KEY=YOUR_WORKER_SECRET"
-  },
-  "dependencies": {
-    "@google-cloud/functions-framework": "^3.3.0",
-    "@google/generative-ai": "^0.16.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.11.5",
-    "typescript": "^5.3.3"
-  },
-  "engines": {
-    "node": "20"
-  }
+	"name": "gemini-summarizer-gcf",
+	"version": "1.0.0",
+	"description": "Google Cloud Function to summarize text using Gemini API",
+	"main": "dist/index.js",
+	"type": "module",
+	"scripts": {
+		"build": "tsc",
+		"start": "functions-framework --target=summarizeText",
+		"deploy": "gcloud functions deploy summarizeText --gen2 --runtime=nodejs20 --region=YOUR_REGION --source=. --entry-point=summarizeText --trigger-http --allow-unauthenticated --set-env-vars GEMINI_API_KEY=YOUR_GEMINI_KEY,WORKER_AUTH_KEY=YOUR_WORKER_SECRET"
+	},
+	"dependencies": {
+		"@google-cloud/functions-framework": "^3.3.0",
+		"@google/generative-ai": "^0.16.0"
+	},
+	"devDependencies": {
+		"@types/node": "^20.11.5",
+		"typescript": "^5.3.3"
+	},
+	"engines": {
+		"node": "20"
+	}
 }
