@@ -260,6 +260,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 							// --- Save locally (cache/fallback) regardless of API success for now ---
 							// (In a more robust system, you might only save locally if API fails, or sync later)
+							/* --- Temporarily Commented Out for Debugging ---
 							try {
 								console.log(
 									"Attempting to save item to chrome.storage.local:",
@@ -281,6 +282,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 									return; // Exit early if both failed
 								}
 							}
+							*/ // --- End of Temporarily Commented Out Block ---
 
 							// --- Send final response ---
 							if (apiSuccess) {
