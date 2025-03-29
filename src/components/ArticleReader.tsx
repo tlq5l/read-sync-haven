@@ -47,34 +47,48 @@ export default function ArticleReader() {
 	// --- DEVELOPMENT ONLY TOKEN FETCHING ---
 	// IMPORTANT: This function is for LOCAL DEVELOPMENT ONLY and requires manual steps.
 	// It relies on the user having `gcloud` CLI installed and authenticated.
-	// DO NOT USE THIS IN PRODUCTION. Implement a secure backend token generation flow.
+	// Fetches Google OIDC token. Uses local dev server endpoint in development.
 	async function getGoogleAuthToken(audience: string): Promise<string> {
-		console.warn(
-			"Using DEVELOPMENT ONLY getGoogleAuthToken. Requires manual gcloud command execution.",
-		);
+		// In development, fetch token from the Vite dev server proxy
+		if (import.meta.env.DEV) {
+			console.log("Fetching GCF token from local dev server...");
+			try {
+				const response = await fetch("/api/get-gcf-token"); // Fetch from local endpoint
+				const data = await response.json();
 
-		// Construct the command the user needs to run
-		const commandToRun = `gcloud auth print-identity-token --audiences="${audience}"`;
-
-		// Prompt the user to run the command and paste the token
-		const token = prompt(
-			`--- LOCAL DEVELOPMENT ONLY ---\n\nPlease run the following command in your terminal (ensure gcloud is authenticated):\n\n${commandToRun}\n\nThen paste the resulting token here:`,
-		);
-
-		if (!token) {
-			throw new Error(
-				"Token fetching cancelled or failed. Could not get OIDC token.",
+				if (!response.ok || !data.token) {
+					// Display specific error from dev server if available
+					const errorMsg = data?.error
+						? `Failed to get token from dev server: ${data.error}`
+						: `Failed to get token from dev server: Status ${response.status}`;
+					alert(errorMsg); // Use alert for visibility in dev
+					throw new Error(errorMsg);
+				}
+				console.log("Successfully received token from dev server.");
+				return data.token;
+			} catch (error) {
+				console.error("Error fetching token from dev server:", error);
+				alert(
+					`Error fetching token from dev server: ${error}. Check Vite console and ensure ADC is configured ('gcloud auth application-default login').`,
+				);
+				throw new Error("Could not get OIDC token from local dev server.");
+			}
+		} else {
+			// --- PRODUCTION/OTHER ENVIRONMENTS ---
+			// TODO: Implement the actual production token fetching mechanism here.
+			// This might involve calling a secure backend endpoint, using Clerk's
+			// integration if configured, or another secure method.
+			// For now, it will likely fail or use a placeholder if not implemented.
+			console.error(
+				"Production token fetching not implemented! Using placeholder.",
 			);
+			// Placeholder/Error for production - Replace with actual implementation
+			throw new Error(
+				"Production OIDC token fetching mechanism is not implemented.",
+			);
+			// return "PRODUCTION_TOKEN_PLACEHOLDER"; // Or throw error
 		}
-
-		// Basic check to see if it looks like a token (optional)
-		if (token.split(".").length !== 3) {
-			console.warn("Pasted value doesn't look like a standard JWT/OIDC token.");
-		}
-
-		return token.trim();
 	}
-	// --- END DEVELOPMENT ONLY TOKEN FETCHING ---
 
 	// Mutation for summarizing content using Google Cloud Function (Authenticated)
 	const summarizeMutation = useMutation({

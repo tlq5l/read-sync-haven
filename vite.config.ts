@@ -1,7 +1,76 @@
 import path from "node:path";
 import react from "@vitejs/plugin-react-swc";
-import { defineConfig } from "vite";
+import { type Plugin, defineConfig, loadEnv } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+import { GoogleAuth } from "google-auth-library"; // Import GoogleAuth
+
+// Custom plugin to provide GCF token during development
+function gcfDevTokenProvider(): Plugin {
+	return {
+		name: "vite-plugin-gcf-dev-token",
+		configureServer(server) {
+			// Load .env variables for server-side use
+			const env = loadEnv("development", process.cwd(), "");
+			const gcfUrl = env.VITE_GCF_SUMMARIZE_URL;
+
+			if (!gcfUrl) {
+				console.warn(
+					"VITE_GCF_SUMMARIZE_URL not found in .env file. GCF token endpoint will not work.",
+				);
+				return;
+			}
+
+			server.middlewares.use(async (req, res, next) => {
+				if (req.url === "/api/get-gcf-token") {
+					console.log("Received request for GCF token...");
+					try {
+						const auth = new GoogleAuth();
+						// Get the client using ADC
+						const client = await auth.getClient();
+						// Check if the client supports fetchIdToken (it should for ADC)
+						if (client && "fetchIdToken" in client && typeof client.fetchIdToken === "function") {
+							const idToken = await client.fetchIdToken(gcfUrl); // Fetch token with audience
+							console.log("Successfully fetched GCF token.");
+							res.setHeader("Content-Type", "application/json");
+							res.end(JSON.stringify({ token: idToken }));
+						} else {
+							throw new Error(
+								"Authenticated client does not support fetchIdToken.",
+							);
+						}
+					} catch (error: any) {
+						console.error("Error fetching GCF token:", error);
+						// Check if the error is due to ADC not being configured
+						if (
+							error.message?.includes("Could not load the default credentials") ||
+							error.message?.includes("Unable to detect a Project Id")
+						) {
+							res.statusCode = 500;
+							res.setHeader("Content-Type", "application/json");
+							res.end(
+								JSON.stringify({
+									error:
+										"Failed to get GCF token. Application Default Credentials (ADC) might not be configured. Run 'gcloud auth application-default login' in your terminal.",
+								}),
+							);
+						} else {
+							res.statusCode = 500;
+							res.setHeader("Content-Type", "application/json");
+							res.end(
+								JSON.stringify({
+									error: "Internal server error fetching GCF token.",
+									details: error.message,
+								}),
+							);
+						}
+					}
+				} else {
+					next(); // Pass request to next middleware if URL doesn't match
+				}
+			});
+		},
+	};
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -12,7 +81,7 @@ export default defineConfig({
 	plugins: [
 		react({
 			jsxImportSource: "react",
-			jsxRuntime: "classic",
+			// jsxRuntime: "classic", // Removed invalid option
 		}),
 		nodePolyfills({
 			globals: {
