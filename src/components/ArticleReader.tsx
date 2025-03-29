@@ -13,9 +13,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useArticles } from "@/context/ArticleContext";
-import { useAuth } from "@clerk/clerk-react"; // Import useAuth
 import { cn } from "@/lib/utils";
 import { type Article, getArticle } from "@/services/db";
+import { useAuth } from "@clerk/clerk-react"; // Import useAuth
 import { useMutation } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
 import parse from "html-react-parser"; // Re-add parse import
@@ -91,15 +91,18 @@ export default function ArticleReader() {
 				}
 
 				// 2. Call the worker endpoint (absolute URL of the standalone worker)
-				response = await fetch("https://bondwise-sync-api.vikione.workers.dev/api/summarize", {
-					// Absolute path to worker endpoint
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${clerkToken}`, // Send Clerk token
+				response = await fetch(
+					"https://bondwise-sync-api.vikione.workers.dev/api/summarize",
+					{
+						// Absolute path to worker endpoint
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${clerkToken}`, // Send Clerk token
+						},
+						body: requestBody,
 					},
-					body: requestBody,
-				});
+				);
 			}
 
 			// --- Handle Response (Common for Dev/Prod) ---

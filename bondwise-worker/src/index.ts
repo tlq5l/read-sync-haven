@@ -16,6 +16,7 @@ export interface Env {
 
 	// Secrets
 	CLERK_SECRET_KEY: string;
+	CLERK_PUBLISHABLE_KEY: string; // Added publishable key
 }
 
 // Define the structure for saved items (consistent with extension)
@@ -48,7 +49,9 @@ function parseUserItemKey(
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
-		console.log(`WORKER FETCH HANDLER INVOKED: Method=${request.method}, URL=${request.url}`); // Add top-level log
+		console.log(
+			`WORKER FETCH HANDLER INVOKED: Method=${request.method}, URL=${request.url}`,
+		); // Add top-level log
 		// CORS headers for all responses
 		const corsHeaders = {
 			"Access-Control-Allow-Origin": "*",
@@ -345,6 +348,7 @@ export default {
 						const requestState = await clerk.authenticateRequest(request, {
 							// Pass request first, then options
 							secretKey: env.CLERK_SECRET_KEY,
+							publishableKey: env.CLERK_PUBLISHABLE_KEY, // Add publishable key
 						});
 
 						// Check if the request is authenticated

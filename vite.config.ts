@@ -1,8 +1,8 @@
 import path from "node:path";
 import react from "@vitejs/plugin-react-swc";
 import { GoogleAuth } from "google-auth-library"; // Import GoogleAuth
-import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { type Plugin, defineConfig, loadEnv } from "vite"; // Moved vite import down
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // // Custom plugin to provide GCF token during development
 // function gcfDevTokenProvider(): Plugin {
