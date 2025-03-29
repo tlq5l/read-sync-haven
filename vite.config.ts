@@ -124,14 +124,15 @@ export default defineConfig(({ mode }) => ({
 						return "vendor-clerk";
 					}
 
-					// Split React and related libraries
-					if (
-						id.includes("react") ||
-						id.includes("react-dom") ||
-						id.includes("react-router")
-					) {
-						return "vendor-react";
-					}
+					// Removed explicit splitting for react/react-dom/react-router
+					// Let Vite handle them or group them in vendor-deps
+					// if (
+					// 	id.includes("react") ||
+					// 	id.includes("react-dom") ||
+					// 	id.includes("react-router")
+					// ) {
+					// 	return "vendor-react";
+					// }
 
 					// Split UI components
 					if (
