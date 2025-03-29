@@ -32,3 +32,4 @@ bun-path.ps1
 # *.lock
 # package-lock.json
 # bun.lockb
+.aider*
