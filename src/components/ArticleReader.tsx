@@ -90,9 +90,9 @@ export default function ArticleReader() {
 					throw new Error("User not authenticated (Clerk token missing).");
 				}
 
-				// 2. Call the worker endpoint (relative path assumes same domain or configured routing)
-				response = await fetch("/api/summarize", {
-					// Relative path to worker endpoint
+				// 2. Call the worker endpoint (absolute URL of the standalone worker)
+				response = await fetch("https://bondwise-sync-api.vikione.workers.dev/api/summarize", {
+					// Absolute path to worker endpoint
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
