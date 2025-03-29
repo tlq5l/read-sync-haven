@@ -434,19 +434,11 @@ export default {
 					let googleOidcToken: string | null | undefined;
 					try {
 						console.log(
-							"Attempting to get Google OIDC token via Workload Identity Federation (using getIdTokenClient)...", // Updated log
+							"Attempting to get Google OIDC token (relying on default auth)...", // Updated log
 						);
-						const googleAuth = new GoogleAuth({
-							// Keep the same WIF credentials configuration
-							credentials: {
-								type: "external_account",
-								audience: `//iam.googleapis.com/projects/${env.GCLOUD_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${env.GCLOUD_WORKLOAD_IDENTITY_POOL_ID}/providers/${env.GCLOUD_WORKLOAD_IDENTITY_PROVIDER_ID}`,
-								subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
-								token_url: "https://sts.googleapis.com/v1/token",
-								service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${env.GCLOUD_SERVICE_ACCOUNT_EMAIL}:generateIdToken`,
-								credential_source: {}, // Rely on auto-detection
-							},
-						});
+						// Initialize GoogleAuth without explicit WIF credentials, rely on default discovery
+						const googleAuth = new GoogleAuth();
+
 
 						// Try using getIdTokenClient specifically for the target audience (GCF URL)
 						const idTokenClient = await googleAuth.getIdTokenClient(gcfUrl);
