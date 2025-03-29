@@ -1,8 +1,8 @@
 import path from "node:path";
 import react from "@vitejs/plugin-react-swc";
-import { type Plugin, defineConfig, loadEnv } from "vite";
-import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { GoogleAuth } from "google-auth-library"; // Import GoogleAuth
+import { nodePolyfills } from "vite-plugin-node-polyfills";
+import { type Plugin, defineConfig, loadEnv } from "vite"; // Moved vite import down
 
 // Custom plugin to provide GCF token during development
 function gcfDevTokenProvider(): Plugin {
@@ -28,7 +28,11 @@ function gcfDevTokenProvider(): Plugin {
 						// Get the client using ADC
 						const client = await auth.getClient();
 						// Check if the client supports fetchIdToken (it should for ADC)
-						if (client && "fetchIdToken" in client && typeof client.fetchIdToken === "function") {
+						if (
+							client &&
+							"fetchIdToken" in client &&
+							typeof client.fetchIdToken === "function"
+						) {
 							const idToken = await client.fetchIdToken(gcfUrl); // Fetch token with audience
 							console.log("Successfully fetched GCF token.");
 							res.setHeader("Content-Type", "application/json");
@@ -42,7 +46,9 @@ function gcfDevTokenProvider(): Plugin {
 						console.error("Error fetching GCF token:", error);
 						// Check if the error is due to ADC not being configured
 						if (
-							error.message?.includes("Could not load the default credentials") ||
+							error.message?.includes(
+								"Could not load the default credentials",
+							) ||
 							error.message?.includes("Unable to detect a Project Id")
 						) {
 							res.statusCode = 500;
@@ -73,12 +79,15 @@ function gcfDevTokenProvider(): Plugin {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+	// Accept mode here
 	server: {
 		host: "::",
 		port: 8080,
 	},
 	plugins: [
+		// Add the custom plugin for development only - Placed first
+		mode === "development" ? gcfDevTokenProvider() : null, // Use mode variable
 		react({
 			jsxImportSource: "react",
 			// jsxRuntime: "classic", // Removed invalid option
@@ -146,4 +155,4 @@ export default defineConfig({
 			},
 		},
 	},
-});
+})); // Close the function call

@@ -13,11 +13,12 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useArticles } from "@/context/ArticleContext";
+import { useAuth } from "@clerk/clerk-react"; // Import useAuth
 import { cn } from "@/lib/utils";
 import { type Article, getArticle } from "@/services/db";
 import { useMutation } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
-import parse from "html-react-parser";
+import parse from "html-react-parser"; // Re-add parse import
 import {
 	ArrowLeft,
 	Bookmark,
@@ -30,7 +31,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "@clerk/clerk-react"; // Import useAuth
+// import { useAuth } from "@clerk/clerk-react"; // Removed duplicate import
 
 export default function ArticleReader() {
 	const { id } = useParams<{ id: string }>();
@@ -65,7 +66,9 @@ export default function ArticleReader() {
 				const tokenResponse = await fetch("/api/get-gcf-token");
 				const tokenData = await tokenResponse.json();
 				if (!tokenResponse.ok || !tokenData.token) {
-					throw new Error(tokenData?.error || "Failed to get dev token from Vite server.");
+					throw new Error(
+						tokenData?.error || "Failed to get dev token from Vite server.",
+					);
 				}
 				const googleOidcToken = tokenData.token;
 
@@ -78,7 +81,6 @@ export default function ArticleReader() {
 					},
 					body: requestBody,
 				});
-
 			} else {
 				// --- PRODUCTION: Call Cloudflare Worker Proxy ---
 				console.log("PROD: Calling Cloudflare Worker proxy...");
@@ -89,7 +91,8 @@ export default function ArticleReader() {
 				}
 
 				// 2. Call the worker endpoint (relative path assumes same domain or configured routing)
-				response = await fetch("/api/summarize", { // Relative path to worker endpoint
+				response = await fetch("/api/summarize", {
+					// Relative path to worker endpoint
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
@@ -105,12 +108,16 @@ export default function ArticleReader() {
 			if (!response.ok) {
 				// Use error message from backend response if available
 				throw new Error(
-					data?.message || data?.error || `Request failed with status ${response.status}`,
+					data?.message ||
+						data?.error ||
+						`Request failed with status ${response.status}`,
 				);
 			}
 
 			if (!data.summary) {
-				throw new Error("Invalid response from summarization service (missing summary).");
+				throw new Error(
+					"Invalid response from summarization service (missing summary).",
+				);
 			}
 
 			return data.summary; // Return the summary text
