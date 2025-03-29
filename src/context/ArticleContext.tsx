@@ -180,10 +180,33 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					filteredArticles = fetchedArticles.filter((a) => a.favorite);
 				}
 
-				// Sort articles (assuming fetchCloudItems returns unsorted or differently sorted)
+				// Sort articles before saving/setting state
 				filteredArticles.sort((a, b) => b.savedAt - a.savedAt); // Sort by savedAt descending
 
+				// --- Save/Update fetched articles in local PouchDB ---
+				if (isSignedIn && fetchedArticles.length > 0) {
+					console.log(
+						`Attempting to save/update ${fetchedArticles.length} fetched articles locally...`,
+					);
+					for (const article of fetchedArticles) {
+						try {
+							// Ensure the article has the correct Clerk user ID before saving locally
+							const articleToSave = { ...article, userId: userId }; // Use Clerk userId
+							await saveArticle(articleToSave); // saveArticle should handle upserts
+						} catch (saveErr) {
+							console.warn(
+								`Failed to save/update article ${article._id} locally:`,
+								saveErr,
+							);
+							// Decide if we should continue or stop? For now, continue.
+						}
+					}
+					console.log("Finished saving/updating fetched articles locally.");
+				}
+				// ----------------------------------------------------
+
 				if (isMounted) {
+					// Set state with the filtered & sorted list
 					setArticles(filteredArticles);
 					setError(null);
 					isLoadingInProgress = false; // Mark loading as complete
@@ -308,10 +331,32 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				filteredArticles = fetchedArticles.filter((a) => a.favorite);
 			}
 
-			// Sort articles
+			// Sort articles before saving/setting state
 			filteredArticles.sort((a, b) => b.savedAt - a.savedAt);
 
-			// Update state
+			// --- Save/Update fetched articles in local PouchDB ---
+			if (isSignedIn && fetchedArticles.length > 0) {
+				console.log(
+					`Attempting to save/update ${fetchedArticles.length} refreshed articles locally...`,
+				);
+				for (const article of fetchedArticles) {
+					try {
+						// Ensure the article has the correct Clerk user ID before saving locally
+						const articleToSave = { ...article, userId: userId }; // Use Clerk userId
+						await saveArticle(articleToSave); // saveArticle should handle upserts
+					} catch (saveErr) {
+						console.warn(
+							`Failed to save/update refreshed article ${article._id} locally:`,
+							saveErr,
+						);
+						// Decide if we should continue or stop? For now, continue.
+					}
+				}
+				console.log("Finished saving/updating refreshed articles locally.");
+			}
+			// ------------------------------------------------
+
+			// Update state with the filtered & sorted list
 			setArticles(filteredArticles);
 			setError(null); // Set error to null on successful fetch and filter
 
