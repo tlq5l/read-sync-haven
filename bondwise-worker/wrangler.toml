@@ -14,7 +14,7 @@ kv_namespaces = [
 # and in .env file for local development
 [vars]
 GEMINI_API_KEY = "" # Value ignored, declares variable (kept for potential future use)
-GCF_URL = ""        # Value ignored, declares variable (HTTPS Trigger URL for the GCF)
+# GCF_URL = ""        # REMOVED - Value is managed via wrangler secret
 # GCF_AUTH_KEY = "" # Removed - Using Workload Identity Federation now
 
 # Variables for Workload Identity Federation
