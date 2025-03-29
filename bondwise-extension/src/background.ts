@@ -163,16 +163,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 								apiSuccess = true;
 
 								// --- Notify open web app tabs ---
+								console.log(
+									"[EXT DEBUG] Checking apiSuccess value before if:",
+									apiSuccess,
+								); // DEBUG LOG
 								if (apiSuccess) {
-									console.log("[EXT DEBUG] API success. Querying tabs..."); // DEBUG LOG
+									console.log(
+										"[EXT DEBUG] Entering if(apiSuccess) block. Querying tabs...",
+									); // Updated DEBUG LOG
 									const webAppUrls = [
+										// Re-add variable declaration
 										"http://localhost:8080/*",
 										"https://read-sync-haven.pages.dev/*",
 										"https://staging.read-sync-haven.pages.dev/*",
 									];
 									console.log("[EXT DEBUG] About to call chrome.tabs.query"); // DEBUG LOG
 									chrome.tabs.query({ url: webAppUrls }, (tabs) => {
-										console.log("[EXT DEBUG] chrome.tabs.query callback executed."); // DEBUG LOG
+										console.log(
+											"[EXT DEBUG] chrome.tabs.query callback executed.",
+										); // DEBUG LOG
 										if (chrome.runtime.lastError) {
 											console.error(
 												"Error querying tabs:",
