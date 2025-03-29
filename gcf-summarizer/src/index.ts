@@ -1,10 +1,10 @@
+import type { HttpFunction } from "@google-cloud/functions-framework";
 import functions from "@google-cloud/functions-framework";
 import {
 	GoogleGenerativeAI,
-	HarmCategory,
 	HarmBlockThreshold,
+	HarmCategory,
 } from "@google/generative-ai";
-import type { HttpFunction } from "@google-cloud/functions-framework";
 
 // Read environment variables
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -97,11 +97,9 @@ export const summarizeText: HttpFunction = async (req, res) => {
 				console.error(
 					`Prompt blocked: ${result.response.promptFeedback.blockReason}`,
 				);
-				return res
-					.status(400)
-					.send({
-						error: `Content blocked: ${result.response.promptFeedback.blockReason}`,
-					});
+				return res.status(400).send({
+					error: `Content blocked: ${result.response.promptFeedback.blockReason}`,
+				});
 			}
 			console.error("Gemini API returned no candidates:", result.response);
 			return res
@@ -114,11 +112,9 @@ export const summarizeText: HttpFunction = async (req, res) => {
 				`Gemini generation stopped: ${firstCandidate.finishReason}`,
 				firstCandidate.safetyRatings,
 			);
-			return res
-				.status(400)
-				.send({
-					error: `Content generation stopped: ${firstCandidate.finishReason}`,
-				});
+			return res.status(400).send({
+				error: `Content generation stopped: ${firstCandidate.finishReason}`,
+			});
 		}
 		const summary = firstCandidate.content?.parts[0]?.text;
 		if (!summary) {
