@@ -109,15 +109,44 @@ const handleSummarizeRequest: HttpFunction = async (req, res) => {
 	}
 };
 
-// Wrap the main handler with CORS
+// Main exported function, handles CORS preflight and then the request
 export const summarizeText: HttpFunction = (req: Request, res: Response) => {
-	corsHandler(req, res, () => {
-		handleSummarizeRequest(req, res).catch((err: unknown) => {
-			console.error("Unhandled error in handleSummarizeRequest:", err);
+	// Run CORS middleware first
+	corsHandler(req, res, async (err?: any) => {
+		if (err) {
+			console.error("CORS error:", err);
+			// Ensure response is sent even on CORS error if headers not sent
 			if (!res.headersSent) {
-				res.status(500).send({ error: "Internal Server Error." });
+				res.status(500).send({ error: "CORS configuration error." });
 			}
-		});
+			return;
+		}
+
+		// If it's a preflight (OPTIONS) request, CORS middleware handles it,
+		// and we don't need to proceed further. Check if headers were sent.
+		if (req.method === "OPTIONS" && res.headersSent) {
+			// Preflight handled by cors middleware.
+			// Note: Sometimes cors middleware might not automatically end the response.
+			// If issues persist, uncomment the next line:
+			// res.status(204).send('');
+			return;
+		}
+
+		// If it's not OPTIONS or if CORS middleware didn't end the response,
+		// proceed with the actual request handling for POST.
+		if (req.method === "POST") {
+			try {
+				await handleSummarizeRequest(req, res);
+			} catch (error) {
+				console.error("Error in handleSummarizeRequest:", error);
+				if (!res.headersSent) {
+					res.status(500).send({ error: "Internal Server Error." });
+				}
+			}
+		} else if (!res.headersSent) {
+			// Handle methods other than POST and OPTIONS if not already handled
+			res.status(405).send({ error: "Method Not Allowed" });
+		}
 	});
 };
 
