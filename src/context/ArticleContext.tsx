@@ -795,6 +795,47 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		await refreshArticles();
 	}, [currentView, toast, refreshArticles]);
 
+	// --- Listener for Extension Messages ---
+	useEffect(() => {
+		// Check if chrome.runtime is available (it won't be in a standard web context)
+		if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+			const handleExtensionMessage = (
+				message: any,
+				_sender: chrome.runtime.MessageSender, // Prefix with underscore
+				_sendResponse: (response?: any) => void, // Prefix with underscore
+			) => {
+				console.log("Message received from extension:", message);
+				if (message.type === "NEW_CONTENT_SAVED") {
+					console.log(
+						"New content saved message received, triggering refresh...",
+					);
+					// Avoid triggering refresh if one is already in progress
+					if (!fetchLockRef.current) {
+						refreshArticles();
+					} else {
+						console.log(
+							"Refresh skipped because another fetch/refresh is already in progress.",
+						);
+					}
+				}
+				// Indicate async response potentially needed (though we don't send one here)
+				return false;
+			};
+
+			chrome.runtime.onMessage.addListener(handleExtensionMessage);
+			console.log("Extension message listener added.");
+
+			// Cleanup function
+			return () => {
+				chrome.runtime.onMessage.removeListener(handleExtensionMessage);
+				console.log("Extension message listener removed.");
+			};
+		}
+		// No cleanup needed if chrome.runtime is not available
+		return undefined;
+	}, [refreshArticles]); // Dependency: refreshArticles function
+	// --------------------------------------
+
 	// Create context value
 	const contextValue = useMemo(
 		() => ({

@@ -161,6 +161,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 								}
 
 								apiSuccess = true;
+
+								// --- Notify open web app tabs ---
+								if (apiSuccess) {
+									const webAppUrls = [
+										"http://localhost:8080/*",
+										"https://read-sync-haven.pages.dev/*",
+										"https://staging.read-sync-haven.pages.dev/*",
+									];
+									chrome.tabs.query({ url: webAppUrls }, (tabs) => {
+										if (chrome.runtime.lastError) {
+											console.error(
+												"Error querying tabs:",
+												chrome.runtime.lastError.message,
+											);
+											return;
+										}
+										for (const tab of tabs) {
+											// Use for...of loop
+											if (tab.id) {
+												chrome.tabs
+													.sendMessage(tab.id, { type: "NEW_CONTENT_SAVED" })
+													.catch((err) => {
+														// Catch errors if the tab cannot be reached (e.g., closed, content script not ready)
+														console.warn(
+															`Could not send message to tab ${tab.id}: ${err.message}`,
+														);
+													});
+											}
+										} // End of for...of loop
+									}); // End of chrome.tabs.query callback
+								}
+								// --------------------------------
 							} catch (apiError) {
 								// Add more detailed logging in the catch block
 								console.error("Caught API Error during fetch:", apiError);
