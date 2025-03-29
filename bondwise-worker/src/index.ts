@@ -325,12 +325,7 @@ export default {
 				console.log("Processing /api/summarize request...");
 				try {
 					// --- 1. Verify Clerk Token ---
-					console.log(
-						`DEBUG: CLERK_SECRET_KEY is ${env.CLERK_SECRET_KEY ? "present" : "MISSING"}`,
-					); // Temporary debug log
-					console.log(
-						`DEBUG: CLERK_PUBLISHABLE_KEY is ${env.CLERK_PUBLISHABLE_KEY ? "present" : "MISSING"}`,
-					); // Temporary debug log
+					// Removed temporary debug logging for keys
 					const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 					const authHeader = request.headers.get("Authorization");
 					if (!authHeader || !authHeader.startsWith("Bearer ")) {
