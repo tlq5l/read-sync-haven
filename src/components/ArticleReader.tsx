@@ -26,12 +26,15 @@ import {
 	Maximize2,
 	Minimize2,
 	PanelRightOpen,
+	// PanelRightOpen, // Removed duplicate
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react"; // Import useAuth
 
 export default function ArticleReader() {
 	const { id } = useParams<{ id: string }>();
+	const { getToken } = useAuth(); // Get getToken function from Clerk
 	const navigate = useNavigate();
 	const [article, setArticle] = useState<Article | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -44,90 +47,73 @@ export default function ArticleReader() {
 	const [summary, setSummary] = useState<string | null>(null);
 	const [summaryError, setSummaryError] = useState<string | null>(null);
 
-	// --- DEVELOPMENT ONLY TOKEN FETCHING ---
-	// IMPORTANT: This function is for LOCAL DEVELOPMENT ONLY and requires manual steps.
-	// It relies on the user having `gcloud` CLI installed and authenticated.
-	// Fetches Google OIDC token. Uses local dev server endpoint in development.
-	async function getGoogleAuthToken(audience: string): Promise<string> {
-		// In development, fetch token from the Vite dev server proxy
-		if (import.meta.env.DEV) {
-			console.log("Fetching GCF token from local dev server...");
-			try {
-				const response = await fetch("/api/get-gcf-token"); // Fetch from local endpoint
-				const data = await response.json();
-
-				if (!response.ok || !data.token) {
-					// Display specific error from dev server if available
-					const errorMsg = data?.error
-						? `Failed to get token from dev server: ${data.error}`
-						: `Failed to get token from dev server: Status ${response.status}`;
-					alert(errorMsg); // Use alert for visibility in dev
-					throw new Error(errorMsg);
-				}
-				console.log("Successfully received token from dev server.");
-				return data.token;
-			} catch (error) {
-				console.error("Error fetching token from dev server:", error);
-				alert(
-					`Error fetching token from dev server: ${error}. Check Vite console and ensure ADC is configured ('gcloud auth application-default login').`,
-				);
-				throw new Error("Could not get OIDC token from local dev server.");
-			}
-		} else {
-			// --- PRODUCTION/OTHER ENVIRONMENTS ---
-			// TODO: Implement the actual production token fetching mechanism here.
-			// This might involve calling a secure backend endpoint, using Clerk's
-			// integration if configured, or another secure method.
-			// For now, it will likely fail or use a placeholder if not implemented.
-			console.error(
-				"Production token fetching not implemented! Using placeholder.",
-			);
-			// Placeholder/Error for production - Replace with actual implementation
-			throw new Error(
-				"Production OIDC token fetching mechanism is not implemented.",
-			);
-			// return "PRODUCTION_TOKEN_PLACEHOLDER"; // Or throw error
-		}
-	}
+	// Removed the old getGoogleAuthToken function
 
 	// Mutation for summarizing content using Google Cloud Function (Authenticated)
 	const summarizeMutation = useMutation({
 		mutationFn: async (textContent: string) => {
-			const gcfUrl = import.meta.env.VITE_GCF_SUMMARIZE_URL;
+			let response: Response;
+			const requestBody = JSON.stringify({ content: textContent }); // Use const
 
-			if (!gcfUrl) {
-				throw new Error(
-					"GCF Summarizer URL is not configured in environment variables.",
-				);
+			if (import.meta.env.DEV) {
+				// --- DEVELOPMENT: Call GCF directly via Vite Proxy ---
+				console.log("DEV: Calling GCF via Vite proxy...");
+				const gcfUrl = import.meta.env.VITE_GCF_SUMMARIZE_URL;
+				if (!gcfUrl) throw new Error("VITE_GCF_SUMMARIZE_URL not set.");
+
+				// 1. Get Google OIDC token from Vite dev server
+				const tokenResponse = await fetch("/api/get-gcf-token");
+				const tokenData = await tokenResponse.json();
+				if (!tokenResponse.ok || !tokenData.token) {
+					throw new Error(tokenData?.error || "Failed to get dev token from Vite server.");
+				}
+				const googleOidcToken = tokenData.token;
+
+				// 2. Call GCF directly with the token
+				response = await fetch(gcfUrl, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${googleOidcToken}`,
+					},
+					body: requestBody,
+				});
+
+			} else {
+				// --- PRODUCTION: Call Cloudflare Worker Proxy ---
+				console.log("PROD: Calling Cloudflare Worker proxy...");
+				// 1. Get Clerk token
+				const clerkToken = await getToken(); // Get token from useAuth hook
+				if (!clerkToken) {
+					throw new Error("User not authenticated (Clerk token missing).");
+				}
+
+				// 2. Call the worker endpoint (relative path assumes same domain or configured routing)
+				response = await fetch("/api/summarize", { // Relative path to worker endpoint
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${clerkToken}`, // Send Clerk token
+					},
+					body: requestBody,
+				});
 			}
 
-			// Fetch the OIDC token for the Cloud Function URL (audience)
-			const authToken = await getGoogleAuthToken(gcfUrl);
-
-			const response = await fetch(gcfUrl, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${authToken}`, // Use Google OIDC token
-				},
-				body: JSON.stringify({ content: textContent }),
-			});
-
-			const data = await response.json(); // Always parse JSON to get potential error messages
+			// --- Handle Response (Common for Dev/Prod) ---
+			const data = await response.json(); // Always parse JSON
 
 			if (!response.ok) {
-				// Use error message from GCF response if available
+				// Use error message from backend response if available
 				throw new Error(
-					data?.error || `Request failed with status ${response.status}`,
+					data?.message || data?.error || `Request failed with status ${response.status}`,
 				);
 			}
 
 			if (!data.summary) {
-				// Handle cases where response is ok but summary is missing
-				throw new Error("Invalid summary response from GCF.");
+				throw new Error("Invalid response from summarization service (missing summary).");
 			}
 
-			return data.summary as string;
+			return data.summary; // Return the summary text
 		},
 		onMutate: () => {
 			setIsSummarizing(true);

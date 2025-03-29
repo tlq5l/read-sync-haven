@@ -1,9 +1,21 @@
+import { createClerkClient } from "@clerk/backend"; // Correct import
+import { GoogleAuth } from "google-auth-library";
+
 // Define the environment interface for TypeScript
 export interface Env {
+	// Bindings
 	SAVED_ITEMS_KV: KVNamespace;
-	GEMINI_API_KEY: string; // Kept for potential future use/debugging, but GCF uses its own env var
+
+	// Variables
 	GCF_URL: string; // URL for the Google Cloud Function summarizer
-	GCF_AUTH_KEY: string; // Secret key to authenticate with the GCF
+	GEMINI_API_KEY: string; // Kept for potential future use/debugging
+	GCLOUD_PROJECT_NUMBER: string;
+	GCLOUD_WORKLOAD_IDENTITY_POOL_ID: string;
+	GCLOUD_WORKLOAD_IDENTITY_PROVIDER_ID: string;
+	GCLOUD_SERVICE_ACCOUNT_EMAIL: string;
+
+	// Secrets
+	CLERK_SECRET_KEY: string;
 }
 
 // Define the structure for saved items (consistent with extension)
@@ -303,122 +315,162 @@ export default {
 				}
 			}
 
-			// POST /api/summarize - Summarize content using Google Cloud Function
+			// POST /api/summarize - Summarize content using Google Cloud Function (with Clerk Auth & WIF)
 			if (path === "/api/summarize" && request.method === "POST") {
-				console.log("Processing /api/summarize request via GCF");
+				console.log("Processing /api/summarize request...");
 				try {
-					const gcfUrl = env.GCF_URL;
-					const gcfAuthKey = env.GCF_AUTH_KEY;
-
-					if (!gcfUrl || !gcfAuthKey) {
-						console.error(
-							"GCF environment variables (GCF_URL, GCF_AUTH_KEY) are not fully configured.",
-						);
-						// Return 503 Service Unavailable if backend isn't configured
+					// --- 1. Verify Clerk Token ---
+					const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+					const authHeader = request.headers.get("Authorization");
+					if (!authHeader || !authHeader.startsWith("Bearer ")) {
 						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "AI summarization service is not configured.",
-							}),
-							{
-								status: 503, // Service Unavailable
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
+							JSON.stringify({ status: "error", message: "Missing Authorization Bearer token" }),
+							{ status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } },
+						);
+					}
+					// Note: Clerk verification often needs the full Request object
+					// We'll pass necessary parts or adapt if the SDK requires it.
+					// For now, assuming we just need the token itself for a basic check,
+					// but full request verification is more robust.
+
+					try {
+						// Verify the token using Clerk SDK's request authentication
+						const requestState = await clerk.authenticateRequest(request, { // Pass request first, then options
+							secretKey: env.CLERK_SECRET_KEY,
+						});
+
+						// Check if the request is authenticated
+						if (requestState.status !== "signed-in") { // Use hyphenated status
+							console.error("Clerk authentication failed:", requestState.reason);
+							return new Response(
+								JSON.stringify({ status: "error", message: `Authentication failed: ${requestState.reason}` }), // Use template literal
+								{ status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } },
+							);
+						}
+
+						console.log("Clerk token verified successfully via authenticateRequest.");
+						// Optional: Extract userId if needed
+						// const userId = requestState.toAuth().userId;
+						// const userId = claims.sub;
+					} catch (clerkError: any) {
+						console.error("Clerk token verification failed:", clerkError);
+						return new Response(
+							JSON.stringify({ status: "error", message: "Invalid or expired session token", details: clerkError.message }),
+							{ status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } },
+						);
+					}
+
+					// --- 2. Prepare GCF Call ---
+					const gcfUrl = env.GCF_URL;
+					if (!gcfUrl) {
+						console.error("GCF_URL environment variable is not configured.");
+						return new Response(
+							JSON.stringify({ status: "error", message: "AI summarization service URL is not configured." }),
+							{ status: 503, headers: { "Content-Type": "application/json", ...corsHeaders } },
 						);
 					}
 
 					const { content } = (await request.json()) as { content?: string };
 					if (!content) {
 						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "Missing 'content' in request body",
-							}),
-							{
-								status: 400,
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
+							JSON.stringify({ status: "error", message: "Missing 'content' in request body" }),
+							{ status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
 						);
 					}
 
-					// Call the Google Cloud Function
+					// --- 3. Generate Google OIDC Token via Workload Identity Federation ---
+					let googleOidcToken: string | null | undefined;
+					try {
+						console.log("Attempting to get Google OIDC token via Workload Identity Federation...");
+						const googleAuth = new GoogleAuth({
+							// Construct the credentials source URL for Workload Identity Federation
+							credentials: {
+								type: "external_account",
+								audience: `//iam.googleapis.com/projects/${env.GCLOUD_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${env.GCLOUD_WORKLOAD_IDENTITY_POOL_ID}/providers/${env.GCLOUD_WORKLOAD_IDENTITY_PROVIDER_ID}`,
+								subject_token_type: "urn:ietf:params:oauth:token-type:jwt", // Assuming Cloudflare provides JWT
+								token_url: "https://sts.googleapis.com/v1/token",
+								service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${env.GCLOUD_SERVICE_ACCOUNT_EMAIL}:generateIdToken`,
+								credential_source: {
+									// Cloudflare Workers don't have a file system, so we rely on environment/metadata
+									// The google-auth-library might automatically detect Cloudflare environment
+									// or we might need specific configuration if available.
+									// For now, relying on automatic detection or default behavior.
+									// If this fails, more specific Cloudflare credential source config might be needed.
+								},
+							},
+						});
+
+						// Get the authenticated client using WIF configuration
+						const client = await googleAuth.getClient();
+						// Check if the client supports getIDToken and call it with the audience
+						if (client && "getIDToken" in client && typeof client.getIDToken === "function") {
+							googleOidcToken = await client.getIDToken(gcfUrl);
+						} else {
+							// Fallback or error if getIDToken is not available on the obtained client
+							throw new Error("Authenticated client (WIF) does not support getIDToken.");
+						}
+
+						if (!googleOidcToken) {
+							throw new Error("Google Auth library returned an empty token via WIF client.");
+						}
+						console.log("Successfully obtained Google OIDC token.");
+
+					} catch (googleAuthError: any) {
+						console.error("Failed to get Google OIDC token:", googleAuthError);
+						return new Response(
+							JSON.stringify({ status: "error", message: "Failed to authenticate with backend service.", details: googleAuthError.message }),
+							{ status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
+						);
+					}
+
+
+					// --- 4. Call the Google Cloud Function ---
+					console.log(`Calling GCF at ${gcfUrl}...`);
 					const gcfResponse = await fetch(gcfUrl, {
 						method: "POST",
 						headers: {
 							"Content-Type": "application/json",
-							Authorization: `Bearer ${gcfAuthKey}`, // Send the secret key
+							Authorization: `Bearer ${googleOidcToken}`, // Use the generated Google OIDC token
 						},
 						body: JSON.stringify({ content: content }),
 					});
 
-					// Check if the GCF call was successful
+					// --- 5. Handle GCF Response ---
 					if (!gcfResponse.ok) {
-						const errorBody = await gcfResponse.text(); // Read error body as text first
-						console.error(
-							`GCF call failed with status ${gcfResponse.status}: ${errorBody}`,
-						);
-						// Try to parse as JSON, but default to text if parsing fails
+						const errorBody = await gcfResponse.text();
+						console.error(`GCF call failed with status ${gcfResponse.status}: ${errorBody}`);
 						let errorMessage = `AI service request failed (Status: ${gcfResponse.status})`;
 						try {
 							const errorJson = JSON.parse(errorBody);
-							errorMessage =
-								errorJson.error ||
-								`AI service error: ${gcfResponse.statusText}`;
-						} catch (e) {
-							// Parsing failed, use the raw text if not empty
-							if (errorBody) {
-								errorMessage = `AI service error: ${errorBody}`;
-							}
-						}
+							errorMessage = errorJson.error || `AI service error: ${gcfResponse.statusText}`;
+						} catch (e) { if (errorBody) { errorMessage = `AI service error: ${errorBody}`; } }
 						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: errorMessage,
-							}),
-							{
-								status: gcfResponse.status === 401 ? 401 : 502, // 401 Unauthorized or 502 Bad Gateway
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
+							JSON.stringify({ status: "error", message: errorMessage }),
+							{ status: gcfResponse.status === 401 ? 401 : 502, headers: { "Content-Type": "application/json", ...corsHeaders } },
 						);
 					}
 
-					// Parse the successful response from GCF
 					const gcfResult = (await gcfResponse.json()) as { summary?: string };
 					if (!gcfResult.summary) {
 						console.error("GCF response missing 'summary' field.");
 						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "AI service returned an invalid response.",
-							}),
-							{
-								status: 502, // Bad Gateway - GCF didn't return expected format
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
+							JSON.stringify({ status: "error", message: "AI service returned an invalid response." }),
+							{ status: 502, headers: { "Content-Type": "application/json", ...corsHeaders } },
 						);
 					}
 
-					// Return success response to the frontend
+					// --- 6. Return Success Response ---
+					console.log("Successfully processed /api/summarize request.");
 					return new Response(
 						JSON.stringify({ status: "success", summary: gcfResult.summary }),
-						{
-							headers: { "Content-Type": "application/json", ...corsHeaders },
-						},
+						{ headers: { "Content-Type": "application/json", ...corsHeaders } },
 					);
-				} catch (error) {
+
+				} catch (error: any) { // Catch errors from Clerk verification, JSON parsing, or GCF call
 					console.error("Error processing /api/summarize:", error);
 					return new Response(
-						JSON.stringify({
-							status: "error",
-							message:
-								error instanceof Error
-									? error.message
-									: "Failed to generate summary due to an internal worker error.",
-						}),
-						{
-							status: 500, // Internal Server Error
-							headers: { "Content-Type": "application/json", ...corsHeaders },
-						},
+						JSON.stringify({ status: "error", message: error.message || "Internal worker error processing summary request." }),
+						{ status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } },
 					);
 				}
 			}
