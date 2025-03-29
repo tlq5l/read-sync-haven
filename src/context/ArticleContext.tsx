@@ -273,19 +273,29 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				}
 				// ----------------------------------------------------
 
-				// Apply client-side filtering based on currentView to the FRESH data
-				let filteredArticles = fetchedArticles;
+				// --- Re-fetch from local DB AFTER saving cloud data ---
+				console.log("Re-fetching articles from local DB after sync...");
+				const localArticlesAfterSync = await getAllArticles({
+					userId: userId ?? undefined,
+				}); // Handle null userId
+				console.log(
+					`Fetched ${localArticlesAfterSync.length} articles locally after sync.`,
+				);
+				// ------------------------------------------------------
+
+				// Apply client-side filtering based on currentView to the LOCAL data
+				let filteredArticles = localArticlesAfterSync; // Use local data now
 				if (currentView === "unread") {
-					filteredArticles = fetchedArticles.filter((a) => !a.isRead);
+					filteredArticles = localArticlesAfterSync.filter((a) => !a.isRead);
 				} else if (currentView === "favorites") {
-					filteredArticles = fetchedArticles.filter((a) => a.favorite);
+					filteredArticles = localArticlesAfterSync.filter((a) => a.favorite);
 				}
 
-				// Sort fresh articles
+				// Sort local articles
 				filteredArticles.sort((a, b) => b.savedAt - a.savedAt);
 
 				if (isMounted) {
-					// Update state with the fresh, filtered & sorted list
+					// Update state with the local, filtered & sorted list
 					setArticles(filteredArticles);
 					setError(null); // Clear any previous error on successful sync
 				}
@@ -425,14 +435,32 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			}
 			// ------------------------------------------------
 
-			// Update state with the filtered & sorted list
+			// --- Re-fetch from local DB AFTER saving cloud data ---
+			console.log("Re-fetching articles from local DB after refresh...");
+			const localArticlesAfterRefresh = await getAllArticles({
+				userId: userId ?? undefined,
+			}); // Handle null userId
+			console.log(
+				`Fetched ${localArticlesAfterRefresh.length} articles locally after refresh.`,
+			);
+			// ------------------------------------------------------
+
+			// Apply client-side filtering based on currentView to the LOCAL data
+			filteredArticles = localArticlesAfterRefresh; // Use local data now (Assign, don't re-declare)
+			if (currentView === "unread") {
+				filteredArticles = localArticlesAfterRefresh.filter((a) => !a.isRead);
+			} else if (currentView === "favorites") {
+				filteredArticles = localArticlesAfterRefresh.filter((a) => a.favorite);
+			}
+
+			// Sort local articles
+			filteredArticles.sort((a, b) => b.savedAt - a.savedAt);
+
+			// Update state with the local, filtered & sorted list
 			setArticles(filteredArticles);
 			setError(null); // Set error to null on successful fetch and filter
 
-			// Note: The 'else' block here was removed as it was causing a syntax error.
-			// If fetchedArticles is empty after filtering, setArticles([]) handles it.
-
-			return filteredArticles; // Return the potentially filtered/sorted articles
+			return filteredArticles; // Return the filtered/sorted local articles
 		} catch (err) {
 			console.error("Failed to refresh articles:", err);
 			const errorObj =
