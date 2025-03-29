@@ -48,6 +48,7 @@ function parseUserItemKey(
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+		console.log(`WORKER FETCH HANDLER INVOKED: Method=${request.method}, URL=${request.url}`); // Add top-level log
 		// CORS headers for all responses
 		const corsHeaders = {
 			"Access-Control-Allow-Origin": "*",
