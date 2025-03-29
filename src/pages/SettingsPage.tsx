@@ -1,4 +1,3 @@
-import { CloudImportSection } from "@/components/CloudImportSection";
 import UserProfileSection from "@/components/UserProfileSection";
 import { KeyboardShortcutsTab } from "@/components/keyboard-shortcuts-tab";
 import { Button } from "@/components/ui/button";
@@ -167,8 +166,7 @@ export default function SettingsPage() {
 				<TabsContent value="data" className="space-y-6">
 					<ScrollArea className="h-[70vh]">
 						<div className="pr-4 space-y-6">
-							{/* Cloud Import Section */}
-							<CloudImportSection />
+							{/* CloudImportSection removed as automatic sync is implemented */}
 
 							<Card>
 								<CardHeader>

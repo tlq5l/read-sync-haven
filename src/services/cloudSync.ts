@@ -1,4 +1,4 @@
-import { type Article, getArticle, saveArticle } from "./db";
+import type { Article } from "./db"; // Use type-only import
 
 // Interface for items from the Cloudflare Worker
 interface CloudItem {
@@ -12,16 +12,32 @@ interface CloudItem {
 }
 
 /**
- * Fetches items for a specific user from the Cloudflare Worker
+ * Fetches items for the authenticated user from the Cloudflare Worker using Clerk token.
  */
-export async function fetchCloudItems(email: string): Promise<Article[]> {
+export async function fetchCloudItems(token: string): Promise<Article[]> {
+	if (!token) {
+		console.error("Cannot fetch cloud items: No token provided.");
+		return []; // Or throw an error, depending on desired handling
+	}
 	try {
-		console.log(`Fetching cloud items for email: ${email}`);
+		console.log("Fetching cloud items for authenticated user...");
 		const response = await fetch(
-			`https://bondwise-sync-api.vikione.workers.dev/items?userId=${encodeURIComponent(email)}`,
+			"https://bondwise-sync-api.vikione.workers.dev/items", // Removed userId query param
+			{
+				headers: {
+					// Add the Authorization header
+					Authorization: `Bearer ${token}`,
+				},
+			},
 		);
 
 		if (!response.ok) {
+			// Handle specific auth error
+			if (response.status === 401) {
+				console.error("Authentication failed when fetching cloud items.");
+				// Optionally trigger re-authentication or sign-out
+				throw new Error("Authentication failed. Please sign in again.");
+			}
 			throw new Error(`API error: ${response.status} ${response.statusText}`);
 		}
 
@@ -84,66 +100,7 @@ export async function saveItemToCloud(article: Article): Promise<boolean> {
 	}
 }
 
-/**
- * Imports cloud items into local PouchDB database
- * Returns the number of items imported successfully
- */
-export async function importCloudItems(
-	email: string,
-	clerkUserId: string,
-): Promise<number> {
-	try {
-		const cloudItems = await fetchCloudItems(email);
-		let importedCount = 0;
-
-		for (const item of cloudItems) {
-			try {
-				// Check if item already exists
-				const existingItem = await getArticle(item._id);
-
-				if (!existingItem) {
-					console.log(`Importing new item: ${item._id} - ${item.title}`);
-
-					// Update the userId to match the Clerk userId for proper association
-					const articleToSave = {
-						...item,
-						userId: clerkUserId,
-					};
-
-					await saveArticle(articleToSave);
-					importedCount++;
-				}
-			} catch (error: unknown) {
-				// Type check the error before accessing properties
-				if (
-					typeof error === "object" &&
-					error !== null &&
-					"name" in error &&
-					error.name === "not_found"
-				) {
-					// This is expected - article doesn't exist yet
-					console.log(`Importing new item: ${item._id} - ${item.title}`);
-
-					// Update the userId to match the Clerk userId for proper association
-					const articleToSave = {
-						...item,
-						userId: clerkUserId,
-					};
-
-					await saveArticle(articleToSave);
-					importedCount++;
-				} else {
-					console.error(`Error importing item ${item._id}:`, error);
-				}
-			}
-		}
-
-		return importedCount;
-	} catch (error) {
-		console.error("Error importing cloud items:", error);
-		return 0;
-	}
-}
+// Removed importCloudItems function as it's no longer needed with automatic cloud sync
 
 /**
  * Helper function to extract a short excerpt from HTML content

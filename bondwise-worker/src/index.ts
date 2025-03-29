@@ -48,6 +48,111 @@ function parseUserItemKey(
 	};
 }
 
+// Helper function for Clerk Authentication
+async function authenticateRequestWithClerk(
+	request: Request,
+	env: Env,
+): Promise<
+	| { status: "error"; response: Response }
+	| { status: "success"; userId: string }
+> {
+	// Note: CORS headers added directly to error responses within this function
+	const corsHeaders = {
+		// Define CORS headers locally for use in error responses
+		"Access-Control-Allow-Origin": "*",
+		"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+		"Access-Control-Allow-Headers": "Content-Type, Authorization",
+	};
+	const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+	try {
+		// Check for Authorization header before calling Clerk
+		const authHeader = request.headers.get("Authorization");
+		if (!authHeader || !authHeader.startsWith("Bearer ")) {
+			return {
+				status: "error",
+				response: new Response(
+					JSON.stringify({
+						status: "error",
+						message: "Missing Authorization Bearer token",
+					}),
+					{
+						status: 401,
+						headers: { "Content-Type": "application/json", ...corsHeaders },
+					},
+				),
+			};
+		}
+
+		const requestState = await clerk.authenticateRequest(request, {
+			secretKey: env.CLERK_SECRET_KEY,
+			publishableKey: env.CLERK_PUBLISHABLE_KEY,
+		});
+
+		if (requestState.status !== "signed-in") {
+			console.error("Clerk authentication failed:", requestState.reason);
+			return {
+				status: "error",
+				response: new Response(
+					JSON.stringify({
+						status: "error",
+						message: `Authentication failed: ${requestState.reason}`,
+					}),
+					{
+						status: 401,
+						headers: { "Content-Type": "application/json", ...corsHeaders },
+					},
+				),
+			};
+		}
+
+		const userId = requestState.toAuth().userId;
+		if (!userId) {
+			console.error("Clerk authentication succeeded but userId is missing.");
+			return {
+				status: "error",
+				response: new Response(
+					JSON.stringify({
+						status: "error",
+						message:
+							"Authentication succeeded but user ID could not be determined.",
+					}),
+					{
+						status: 401, // Or 500, as it's unexpected
+						headers: { "Content-Type": "application/json", ...corsHeaders },
+					},
+				),
+			};
+		}
+
+		console.log(`Clerk token verified successfully for user: ${userId}`);
+		return { status: "success", userId: userId };
+	} catch (clerkError: any) {
+		console.error("Clerk token verification failed:", clerkError);
+		// Check if the error is specifically about the header format/missing token
+		// Clerk's errors might be specific, adjust message if needed
+		let message = "Invalid or expired session token";
+		if (clerkError.message?.includes("header")) {
+			// Basic check
+			message = "Invalid Authorization header format or token.";
+		}
+
+		return {
+			status: "error",
+			response: new Response(
+				JSON.stringify({
+					status: "error",
+					message: message,
+					details: clerkError.message, // Keep original error for debugging
+				}),
+				{
+					status: 401,
+					headers: { "Content-Type": "application/json", ...corsHeaders },
+				},
+			),
+		};
+	}
+}
+
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
 		console.log(
@@ -101,40 +206,29 @@ export default {
 
 			// Items collection endpoints
 			if (pathParts[0] === "items") {
-				// GET /items?userId=email@example.com - List all items for a user
+				// GET /items - List all items for the authenticated user
 				if (pathParts.length === 1 && request.method === "GET") {
-					// Get userId from query parameter
-					const userId = url.searchParams.get("userId");
-
-					if (!userId) {
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "userId parameter is required",
-							}),
-							{
-								status: 400,
-								headers: {
-									"Content-Type": "application/json",
-									...corsHeaders,
-								},
-							},
-						);
+					// --- Authenticate the request ---
+					const authResult = await authenticateRequestWithClerk(request, env);
+					if (authResult.status === "error") {
+						return authResult.response; // Return the error response directly
 					}
+					const userId = authResult.userId; // Get authenticated userId
+					// ---------------------------------
+
+					console.log(`Listing items for authenticated user: ${userId}`);
 
 					try {
-						// List all keys in the KV namespace
-						const listResult = await env.SAVED_ITEMS_KV.list();
-
-						// Filter keys that belong to the requested user
-						const userKeys = listResult.keys
-							.map((key) => key.name)
-							.filter((key) => key.startsWith(`${userId}:`));
+						// List keys using the authenticated user's ID as a prefix for efficiency
+						const listResult = await env.SAVED_ITEMS_KV.list({
+							prefix: `${userId}:`,
+						});
 
 						// Get all values for the user's keys
 						const items: SavedItem[] = [];
-						for (const key of userKeys) {
-							const value = await env.SAVED_ITEMS_KV.get(key);
+						for (const key of listResult.keys) {
+							// key.name already includes the prefix (userId:itemId)
+							const value = await env.SAVED_ITEMS_KV.get(key.name);
 							if (value) {
 								try {
 									items.push(JSON.parse(value));
@@ -222,32 +316,27 @@ export default {
 					}
 				}
 
-				// GET /items/:id?userId=email@example.com - Get a specific item for a user
+				// GET /items/:id - Get a specific item for the authenticated user
 				if (pathParts.length === 2 && request.method === "GET") {
-					const id = pathParts[1];
-					const userId = url.searchParams.get("userId");
+					const id = pathParts[1]; // Get item ID from path
 
-					if (!userId) {
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "userId parameter is required",
-							}),
-							{
-								status: 400,
-								headers: {
-									"Content-Type": "application/json",
-									...corsHeaders,
-								},
-							},
-						);
+					// --- Authenticate the request ---
+					const authResult = await authenticateRequestWithClerk(request, env);
+					if (authResult.status === "error") {
+						return authResult.response; // Return the error response directly
 					}
+					const userId = authResult.userId; // Get authenticated userId
+					// ---------------------------------
+
+					console.log(`Getting item ${id} for authenticated user: ${userId}`);
 
 					try {
+						// Create the user-specific key using the authenticated userId
 						const key = createUserItemKey(userId, id);
 						const value = await env.SAVED_ITEMS_KV.get(key);
 
 						if (value === null) {
+							// Item not found *for this user*
 							return new Response(
 								JSON.stringify({
 									status: "error",
@@ -275,29 +364,25 @@ export default {
 					}
 				}
 
-				// DELETE /items/:id?userId=email@example.com - Delete a specific item for a user
+				// DELETE /items/:id - Delete a specific item for the authenticated user
 				if (pathParts.length === 2 && request.method === "DELETE") {
-					const id = pathParts[1];
-					const userId = url.searchParams.get("userId");
+					const id = pathParts[1]; // Get item ID from path
 
-					if (!userId) {
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "userId parameter is required",
-							}),
-							{
-								status: 400,
-								headers: {
-									"Content-Type": "application/json",
-									...corsHeaders,
-								},
-							},
-						);
+					// --- Authenticate the request ---
+					const authResult = await authenticateRequestWithClerk(request, env);
+					if (authResult.status === "error") {
+						return authResult.response; // Return the error response directly
 					}
+					const userId = authResult.userId; // Get authenticated userId
+					// ---------------------------------
+
+					console.log(`Deleting item ${id} for authenticated user: ${userId}`);
 
 					try {
+						// Create the user-specific key using the authenticated userId
 						const key = createUserItemKey(userId, id);
+						// We might want to check if the item exists first, but for simplicity,
+						// just attempting delete is fine. KV delete is idempotent.
 						await env.SAVED_ITEMS_KV.delete(key);
 
 						return new Response(

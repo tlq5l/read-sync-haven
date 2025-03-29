@@ -1,8 +1,9 @@
 import { useToast } from "@/hooks/use-toast";
+import { fetchCloudItems } from "@/services/cloudSync"; // Import the cloud fetch function
 import {
 	type Article,
 	deleteArticle,
-	getAllArticles,
+	// getAllArticles, // Removed as we now fetch from cloud
 	initializeDatabase,
 	saveArticle,
 	saveEpubFile,
@@ -58,7 +59,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	// Add fetch lock to prevent concurrent fetches
 	const fetchLockRef = useRef<boolean>(false);
 	const { toast } = useToast();
-	const { userId, isSignedIn, isLoaded } = useAuth();
+	// Destructure getToken here
+	const { userId, isSignedIn, isLoaded, getToken } = useAuth();
 	const { user } = useUser(); // Add this to get the user's email
 
 	// Initialize database on component mount
@@ -141,35 +143,47 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		setIsLoading(true);
 
 		const loadArticles = async () => {
+			// getToken is now available from the outer scope (destructured at line 63)
+
 			try {
-				// Get the user's email if available
-				const userEmail = user?.primaryEmailAddress?.emailAddress;
+				let fetchedArticles: Article[] = [];
 
-				const options: Parameters<typeof getAllArticles>[0] = {
-					sortBy: "savedAt",
-					sortDirection: "desc",
-					userIds: isSignedIn
-						? ([userId, userEmail].filter(Boolean) as string[])
-						: undefined, // Filter by both Clerk ID and email when signed in
-				};
+				if (isSignedIn) {
+					console.log("User is signed in, attempting to fetch from cloud...");
+					const token = await getToken(); // Get Clerk token
 
-				if (currentView === "unread") {
-					options.isRead = false;
-				} else if (currentView === "favorites") {
-					options.favorite = true;
+					if (token) {
+						fetchedArticles = await fetchCloudItems(token);
+						console.log(
+							`Fetched ${fetchedArticles.length} articles from cloud`,
+						);
+					} else {
+						console.warn("User is signed in but no token available.");
+						// Handle case where token is missing - maybe show error or fetch local?
+						// For simplicity, we'll show empty list for now if token fails.
+						fetchedArticles = [];
+						throw new Error("Could not retrieve authentication token."); // Throw error to show toast
+					}
+				} else {
+					// User is not signed in, maybe load from local storage in future?
+					// For now, show empty list if not signed in.
+					console.log("User is not signed in, showing empty list.");
+					fetchedArticles = [];
 				}
 
-				console.log(
-					`Fetching articles with options for view: ${currentView}`,
-					options,
-				);
-				const fetchedArticles = await getAllArticles(options);
-				console.log(
-					`Fetched ${fetchedArticles.length} articles for ${currentView} view`,
-				);
+				// Apply client-side filtering based on currentView
+				let filteredArticles = fetchedArticles;
+				if (currentView === "unread") {
+					filteredArticles = fetchedArticles.filter((a) => !a.isRead);
+				} else if (currentView === "favorites") {
+					filteredArticles = fetchedArticles.filter((a) => a.favorite);
+				}
+
+				// Sort articles (assuming fetchCloudItems returns unsorted or differently sorted)
+				filteredArticles.sort((a, b) => b.savedAt - a.savedAt); // Sort by savedAt descending
 
 				if (isMounted) {
-					setArticles(fetchedArticles);
+					setArticles(filteredArticles);
 					setError(null);
 					isLoadingInProgress = false; // Mark loading as complete
 				}
@@ -233,7 +247,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Reset fetch lock on cleanup to prevent deadlocks
 			fetchLockRef.current = false;
 		};
-	}, [currentView, isInitialized, toast, userId, isSignedIn, isLoaded, user]); // Added userId, isSignedIn, isLoaded, user
+	}, [currentView, isInitialized, toast, isSignedIn, isLoaded, getToken]); // Correct dependencies: Added getToken, removed useAuth
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {
@@ -250,37 +264,48 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			fetchLockRef.current = true;
 			setIsLoading(true);
 
-			// Get the user's email if available
-			const userEmail = user?.primaryEmailAddress?.emailAddress;
+			let fetchedArticles: Article[] = [];
 
-			const options: Parameters<typeof getAllArticles>[0] = {
-				sortBy: "savedAt",
-				sortDirection: "desc",
-				userIds: isSignedIn
-					? ([userId, userEmail].filter(Boolean) as string[])
-					: undefined, // Filter by both Clerk ID and email when signed in
-			};
+			if (isSignedIn) {
+				console.log("User is signed in, refreshing from cloud...");
+				const token = await getToken(); // Get Clerk token
 
-			if (currentView === "unread") {
-				options.isRead = false;
-			} else if (currentView === "favorites") {
-				options.favorite = true;
-			}
-
-			console.log("Refreshing articles with options:", options);
-			const fetchedArticles = await getAllArticles(options);
-			console.log("Refreshed articles:", fetchedArticles.length);
-
-			// Only update articles if we successfully retrieved them
-			if (fetchedArticles && fetchedArticles.length >= 0) {
-				setArticles(fetchedArticles);
-				setError(null);
+				if (token) {
+					fetchedArticles = await fetchCloudItems(token);
+					console.log(
+						`Refreshed ${fetchedArticles.length} articles from cloud`,
+					);
+				} else {
+					console.warn("User is signed in but no token available for refresh.");
+					fetchedArticles = []; // Show empty on token failure during refresh
+					throw new Error(
+						"Could not retrieve authentication token for refresh.",
+					);
+				}
 			} else {
-				console.warn("Received empty or invalid article list during refresh");
-				// Don't update state to avoid clearing existing articles
+				console.log("User is not signed in, showing empty list on refresh.");
+				fetchedArticles = [];
 			}
 
-			return fetchedArticles;
+			// Apply client-side filtering based on currentView
+			let filteredArticles = fetchedArticles;
+			if (currentView === "unread") {
+				filteredArticles = fetchedArticles.filter((a) => !a.isRead);
+			} else if (currentView === "favorites") {
+				filteredArticles = fetchedArticles.filter((a) => a.favorite);
+			}
+
+			// Sort articles
+			filteredArticles.sort((a, b) => b.savedAt - a.savedAt);
+
+			// Update state
+			setArticles(filteredArticles);
+			setError(null); // Set error to null on successful fetch and filter
+
+			// Note: The 'else' block here was removed as it was causing a syntax error.
+			// If fetchedArticles is empty after filtering, setArticles([]) handles it.
+
+			return filteredArticles; // Return the potentially filtered/sorted articles
 		} catch (err) {
 			console.error("Failed to refresh articles:", err);
 			const errorObj =
@@ -296,14 +321,13 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			fetchLockRef.current = false;
 		}
 	}, [
-		currentView,
-		isInitialized,
-		articles,
-		userId,
+		articles, // Keep articles as dep because we return it on error
 		isSignedIn,
 		isLoaded,
-		user,
-	]); // Added userId, isSignedIn, isLoaded, user
+		getToken,
+		currentView, // Add currentView back for filtering
+		isInitialized, // Add isInitialized back for check
+	]); // Final correct dependencies
 
 	// Add article by URL
 	const addArticleByUrl = useCallback(
