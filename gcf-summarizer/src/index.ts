@@ -4,13 +4,13 @@ import type {
 	Response,
 } from "@google-cloud/functions-framework";
 import functions from "@google-cloud/functions-framework";
+import { SecretManagerServiceClient } from "@google-cloud/secret-manager"; // Import Secret Manager client
 import {
 	GoogleGenerativeAI,
 	HarmBlockThreshold,
 	HarmCategory,
 } from "@google/generative-ai";
 import cors from "cors";
-import { SecretManagerServiceClient } from "@google-cloud/secret-manager"; // Import Secret Manager client
 
 // Initialize Secret Manager client
 const secretClient = new SecretManagerServiceClient();
@@ -34,12 +34,12 @@ async function accessSecretVersion(secretName: string): Promise<string | null> {
 	}
 }
 
-
 // Environment variables are now fetched inside the handler using Secret Manager
 const AI_GATEWAY_URL = process.env.AI_GATEWAY_URL; // Keep this one if set via deployment env var is okay
 if (!AI_GATEWAY_URL)
-	console.warn("WARN: AI_GATEWAY_URL environment variable is not set. Calls will go directly to Google."); // Add check
-
+	console.warn(
+		"WARN: AI_GATEWAY_URL environment variable is not set. Calls will go directly to Google.",
+	); // Add check
 
 // Define allowed origins
 const allowedOrigins = [
@@ -67,12 +67,17 @@ const corsOptions: cors.CorsOptions = {
 const corsHandler = cors(corsOptions);
 
 // Update function signature to accept API key
-const handleSummarizeRequest = async (req: Request, res: Response, geminiApiKey: string) => {
+const handleSummarizeRequest = async (
+	req: Request,
+	res: Response,
+	geminiApiKey: string,
+) => {
 	// Validation - Authentication is now handled by Google Cloud IAM based on the token
 	if (req.method !== "POST")
 		return res.status(405).send({ error: "Method Not Allowed" });
 	// Use the passed argument
-	if (!geminiApiKey) // Check the passed argument
+	if (!geminiApiKey)
+		// Check the passed argument
 		return res
 			.status(500)
 			.send({ error: "Internal Server Error: AI service not configured." });
@@ -87,7 +92,9 @@ const handleSummarizeRequest = async (req: Request, res: Response, geminiApiKey:
 	try {
 		const genAI = new GoogleGenerativeAI(geminiApiKey); // Use the passed argument
 		// Conditionally add baseUrl if AI_GATEWAY_URL is set
-		const modelOptions = AI_GATEWAY_URL ? { baseUrl: AI_GATEWAY_URL } : undefined;
+		const modelOptions = AI_GATEWAY_URL
+			? { baseUrl: AI_GATEWAY_URL }
+			: undefined;
 		const model = genAI.getGenerativeModel(
 			{ model: "gemini-2.5-pro-exp-03-25" },
 			modelOptions, // Pass model options here
@@ -159,7 +166,11 @@ const handleSummarizeRequest = async (req: Request, res: Response, geminiApiKey:
 };
 
 // Main exported function, handles CORS preflight and then the request
-export const summarizeText: HttpFunction = async (req: Request, res: Response) => { // Make async
+export const summarizeText: HttpFunction = async (
+	req: Request,
+	res: Response,
+) => {
+	// Make async
 	// Run CORS middleware first
 	corsHandler(req, res, async (err?: any) => {
 		if (err) {
@@ -173,12 +184,16 @@ export const summarizeText: HttpFunction = async (req: Request, res: Response) =
 
 		// Fetch secrets from Secret Manager
 		const GEMINI_API_KEY = await accessSecretVersion("gcf-gemini-api-key");
-		const WORKER_AUTH_SECRET = await accessSecretVersion("gcf-worker-auth-secret");
+		const WORKER_AUTH_SECRET = await accessSecretVersion(
+			"gcf-worker-auth-secret",
+		);
 
 		if (!GEMINI_API_KEY || !WORKER_AUTH_SECRET) {
 			console.error("Failed to fetch required secrets from Secret Manager.");
 			// Avoid sending detailed errors to the client in production
-			return res.status(500).send({ error: "Internal Server Error: Configuration failed." });
+			return res
+				.status(500)
+				.send({ error: "Internal Server Error: Configuration failed." });
 		}
 
 		// If it's a preflight (OPTIONS) request, CORS middleware handles it,
@@ -198,23 +213,27 @@ export const summarizeText: HttpFunction = async (req: Request, res: Response) =
 			if (!WORKER_AUTH_SECRET) {
 				// Check if secret is configured (should have been caught at startup, but good practice)
 				console.error("WORKER_AUTH_SECRET is not configured.");
-				return res.status(500).send({ error: "Internal Server Error: Auth misconfiguration." });
+				return res
+					.status(500)
+					.send({ error: "Internal Server Error: Auth misconfiguration." });
 			}
 
 			const authHeader = req.headers["x-worker-authorization"]; // Case-insensitive lookup
 			const expectedToken = `Bearer ${WORKER_AUTH_SECRET}`;
 
 			if (!authHeader || authHeader !== expectedToken) {
-				console.warn("Unauthorized attempt: Invalid or missing X-Worker-Authorization header.");
+				console.warn(
+					"Unauthorized attempt: Invalid or missing X-Worker-Authorization header.",
+				);
 				return res.status(401).send({ error: "Unauthorized" });
 			}
 			// --- End Authentication ---
-// Authentication passed, proceed with the handler
-try {
-	// Pass the fetched API key
-	await handleSummarizeRequest(req, res, GEMINI_API_KEY);
-} catch (error) {
-	console.error("Error in handleSummarizeRequest:", error);
+			// Authentication passed, proceed with the handler
+			try {
+				// Pass the fetched API key
+				await handleSummarizeRequest(req, res, GEMINI_API_KEY);
+			} catch (error) {
+				console.error("Error in handleSummarizeRequest:", error);
 				console.error("Error in handleSummarizeRequest:", error);
 				if (!res.headersSent) {
 					res.status(500).send({ error: "Internal Server Error." });

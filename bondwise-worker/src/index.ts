@@ -428,11 +428,14 @@ export default {
 
 					// --- 3. Prepare GCF Call with Shared Secret ---
 					if (!env.GCF_AUTH_SECRET) {
-						console.error("GCF_AUTH_SECRET is not configured in worker environment.");
+						console.error(
+							"GCF_AUTH_SECRET is not configured in worker environment.",
+						);
 						return new Response(
 							JSON.stringify({
 								status: "error",
-								message: "Worker is missing configuration for backend authentication.",
+								message:
+									"Worker is missing configuration for backend authentication.",
 							}),
 							{
 								status: 500,
