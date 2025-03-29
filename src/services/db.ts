@@ -268,6 +268,76 @@ export async function saveArticle(
 		userId: article.userId,
 	};
 
+	// --- Start: Ensure siteName and estimatedReadTime are populated ---
+	if (!newArticle.siteName) {
+		try {
+			// Check if URL is valid and not a local file scheme
+			if (
+				newArticle.url &&
+				!newArticle.url.startsWith("local://") &&
+				URL.canParse(newArticle.url)
+			) {
+				newArticle.siteName = new URL(newArticle.url).hostname;
+			} else {
+				// Fallback for local files or invalid/missing URLs
+				switch (newArticle.type) {
+					case "epub":
+						newArticle.siteName = "EPUB Book";
+						break;
+					case "pdf":
+						newArticle.siteName = "PDF Document";
+						break;
+					default:
+						// Use filename if available for local files, otherwise Unknown
+						newArticle.siteName = newArticle.fileName || "Unknown Source";
+				}
+			}
+		} catch (e) {
+			console.warn(
+				"Could not parse URL for siteName fallback:",
+				newArticle.url,
+				e,
+			);
+			// Fallback using type or filename if URL parsing fails
+			switch (newArticle.type) {
+				case "epub":
+					newArticle.siteName = "EPUB Book";
+					break;
+				case "pdf":
+					newArticle.siteName = "PDF Document";
+					break;
+				default:
+					newArticle.siteName = newArticle.fileName || "Unknown Source";
+			}
+		}
+	}
+
+	if (!newArticle.estimatedReadTime || newArticle.estimatedReadTime <= 0) {
+		if (
+			newArticle.content &&
+			typeof newArticle.content === "string" &&
+			newArticle.content.length > 10
+		) {
+			// Check content exists and has some length
+			// Estimate from content word count (simple split)
+			const wordCount = newArticle.content
+				.replace(/<[^>]*>/g, " ")
+				.split(/\s+/)
+				.filter(Boolean).length; // Basic tag removal and split
+			newArticle.estimatedReadTime = Math.max(1, Math.ceil(wordCount / 200)); // Min 1 min, 200 WPM
+		} else if (newArticle.fileSize && newArticle.fileSize > 0) {
+			// Estimate from file size (very rough guess: 5KB/min?) - adjust as needed
+			newArticle.estimatedReadTime = Math.max(
+				1,
+				Math.ceil(newArticle.fileSize / 5000),
+			);
+		} else {
+			// Default fallback if no content or size
+			newArticle.estimatedReadTime = 1;
+		}
+	}
+	// --- End: Ensure siteName and estimatedReadTime are populated ---
+
 	try {
 		// Attempt to get the existing document to retrieve the latest _rev
 		let existingRev: string | undefined;
