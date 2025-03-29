@@ -44,29 +44,37 @@ export default function ArticleReader() {
 	const [summary, setSummary] = useState<string | null>(null);
 	const [summaryError, setSummaryError] = useState<string | null>(null);
 
-	// Placeholder function to obtain Google Cloud OIDC token
-	// IMPORTANT: Replace this with a secure method for your environment.
-	// For local testing with gcloud CLI logged in:
-	// You might run `gcloud auth print-identity-token --audiences=<GCF_URL>`
-	// in your terminal and paste the token here, or implement a local server
-	// that runs this command. For production (e.g., Vercel), you'll need a
-	// different approach, possibly involving a backend or service account keys
-	// handled securely.
+	// --- DEVELOPMENT ONLY TOKEN FETCHING ---
+	// IMPORTANT: This function is for LOCAL DEVELOPMENT ONLY and requires manual steps.
+	// It relies on the user having `gcloud` CLI installed and authenticated.
+	// DO NOT USE THIS IN PRODUCTION. Implement a secure backend token generation flow.
 	async function getGoogleAuthToken(audience: string): Promise<string> {
 		console.warn(
-			"Using placeholder getGoogleAuthToken. Implement secure token fetching.",
+			"Using DEVELOPMENT ONLY getGoogleAuthToken. Requires manual gcloud command execution.",
 		);
-		// Example for local testing (requires manual token fetching):
-		// const token = prompt(`Paste OIDC token for audience: ${audience}`);
-		// if (!token) throw new Error("Token fetching cancelled or failed.");
-		// return token;
 
-		// For now, throw an error to indicate it needs implementation
-		throw new Error(
-			`Secure token fetching for audience ${audience} needs to be implemented.`,
+		// Construct the command the user needs to run
+		const commandToRun = `gcloud auth print-identity-token --audiences="${audience}"`;
+
+		// Prompt the user to run the command and paste the token
+		const token = prompt(
+			`--- LOCAL DEVELOPMENT ONLY ---\n\nPlease run the following command in your terminal (ensure gcloud is authenticated):\n\n${commandToRun}\n\nThen paste the resulting token here:`,
 		);
-		// Replace the above error with your actual token fetching logic.
+
+		if (!token) {
+			throw new Error(
+				"Token fetching cancelled or failed. Could not get OIDC token.",
+			);
+		}
+
+		// Basic check to see if it looks like a token (optional)
+		if (token.split(".").length !== 3) {
+			console.warn("Pasted value doesn't look like a standard JWT/OIDC token.");
+		}
+
+		return token.trim();
 	}
+	// --- END DEVELOPMENT ONLY TOKEN FETCHING ---
 
 	// Mutation for summarizing content using Google Cloud Function (Authenticated)
 	const summarizeMutation = useMutation({
