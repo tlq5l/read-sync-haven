@@ -7,7 +7,9 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Node dependencies
 node_modules
+**/node_modules
 dist
 dist-ssr
 *.local
@@ -24,3 +26,9 @@ dist-ssr
 *.sw?
 bun-path.ps1
 .env
+
+# Lock files
+# Uncomment if you want to ignore lock files
+# *.lock
+# package-lock.json
+# bun.lockb
