@@ -3,7 +3,7 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "node",
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "WebWorker"], // Add WebWorker for fetch, Request, Response etc.
     "types": ["@cloudflare/workers-types"], // Use Cloudflare Workers types
     "esModuleInterop": true,
     "strict": true,

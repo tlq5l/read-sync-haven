@@ -12,9 +12,9 @@ kv_namespaces = [
 # Actual values are set in Cloudflare dashboard for deployment
 # and in .env file for local development
 [vars]
-GEMINI_API_KEY = "" # Value is ignored, just declares the variable
-CF_ACCOUNT_ID = "" # Value is ignored, just declares the variable
-CF_GATEWAY_ID = "" # Value is ignored, just declares the variable
+GEMINI_API_KEY = "" # Value ignored, declares variable (kept for potential future use)
+GCF_URL = ""        # Value ignored, declares variable (HTTPS Trigger URL for the GCF)
+GCF_AUTH_KEY = ""   # Value ignored, declares variable (Secret key for GCF authentication)
 
 [observability.logs]
 enabled = true

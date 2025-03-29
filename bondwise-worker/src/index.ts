@@ -1,11 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 // Define the environment interface for TypeScript
 export interface Env {
 	SAVED_ITEMS_KV: KVNamespace;
-	GEMINI_API_KEY: string;
-	CF_ACCOUNT_ID: string; // Added for AI Gateway
-	CF_GATEWAY_ID: string; // Added for AI Gateway
+	GEMINI_API_KEY: string; // Kept for potential future use/debugging, but GCF uses its own env var
+	GCF_URL: string; // URL for the Google Cloud Function summarizer
+	GCF_AUTH_KEY: string; // Secret key to authenticate with the GCF
 }
 
 // Define the structure for saved items (consistent with extension)
@@ -305,19 +303,28 @@ export default {
 				}
 			}
 
-			// POST /api/summarize - Summarize content using Gemini
+			// POST /api/summarize - Summarize content using Google Cloud Function
 			if (path === "/api/summarize" && request.method === "POST") {
-				console.log("Processing /api/summarize request");
+				console.log("Processing /api/summarize request via GCF");
 				try {
-					const apiKey = env.GEMINI_API_KEY;
-					const accountId = env.CF_ACCOUNT_ID;
-					const gatewayId = env.CF_GATEWAY_ID;
+					const gcfUrl = env.GCF_URL;
+					const gcfAuthKey = env.GCF_AUTH_KEY;
 
-					if (!apiKey || !accountId || !gatewayId) {
+					if (!gcfUrl || !gcfAuthKey) {
 						console.error(
-							"AI Gateway/API Key environment variables (GEMINI_API_KEY, CF_ACCOUNT_ID, CF_GATEWAY_ID) are not fully configured.",
+							"GCF environment variables (GCF_URL, GCF_AUTH_KEY) are not fully configured.",
 						);
-						throw new Error("AI service is not configured.");
+						// Return 503 Service Unavailable if backend isn't configured
+						return new Response(
+							JSON.stringify({
+								status: "error",
+								message: "AI summarization service is not configured.",
+							}),
+							{
+								status: 503, // Service Unavailable
+								headers: { "Content-Type": "application/json", ...corsHeaders },
+							},
+						);
 					}
 
 					const { content } = (await request.json()) as { content?: string };
@@ -334,41 +341,82 @@ export default {
 						);
 					}
 
-					const genAI = new GoogleGenerativeAI(apiKey);
-					// Configure the model to use the AI Gateway baseUrl
-					const model = genAI.getGenerativeModel(
-						{ model: "gemini-1.5-flash-latest" }, // Using flash model as per CF example
-						{
-							baseUrl: `https://gateway.ai.cloudflare.com/v1/${accountId}/${gatewayId}/google-ai-studio`,
+					// Call the Google Cloud Function
+					const gcfResponse = await fetch(gcfUrl, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${gcfAuthKey}`, // Send the secret key
 						},
-					);
-					const prompt = `Summarize the following text concisely:
+						body: JSON.stringify({ content: content }),
+					});
 
-${content}`;
+					// Check if the GCF call was successful
+					if (!gcfResponse.ok) {
+						const errorBody = await gcfResponse.text(); // Read error body as text first
+						console.error(
+							`GCF call failed with status ${gcfResponse.status}: ${errorBody}`,
+						);
+						// Try to parse as JSON, but default to text if parsing fails
+						let errorMessage = `AI service request failed (Status: ${gcfResponse.status})`;
+						try {
+							const errorJson = JSON.parse(errorBody);
+							errorMessage =
+								errorJson.error ||
+								`AI service error: ${gcfResponse.statusText}`;
+						} catch (e) {
+							// Parsing failed, use the raw text if not empty
+							if (errorBody) {
+								errorMessage = `AI service error: ${errorBody}`;
+							}
+						}
+						return new Response(
+							JSON.stringify({
+								status: "error",
+								message: errorMessage,
+							}),
+							{
+								status: gcfResponse.status === 401 ? 401 : 502, // 401 Unauthorized or 502 Bad Gateway
+								headers: { "Content-Type": "application/json", ...corsHeaders },
+							},
+						);
+					}
 
-					const result = await model.generateContent(prompt);
-					const response = result.response;
-					const summary = response.text();
+					// Parse the successful response from GCF
+					const gcfResult = (await gcfResponse.json()) as { summary?: string };
+					if (!gcfResult.summary) {
+						console.error("GCF response missing 'summary' field.");
+						return new Response(
+							JSON.stringify({
+								status: "error",
+								message: "AI service returned an invalid response.",
+							}),
+							{
+								status: 502, // Bad Gateway - GCF didn't return expected format
+								headers: { "Content-Type": "application/json", ...corsHeaders },
+							},
+						);
+					}
 
+					// Return success response to the frontend
 					return new Response(
-						JSON.stringify({ status: "success", summary: summary }),
+						JSON.stringify({ status: "success", summary: gcfResult.summary }),
 						{
 							headers: { "Content-Type": "application/json", ...corsHeaders },
 						},
 					);
-				} catch (aiError) {
-					console.error("Error calling Gemini API:", aiError);
-					// Don't throw here, return a proper error response
+				} catch (error) {
+					console.error("Error processing /api/summarize:", error);
 					return new Response(
 						JSON.stringify({
 							status: "error",
 							message:
-								aiError instanceof Error
-									? aiError.message
-									: "Failed to generate summary due to an AI service error.",
+								error instanceof Error
+									? error.message
+									: "Failed to generate summary due to an internal worker error.",
 						}),
 						{
-							status: 500,
+							status: 500, // Internal Server Error
 							headers: { "Content-Type": "application/json", ...corsHeaders },
 						},
 					);
