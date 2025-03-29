@@ -324,6 +324,12 @@ export default {
 				console.log("Processing /api/summarize request...");
 				try {
 					// --- 1. Verify Clerk Token ---
+					console.log(
+						`DEBUG: CLERK_SECRET_KEY is ${env.CLERK_SECRET_KEY ? "present" : "MISSING"}`,
+					); // Temporary debug log
+					console.log(
+						`DEBUG: CLERK_PUBLISHABLE_KEY is ${env.CLERK_PUBLISHABLE_KEY ? "present" : "MISSING"}`,
+					); // Temporary debug log
 					const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 					const authHeader = request.headers.get("Authorization");
 					if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -428,48 +434,41 @@ export default {
 					let googleOidcToken: string | null | undefined;
 					try {
 						console.log(
-							"Attempting to get Google OIDC token via Workload Identity Federation...",
+							"Attempting to get Google OIDC token via Workload Identity Federation (using getIdTokenClient)...", // Updated log
 						);
 						const googleAuth = new GoogleAuth({
-							// Construct the credentials source URL for Workload Identity Federation
+							// Keep the same WIF credentials configuration
 							credentials: {
 								type: "external_account",
 								audience: `//iam.googleapis.com/projects/${env.GCLOUD_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${env.GCLOUD_WORKLOAD_IDENTITY_POOL_ID}/providers/${env.GCLOUD_WORKLOAD_IDENTITY_PROVIDER_ID}`,
-								subject_token_type: "urn:ietf:params:oauth:token-type:jwt", // Assuming Cloudflare provides JWT
+								subject_token_type: "urn:ietf:params:oauth:token-type:jwt",
 								token_url: "https://sts.googleapis.com/v1/token",
 								service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${env.GCLOUD_SERVICE_ACCOUNT_EMAIL}:generateIdToken`,
-								credential_source: {
-									// Cloudflare Workers don't have a file system, so we rely on environment/metadata
-									// The google-auth-library might automatically detect Cloudflare environment
-									// or we might need specific configuration if available.
-									// For now, relying on automatic detection or default behavior.
-									// If this fails, more specific Cloudflare credential source config might be needed.
-								},
+								credential_source: {}, // Rely on auto-detection
 							},
 						});
 
-						// Get the authenticated client using WIF configuration
-						const client = await googleAuth.getClient();
-						// Check if the client supports getIDToken and call it with the audience
-						if (
-							client &&
-							"getIDToken" in client &&
-							typeof client.getIDToken === "function"
-						) {
-							googleOidcToken = await client.getIDToken(gcfUrl);
-						} else {
-							// Fallback or error if getIDToken is not available on the obtained client
-							throw new Error(
-								"Authenticated client (WIF) does not support getIDToken.",
-							);
+						// Try using getIdTokenClient specifically for the target audience (GCF URL)
+						const idTokenClient = await googleAuth.getIdTokenClient(gcfUrl);
+
+						// Get the ID token using the specialized client by making a dummy request
+						// The actual request isn't sent; we just extract the auth header it prepares.
+						const response = await idTokenClient.request({ url: gcfUrl });
+						const authHeader = response.config.headers?.Authorization;
+
+						if (authHeader?.startsWith("Bearer ")) {
+							// Use optional chaining
+							googleOidcToken = authHeader.split(" ")[1];
 						}
 
 						if (!googleOidcToken) {
 							throw new Error(
-								"Google Auth library returned an empty token via WIF client.",
+								"Google Auth library returned an empty token via getIdTokenClient.", // Updated error message
 							);
 						}
-						console.log("Successfully obtained Google OIDC token.");
+						console.log(
+							"Successfully obtained Google OIDC token via getIdTokenClient.",
+						); // Updated log
 					} catch (googleAuthError: any) {
 						console.error("Failed to get Google OIDC token:", googleAuthError);
 						return new Response(
