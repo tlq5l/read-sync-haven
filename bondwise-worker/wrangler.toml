@@ -1,6 +1,6 @@
 name = "bondwise-sync-api" # Fixed typo
 main = "src/index.ts"
-compatibility_date = "2023-10-30"
+compatibility_date = "2024-09-23" # Updated compatibility date
 compatibility_flags = [ "nodejs_compat" ] # Enable Node.js compatibility
 
 # Use the existing KV namespace - the binding name is what our code uses
