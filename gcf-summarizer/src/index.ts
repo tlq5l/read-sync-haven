@@ -17,9 +17,30 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY)
 	console.error("FATAL: GEMINI_API_KEY environment variable is not set.");
 
-// Initialize CORS middleware
-// TODO: Restrict origin in production to your frontend's domain
-const corsHandler = cors({ origin: true });
+// Define allowed origins
+const allowedOrigins = [
+	"http://localhost:8080", // Local development
+	"https://read-sync-haven.pages.dev", // Cloudflare Pages deployment
+];
+
+// Configure CORS middleware
+const corsOptions: cors.CorsOptions = {
+	origin: (origin, callback) => {
+		// Allow requests with no origin (like mobile apps or curl requests)
+		if (!origin) return callback(null, true);
+		if (allowedOrigins.indexOf(origin) === -1) {
+			const msg =
+				"The CORS policy for this site does not allow access from the specified Origin.";
+			return callback(new Error(msg), false);
+		}
+		return callback(null, true);
+	},
+	methods: ["POST", "OPTIONS"], // Allow POST for the function and OPTIONS for preflight
+	allowedHeaders: ["Content-Type", "Authorization"], // Allow necessary headers
+	credentials: true, // If you need to handle cookies or authorization headers
+};
+
+const corsHandler = cors(corsOptions);
 
 const handleSummarizeRequest: HttpFunction = async (req, res) => {
 	// Validation - Authentication is now handled by Google Cloud IAM based on the token
