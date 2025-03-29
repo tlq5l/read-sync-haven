@@ -164,6 +164,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 								// --- Notify open web app tabs ---
 								if (apiSuccess) {
+									console.log("[EXT DEBUG] API success. Querying tabs..."); // DEBUG LOG
 									const webAppUrls = [
 										"http://localhost:8080/*",
 										"https://read-sync-haven.pages.dev/*",
@@ -177,9 +178,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 											);
 											return;
 										}
+										console.log("[EXT DEBUG] Found tabs:", tabs); // DEBUG LOG
 										for (const tab of tabs) {
 											// Use for...of loop
 											if (tab.id) {
+												console.log(
+													`[EXT DEBUG] Sending message to tab ${tab.id}`,
+												); // DEBUG LOG
 												chrome.tabs
 													.sendMessage(tab.id, { type: "NEW_CONTENT_SAVED" })
 													.catch((err) => {

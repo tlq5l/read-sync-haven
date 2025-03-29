@@ -804,17 +804,25 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				_sender: chrome.runtime.MessageSender, // Prefix with underscore
 				_sendResponse: (response?: any) => void, // Prefix with underscore
 			) => {
-				console.log("Message received from extension:", message);
-				if (message.type === "NEW_CONTENT_SAVED") {
+				console.log(
+					"[WEB APP DEBUG] Message received from extension:",
+					message,
+				); // DEBUG LOG
+				if (message?.type === "NEW_CONTENT_SAVED") {
+					// Add optional chaining for safety
 					console.log(
-						"New content saved message received, triggering refresh...",
-					);
+						"[WEB APP DEBUG] NEW_CONTENT_SAVED message received. Checking lock...",
+					); // DEBUG LOG
 					// Avoid triggering refresh if one is already in progress
+					console.log(
+						`[WEB APP DEBUG] Current fetchLockRef: ${fetchLockRef.current}`,
+					); // DEBUG LOG
 					if (!fetchLockRef.current) {
+						console.log("[WEB APP DEBUG] Calling refreshArticles()..."); // DEBUG LOG
 						refreshArticles();
 					} else {
 						console.log(
-							"Refresh skipped because another fetch/refresh is already in progress.",
+							"[WEB APP DEBUG] Refresh skipped because another fetch/refresh is already in progress.", // DEBUG LOG
 						);
 					}
 				}
@@ -823,7 +831,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			};
 
 			chrome.runtime.onMessage.addListener(handleExtensionMessage);
-			console.log("Extension message listener added.");
+			console.log("[WEB APP DEBUG] Extension message listener added."); // DEBUG LOG
 
 			// Cleanup function
 			return () => {
