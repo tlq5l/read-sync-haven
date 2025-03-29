@@ -44,23 +44,49 @@ export default function ArticleReader() {
 	const [summary, setSummary] = useState<string | null>(null);
 	const [summaryError, setSummaryError] = useState<string | null>(null);
 
-	// Mutation for summarizing content using Google Cloud Function
+	// Placeholder function to obtain Google Cloud OIDC token
+	// IMPORTANT: Replace this with a secure method for your environment.
+	// For local testing with gcloud CLI logged in:
+	// You might run `gcloud auth print-identity-token --audiences=<GCF_URL>`
+	// in your terminal and paste the token here, or implement a local server
+	// that runs this command. For production (e.g., Vercel), you'll need a
+	// different approach, possibly involving a backend or service account keys
+	// handled securely.
+	async function getGoogleAuthToken(audience: string): Promise<string> {
+		console.warn(
+			"Using placeholder getGoogleAuthToken. Implement secure token fetching.",
+		);
+		// Example for local testing (requires manual token fetching):
+		// const token = prompt(`Paste OIDC token for audience: ${audience}`);
+		// if (!token) throw new Error("Token fetching cancelled or failed.");
+		// return token;
+
+		// For now, throw an error to indicate it needs implementation
+		throw new Error(
+			`Secure token fetching for audience ${audience} needs to be implemented.`,
+		);
+		// Replace the above error with your actual token fetching logic.
+	}
+
+	// Mutation for summarizing content using Google Cloud Function (Authenticated)
 	const summarizeMutation = useMutation({
 		mutationFn: async (textContent: string) => {
 			const gcfUrl = import.meta.env.VITE_GCF_SUMMARIZE_URL;
-			const gcfAuthKey = import.meta.env.VITE_GCF_AUTH_KEY;
 
-			if (!gcfUrl || !gcfAuthKey) {
+			if (!gcfUrl) {
 				throw new Error(
-					"GCF Summarizer URL or Auth Key is not configured in environment variables.",
+					"GCF Summarizer URL is not configured in environment variables.",
 				);
 			}
+
+			// Fetch the OIDC token for the Cloud Function URL (audience)
+			const authToken = await getGoogleAuthToken(gcfUrl);
 
 			const response = await fetch(gcfUrl, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
-					Authorization: `Bearer ${gcfAuthKey}`, // Add authentication header
+					Authorization: `Bearer ${authToken}`, // Use Google OIDC token
 				},
 				body: JSON.stringify({ content: textContent }),
 			});

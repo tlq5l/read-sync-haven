@@ -13,41 +13,19 @@ import cors from "cors";
 
 // Read environment variables
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const EXPECTED_WORKER_AUTH_KEY = process.env.WORKER_AUTH_KEY;
 
 if (!GEMINI_API_KEY)
 	console.error("FATAL: GEMINI_API_KEY environment variable is not set.");
-if (!EXPECTED_WORKER_AUTH_KEY)
-	console.error("FATAL: WORKER_AUTH_KEY environment variable is not set.");
-
-function authenticateRequest(req: functions.Request): boolean {
-	if (!EXPECTED_WORKER_AUTH_KEY) {
-		console.error("Auth skipped: WORKER_AUTH_KEY not configured.");
-		return false; // Fail closed
-	}
-	const authHeader = req.headers.authorization;
-	if (!authHeader || !authHeader.startsWith("Bearer ")) {
-		console.warn("Auth failed: Missing or invalid Authorization header.");
-		return false;
-	}
-	const providedKey = authHeader.split(" ")[1];
-	if (providedKey !== EXPECTED_WORKER_AUTH_KEY) {
-		console.warn("Auth failed: Invalid token.");
-		return false;
-	}
-	return true;
-}
 
 // Initialize CORS middleware
 // TODO: Restrict origin in production to your frontend's domain
 const corsHandler = cors({ origin: true });
 
 const handleSummarizeRequest: HttpFunction = async (req, res) => {
-	// Validation & Auth
+	// Validation - Authentication is now handled by Google Cloud IAM based on the token
 	if (req.method !== "POST")
 		return res.status(405).send({ error: "Method Not Allowed" });
-	if (!authenticateRequest(req))
-		return res.status(401).send({ error: "Unauthorized" });
+	// Removed custom authentication check
 	if (!GEMINI_API_KEY)
 		return res
 			.status(500)
