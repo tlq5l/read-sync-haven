@@ -95,6 +95,7 @@
 		"@vitejs/plugin-react-swc": "^3.8.1",
 		"autoprefixer": "^10.4.21",
 		"globals": "^15.15.0",
+		"google-auth-library": "^9.15.1",
 		"husky": "^9.1.7",
 		"lovable-tagger": "^1.1.7",
 		"postcss": "^8.5.3",
