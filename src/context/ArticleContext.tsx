@@ -3,7 +3,8 @@ import { fetchCloudItems } from "@/services/cloudSync"; // Import the cloud fetc
 import {
 	type Article,
 	deleteArticle,
-	// getAllArticles, // Removed as we now fetch from cloud
+	getAllArticles, // Re-add getAllArticles for cache-first loading
+	getArticle, // Add getArticle import
 	initializeDatabase,
 	saveArticle,
 	saveEpubFile,
@@ -27,7 +28,8 @@ import {
 
 interface ArticleContextType {
 	articles: Article[];
-	isLoading: boolean;
+	isLoading: boolean; // True when initially loading OR loading without cache
+	isRefreshing: boolean; // True when syncing with cloud in the background
 	error: Error | null;
 	currentView: "all" | "unread" | "favorites";
 	setCurrentView: (view: "all" | "unread" | "favorites") => void;
@@ -51,6 +53,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
 	const [articles, setArticles] = useState<Article[]>([]);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
+	const [isRefreshing, setIsRefreshing] = useState<boolean>(false); // Add isRefreshing state
 	const [error, setError] = useState<Error | null>(null);
 	const [currentView, setCurrentView] = useState<
 		"all" | "unread" | "favorites"
@@ -129,50 +132,148 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	useEffect(() => {
 		if (!isInitialized || !isLoaded) return;
 
-		// Use fetch lock to prevent concurrent fetches
+		// Use fetch lock to prevent concurrent fetches/syncs
 		if (fetchLockRef.current) {
-			console.log("Fetch operation already in progress, skipping");
+			console.log("Load/Sync operation already in progress, skipping");
 			return;
 		}
 
 		let isMounted = true;
-		let isLoadingInProgress = true; // Track loading state for timeout
+		let syncTimeoutId: NodeJS.Timeout | null = null;
 
-		// Set fetch lock and loading state
-		fetchLockRef.current = true;
-		setIsLoading(true);
+		const loadAndSyncArticles = async () => {
+			// Set fetch lock
+			fetchLockRef.current = true;
 
-		const loadArticles = async () => {
-			// getToken is now available from the outer scope (destructured at line 63)
+			let loadedFromCache = false;
+
+			// --- 1. Attempt to load from local cache first ---
+			if (isSignedIn && userId) {
+				try {
+					console.log(
+						`Attempting to load articles from cache for user ${userId}...`,
+					);
+					const cachedArticles = await getAllArticles({ userId: userId });
+
+					if (isMounted && cachedArticles && cachedArticles.length > 0) {
+						console.log(`Loaded ${cachedArticles.length} articles from cache.`);
+						// Apply view filtering to cached data
+						let filteredCached = cachedArticles;
+						if (currentView === "unread") {
+							filteredCached = cachedArticles.filter((a) => !a.isRead);
+						} else if (currentView === "favorites") {
+							filteredCached = cachedArticles.filter((a) => a.favorite);
+						}
+						// Sort cached data
+						filteredCached.sort((a, b) => b.savedAt - a.savedAt);
+
+						setArticles(filteredCached);
+						setIsLoading(false); // Stop initial loading indicator
+						setIsRefreshing(true); // Start background refresh indicator
+						setError(null);
+						loadedFromCache = true;
+					} else if (isMounted) {
+						console.log("No articles found in cache or component unmounted.");
+						// If cache is empty, ensure loading state is true before cloud fetch
+						setIsLoading(true);
+						setIsRefreshing(false); // Not refreshing if loading from scratch
+					}
+				} catch (cacheErr) {
+					console.error("Error loading articles from cache:", cacheErr);
+					if (isMounted) {
+						// Don't set global error yet, try cloud sync
+						// Ensure loading state is true if cache fails
+						setIsLoading(true);
+						setIsRefreshing(false);
+					}
+				}
+			} else {
+				// Not signed in or no userId, set initial state
+				if (isMounted) {
+					setArticles([]);
+					setIsLoading(false);
+					setIsRefreshing(false);
+					setError(null);
+				}
+				// Don't proceed to cloud sync if not signed in
+				fetchLockRef.current = false; // Release lock
+				return;
+			}
+
+			// --- 2. Sync with Cloud (always runs if signed in) ---
+			if (!isSignedIn || !userId) {
+				// Should have returned earlier, but double-check
+				fetchLockRef.current = false;
+				return;
+			}
+
+			// If we didn't load from cache, ensure loading state is true
+			if (!loadedFromCache && isMounted) {
+				setIsLoading(true);
+				setIsRefreshing(false);
+			}
+
+			// Start timeout for cloud sync
+			let syncInProgress = true;
+			syncTimeoutId = setTimeout(() => {
+				if (isMounted && syncInProgress) {
+					console.warn(`Cloud sync for ${currentView} view timed out`);
+					if (isMounted) {
+						setIsRefreshing(false); // Stop refreshing indicator on timeout
+						// Keep isLoading as is (might be false if cache loaded)
+						fetchLockRef.current = false; // Reset fetch lock on timeout
+						setError(
+							new Error(
+								`Syncing ${currentView} articles timed out. Displaying cached data.`,
+							),
+						);
+						toast({
+							title: "Sync Timeout",
+							description: `Syncing ${currentView} articles timed out. Displaying cached data.`,
+							variant: "default", // Less severe than destructive
+						});
+					}
+				}
+			}, 15000); // 15 second timeout for sync
 
 			try {
-				let fetchedArticles: Article[] = [];
+				console.log("Starting background sync with cloud...");
+				const token = await getToken();
+				const userEmail = user?.primaryEmailAddress?.emailAddress;
 
-				if (isSignedIn) {
-					console.log("User is signed in, attempting to fetch from cloud...");
-					const token = await getToken(); // Get Clerk token
-					// Get user's primary email
-					const userEmail = user?.primaryEmailAddress?.emailAddress;
-
-					if (token) {
-						// Pass both token and email to fetchCloudItems
-						fetchedArticles = await fetchCloudItems(token, userEmail);
-						console.log(
-							`Fetched ${fetchedArticles.length} articles from cloud for user ${userId} / ${userEmail}`,
-						);
-					} else {
-						console.warn("User is signed in but no token available.");
-						fetchedArticles = [];
-						throw new Error("Could not retrieve authentication token."); // Throw error to show toast
-					}
-				} else {
-					// User is not signed in, maybe load from local storage in future?
-					// For now, show empty list if not signed in.
-					console.log("User is not signed in, showing empty list.");
-					fetchedArticles = [];
+				if (!token) {
+					throw new Error("Could not retrieve authentication token for sync.");
 				}
 
-				// Apply client-side filtering based on currentView
+				const fetchedArticles = await fetchCloudItems(token, userEmail);
+				syncInProgress = false; // Mark sync as complete before processing
+				if (syncTimeoutId) clearTimeout(syncTimeoutId); // Clear timeout on success
+
+				console.log(
+					`Synced ${fetchedArticles.length} articles from cloud for user ${userId} / ${userEmail}`,
+				);
+
+				// --- Save/Update fetched articles in local PouchDB ---
+				if (fetchedArticles.length > 0) {
+					console.log(
+						`Attempting to save/update ${fetchedArticles.length} synced articles locally...`,
+					);
+					for (const article of fetchedArticles) {
+						try {
+							const articleToSave = { ...article, userId: userId };
+							await saveArticle(articleToSave);
+						} catch (saveErr) {
+							console.warn(
+								`Failed to save/update synced article ${article._id} locally:`,
+								saveErr,
+							);
+						}
+					}
+					console.log("Finished saving/updating synced articles locally.");
+				}
+				// ----------------------------------------------------
+
+				// Apply client-side filtering based on currentView to the FRESH data
 				let filteredArticles = fetchedArticles;
 				if (currentView === "unread") {
 					filteredArticles = fetchedArticles.filter((a) => !a.isRead);
@@ -180,96 +281,64 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					filteredArticles = fetchedArticles.filter((a) => a.favorite);
 				}
 
-				// Sort articles before saving/setting state
-				filteredArticles.sort((a, b) => b.savedAt - a.savedAt); // Sort by savedAt descending
-
-				// --- Save/Update fetched articles in local PouchDB ---
-				if (isSignedIn && fetchedArticles.length > 0) {
-					console.log(
-						`Attempting to save/update ${fetchedArticles.length} fetched articles locally...`,
-					);
-					for (const article of fetchedArticles) {
-						try {
-							// Ensure the article has the correct Clerk user ID before saving locally
-							const articleToSave = { ...article, userId: userId }; // Use Clerk userId
-							await saveArticle(articleToSave); // saveArticle should handle upserts
-						} catch (saveErr) {
-							console.warn(
-								`Failed to save/update article ${article._id} locally:`,
-								saveErr,
-							);
-							// Decide if we should continue or stop? For now, continue.
-						}
-					}
-					console.log("Finished saving/updating fetched articles locally.");
-				}
-				// ----------------------------------------------------
+				// Sort fresh articles
+				filteredArticles.sort((a, b) => b.savedAt - a.savedAt);
 
 				if (isMounted) {
-					// Set state with the filtered & sorted list
+					// Update state with the fresh, filtered & sorted list
 					setArticles(filteredArticles);
-					setError(null);
-					isLoadingInProgress = false; // Mark loading as complete
+					setError(null); // Clear any previous error on successful sync
 				}
-			} catch (err) {
-				console.error(`Failed to load articles for ${currentView} view:`, err);
+			} catch (syncErr) {
+				syncInProgress = false; // Mark sync as complete on error
+				if (syncTimeoutId) clearTimeout(syncTimeoutId); // Clear timeout on error
+				console.error(
+					`Failed to sync articles for ${currentView} view:`,
+					syncErr,
+				);
 
 				if (isMounted) {
 					const errorMessage =
-						err instanceof Error ? err.message : "Failed to load articles";
+						syncErr instanceof Error
+							? syncErr.message
+							: "Failed to sync articles";
 
-					setError(
-						err instanceof Error
-							? err
-							: new Error(`Failed to load articles for ${currentView} view`),
-					);
-					// Return empty array to prevent stuck loading state
-					setArticles([]);
+					// Only set global error if we didn't load from cache initially
+					if (!loadedFromCache) {
+						setError(
+							syncErr instanceof Error
+								? syncErr
+								: new Error(`Failed to sync articles for ${currentView} view`),
+						);
+						// Clear articles if sync fails AND cache didn't load
+						setArticles([]);
+					}
 
+					// Show a toast indicating sync failure, but keep cached data if present
 					toast({
-						title: `${currentView.charAt(0).toUpperCase() + currentView.slice(1)} Loading Error`,
-						description: `${errorMessage}. Tap the retry button to try again.`,
-						variant: "destructive",
+						title: "Cloud Sync Failed",
+						description: `${errorMessage}. Displaying local data.`,
+						variant: "destructive", // Keep destructive for sync failure
 					});
 				}
 			} finally {
-				// Always clean up, even if there's an error
+				// Always clean up, even if there's an error or timeout
 				if (isMounted) {
-					setIsLoading(false);
-					isLoadingInProgress = false;
+					setIsLoading(false); // Ensure loading is false
+					setIsRefreshing(false); // Ensure refreshing is false
 				}
 				// Reset fetch lock when done
 				fetchLockRef.current = false;
 			}
 		};
 
-		// Add timeout to prevent indefinite loading state
-		const timeoutId = setTimeout(() => {
-			if (isMounted && isLoadingInProgress) {
-				console.warn(`Loading articles for ${currentView} view timed out`);
-				setIsLoading(false);
-				fetchLockRef.current = false; // Reset fetch lock on timeout
-				setError(
-					new Error(
-						`Loading ${currentView} articles timed out. Please try again.`,
-					),
-				);
-
-				toast({
-					title: "Loading Timeout",
-					description: `Loading ${currentView} articles timed out. Please try again.`,
-					variant: "destructive",
-				});
-			}
-		}, 10000); // 10 second timeout
-
-		loadArticles();
+		loadAndSyncArticles();
 
 		return () => {
 			isMounted = false;
-			clearTimeout(timeoutId);
-			// Reset fetch lock on cleanup to prevent deadlocks
-			fetchLockRef.current = false;
+			if (syncTimeoutId) clearTimeout(syncTimeoutId);
+			// Reset fetch lock on cleanup to prevent deadlocks if unmounted mid-operation
+			// fetchLockRef.current = false; // Be cautious resetting here, might allow concurrent starts
 		};
 	}, [
 		currentView,
@@ -280,7 +349,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		getToken,
 		user,
 		userId,
-	]); // Add user and userId
+	]); // Dependencies remain the same
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {
@@ -527,24 +596,32 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			}
 
 			try {
-				const article = articles.find((a) => a._id === id);
-				if (!article || !article._rev) {
-					throw new Error("Article not found");
+				// Fetch the latest article data directly from DB
+				const fetchedArticle = await getArticle(id);
+				if (!fetchedArticle || !fetchedArticle._rev) {
+					// Use a more specific error message
+					throw new Error(
+						"Could not retrieve article details for update. It might have been deleted.",
+					);
 				}
 
-				// Check if article belongs to current user
-				if (article.userId && article.userId !== userId) {
+				// Check if article belongs to current user using fetched data
+				if (fetchedArticle.userId && fetchedArticle.userId !== userId) {
 					// Get user email for checking
 					const userEmail = user?.primaryEmailAddress?.emailAddress;
 					// Check if article belongs to user's email
-					if (userEmail && article.userId !== userEmail) {
+					if (userEmail && fetchedArticle.userId !== userEmail) {
+						throw new Error("You don't have permission to update this article");
+					}
+					// If no email match but userId mismatch, still throw permission error
+					if (!userEmail) {
 						throw new Error("You don't have permission to update this article");
 					}
 				}
 
 				const updates: Partial<Article> & { _id: string; _rev: string } = {
 					_id: id,
-					_rev: article._rev,
+					_rev: fetchedArticle._rev, // Use _rev from fetched article
 					isRead,
 				};
 
@@ -552,14 +629,14 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					updates.favorite = favorite;
 				}
 
-				// If marking as read and readAt is not set, set it
-				if (isRead && !article.readAt) {
+				// If marking as read and readAt is not set, set it (use fetched data)
+				if (isRead && !fetchedArticle.readAt) {
 					updates.readAt = Date.now();
 				}
 
 				const updatedArticle = await updateArticle(updates);
 
-				// Update articles in state
+				// Update articles in state (if it exists there)
 				setArticles((prevArticles) =>
 					prevArticles.map((a) => (a._id === id ? updatedArticle : a)),
 				);
@@ -581,7 +658,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				});
 			}
 		},
-		[articles, toast, userId, isSignedIn, user],
+		// Remove 'articles' from dependencies as we fetch directly now
+		[toast, userId, isSignedIn, user],
 	);
 
 	// Update reading progress
@@ -590,36 +668,49 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			if (!isSignedIn) return;
 
 			try {
-				const article = articles.find((a) => a._id === id);
-				if (!article || !article._rev) {
-					throw new Error("Article not found");
+				// Fetch the latest article data directly from DB
+				const fetchedArticle = await getArticle(id);
+				if (!fetchedArticle || !fetchedArticle._rev) {
+					// Don't throw an error here, just log and exit silently
+					// as progress updates are less critical than status changes
+					console.warn(
+						`Could not retrieve article ${id} for progress update. It might have been deleted.`,
+					);
+					return;
 				}
 
-				// Check if article belongs to current user
-				if (article.userId && article.userId !== userId) {
-					// Get user email for checking
+				// Check if article belongs to current user using fetched data
+				if (fetchedArticle.userId && fetchedArticle.userId !== userId) {
 					const userEmail = user?.primaryEmailAddress?.emailAddress;
-					// Check if article belongs to user's email
-					if (userEmail && article.userId !== userEmail) {
-						throw new Error("You don't have permission to update this article");
+					if (userEmail && fetchedArticle.userId !== userEmail) {
+						console.warn(
+							`Permission denied: User ${userId}/${userEmail} cannot update progress for article ${id} owned by ${fetchedArticle.userId}`,
+						);
+						return; // Exit silently on permission error
+					}
+					if (!userEmail) {
+						console.warn(
+							`Permission denied: User ${userId} cannot update progress for article ${id} owned by ${fetchedArticle.userId}`,
+						);
+						return; // Exit silently on permission error
 					}
 				}
 
 				const updates: Partial<Article> & { _id: string; _rev: string } = {
 					_id: id,
-					_rev: article._rev,
+					_rev: fetchedArticle._rev, // Use _rev from fetched article
 					readingProgress: progress,
 				};
 
-				// If reached end (90%+), mark as read
-				if (progress >= 90 && !article.isRead) {
+				// If reached end (90%+) and not already marked read, mark as read
+				if (progress >= 90 && !fetchedArticle.isRead) {
 					updates.isRead = true;
 					updates.readAt = Date.now();
 				}
 
 				const updatedArticle = await updateArticle(updates);
 
-				// Update articles in state
+				// Update articles in state (if it exists there)
 				setArticles((prevArticles) =>
 					prevArticles.map((a) => (a._id === id ? updatedArticle : a)),
 				);
@@ -628,7 +719,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				// Not showing toast for progress updates as they happen frequently
 			}
 		},
-		[articles, userId, isSignedIn, user],
+		// Remove 'articles' from dependencies
+		[userId, isSignedIn, user],
 	);
 
 	// Remove article
@@ -708,6 +800,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		() => ({
 			articles,
 			isLoading,
+			isRefreshing, // Add isRefreshing here
 			error,
 			currentView,
 			setCurrentView,
@@ -722,6 +815,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		[
 			articles,
 			isLoading,
+			isRefreshing, // Add isRefreshing dependency
 			error,
 			currentView,
 			refreshArticles,
