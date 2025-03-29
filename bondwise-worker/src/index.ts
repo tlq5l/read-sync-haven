@@ -470,7 +470,8 @@ export default {
 							"Successfully obtained Google OIDC token via getIdTokenClient.",
 						); // Updated log
 					} catch (googleAuthError: any) {
-						console.error("Failed to get Google OIDC token:", googleAuthError);
+						// Log more details from the error object
+						console.error("Failed to get Google OIDC token. Full Error:", JSON.stringify(googleAuthError, Object.getOwnPropertyNames(googleAuthError)));
 						return new Response(
 							JSON.stringify({
 								status: "error",
