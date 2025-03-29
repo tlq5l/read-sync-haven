@@ -44,29 +44,39 @@ export default function ArticleReader() {
 	const [summary, setSummary] = useState<string | null>(null);
 	const [summaryError, setSummaryError] = useState<string | null>(null);
 
-	// Mutation for summarizing content
+	// Mutation for summarizing content using Google Cloud Function
 	const summarizeMutation = useMutation({
 		mutationFn: async (textContent: string) => {
-			// TODO: Replace with actual worker URL
-			const workerUrl = import.meta.env.VITE_WORKER_URL; // Or your deployed worker URL
-			const response = await fetch(`${workerUrl}/api/summarize`, {
+			const gcfUrl = import.meta.env.VITE_GCF_SUMMARIZE_URL;
+			const gcfAuthKey = import.meta.env.VITE_GCF_AUTH_KEY;
+
+			if (!gcfUrl || !gcfAuthKey) {
+				throw new Error(
+					"GCF Summarizer URL or Auth Key is not configured in environment variables.",
+				);
+			}
+
+			const response = await fetch(gcfUrl, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
+					Authorization: `Bearer ${gcfAuthKey}`, // Add authentication header
 				},
 				body: JSON.stringify({ content: textContent }),
 			});
 
+			const data = await response.json(); // Always parse JSON to get potential error messages
+
 			if (!response.ok) {
-				const errorData = await response.json();
+				// Use error message from GCF response if available
 				throw new Error(
-					errorData.message || "Failed to fetch summary from worker",
+					data?.error || `Request failed with status ${response.status}`,
 				);
 			}
 
-			const data = await response.json();
-			if (data.status !== "success" || !data.summary) {
-				throw new Error(data.message || "Invalid summary response from worker");
+			if (!data.summary) {
+				// Handle cases where response is ok but summary is missing
+				throw new Error("Invalid summary response from GCF.");
 			}
 
 			return data.summary as string;

@@ -11,7 +11,9 @@
 	},
 	"dependencies": {
 		"@google-cloud/functions-framework": "^3.3.0",
-		"@google/generative-ai": "^0.16.0"
+		"@google/generative-ai": "^0.16.0",
+		"@types/cors": "^2.8.17",
+		"cors": "^2.8.5"
 	},
 	"devDependencies": {
 		"@types/node": "^20.11.5",

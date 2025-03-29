@@ -1,10 +1,15 @@
-import type { HttpFunction } from "@google-cloud/functions-framework";
+import type {
+	HttpFunction,
+	Request,
+	Response,
+} from "@google-cloud/functions-framework";
 import functions from "@google-cloud/functions-framework";
 import {
 	GoogleGenerativeAI,
 	HarmBlockThreshold,
 	HarmCategory,
 } from "@google/generative-ai";
+import cors from "cors";
 
 // Read environment variables
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -33,16 +38,11 @@ function authenticateRequest(req: functions.Request): boolean {
 	return true;
 }
 
-export const summarizeText: HttpFunction = async (req, res) => {
-	// CORS
-	res.set("Access-Control-Allow-Origin", "*"); // Adjust in production
-	res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-	res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-	if (req.method === "OPTIONS") {
-		res.status(204).send("");
-		return;
-	}
+// Initialize CORS middleware
+// TODO: Restrict origin in production to your frontend's domain
+const corsHandler = cors({ origin: true });
 
+const handleSummarizeRequest: HttpFunction = async (req, res) => {
 	// Validation & Auth
 	if (req.method !== "POST")
 		return res.status(405).send({ error: "Method Not Allowed" });
@@ -129,6 +129,18 @@ export const summarizeText: HttpFunction = async (req, res) => {
 		console.error("Error calling Gemini API:", error);
 		res.status(500).send({ error: "Internal Server Error." });
 	}
+};
+
+// Wrap the main handler with CORS
+export const summarizeText: HttpFunction = (req: Request, res: Response) => {
+	corsHandler(req, res, () => {
+		handleSummarizeRequest(req, res).catch((err: unknown) => {
+			console.error("Unhandled error in handleSummarizeRequest:", err);
+			if (!res.headersSent) {
+				res.status(500).send({ error: "Internal Server Error." });
+			}
+		});
+	});
 };
 
 functions.http("summarizeText", summarizeText);
