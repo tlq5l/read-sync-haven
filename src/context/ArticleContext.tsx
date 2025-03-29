@@ -151,16 +151,17 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				if (isSignedIn) {
 					console.log("User is signed in, attempting to fetch from cloud...");
 					const token = await getToken(); // Get Clerk token
+					// Get user's primary email
+					const userEmail = user?.primaryEmailAddress?.emailAddress;
 
 					if (token) {
-						fetchedArticles = await fetchCloudItems(token);
+						// Pass both token and email to fetchCloudItems
+						fetchedArticles = await fetchCloudItems(token, userEmail);
 						console.log(
-							`Fetched ${fetchedArticles.length} articles from cloud`,
+							`Fetched ${fetchedArticles.length} articles from cloud for user ${userId} / ${userEmail}`,
 						);
 					} else {
 						console.warn("User is signed in but no token available.");
-						// Handle case where token is missing - maybe show error or fetch local?
-						// For simplicity, we'll show empty list for now if token fails.
 						fetchedArticles = [];
 						throw new Error("Could not retrieve authentication token."); // Throw error to show toast
 					}
@@ -247,7 +248,16 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Reset fetch lock on cleanup to prevent deadlocks
 			fetchLockRef.current = false;
 		};
-	}, [currentView, isInitialized, toast, isSignedIn, isLoaded, getToken]); // Correct dependencies: Added getToken, removed useAuth
+	}, [
+		currentView,
+		isInitialized,
+		toast,
+		isSignedIn,
+		isLoaded,
+		getToken,
+		user,
+		userId,
+	]); // Add user and userId
 
 	// Refresh articles function
 	const refreshArticles = useCallback(async () => {
@@ -269,11 +279,14 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			if (isSignedIn) {
 				console.log("User is signed in, refreshing from cloud...");
 				const token = await getToken(); // Get Clerk token
+				// Get user's primary email
+				const userEmail = user?.primaryEmailAddress?.emailAddress;
 
 				if (token) {
-					fetchedArticles = await fetchCloudItems(token);
+					// Pass both token and email to fetchCloudItems
+					fetchedArticles = await fetchCloudItems(token, userEmail);
 					console.log(
-						`Refreshed ${fetchedArticles.length} articles from cloud`,
+						`Refreshed ${fetchedArticles.length} articles from cloud for user ${userId} / ${userEmail}`,
 					);
 				} else {
 					console.warn("User is signed in but no token available for refresh.");
@@ -327,6 +340,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		getToken,
 		currentView, // Add currentView back for filtering
 		isInitialized, // Add isInitialized back for check
+		user, // Add user
+		userId, // Add userId
 	]); // Final correct dependencies
 
 	// Add article by URL

@@ -12,24 +12,33 @@ interface CloudItem {
 }
 
 /**
- * Fetches items for the authenticated user from the Cloudflare Worker using Clerk token.
+ * Fetches items for the authenticated user from the Cloudflare Worker using Clerk token
+ * and optionally the user's email for fallback lookup.
  */
-export async function fetchCloudItems(token: string): Promise<Article[]> {
+export async function fetchCloudItems(
+	token: string,
+	email?: string | null, // Add optional email parameter
+): Promise<Article[]> {
 	if (!token) {
 		console.error("Cannot fetch cloud items: No token provided.");
 		return []; // Or throw an error, depending on desired handling
 	}
 	try {
-		console.log("Fetching cloud items for authenticated user...");
-		const response = await fetch(
-			"https://bondwise-sync-api.vikione.workers.dev/items", // Removed userId query param
-			{
-				headers: {
-					// Add the Authorization header
-					Authorization: `Bearer ${token}`,
-				},
-			},
+		// Construct URL, adding email query param if available
+		let fetchUrl = "https://bondwise-sync-api.vikione.workers.dev/items";
+		if (email) {
+			fetchUrl += `?email=${encodeURIComponent(email)}`;
+		}
+		console.log(
+			`Fetching cloud items for authenticated user from: ${fetchUrl}`,
 		);
+
+		const response = await fetch(fetchUrl, {
+			headers: {
+				// Add the Authorization header
+				Authorization: `Bearer ${token}`,
+			},
+		});
 
 		if (!response.ok) {
 			// Handle specific auth error

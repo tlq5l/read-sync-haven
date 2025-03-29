@@ -115,6 +115,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 							// --- Try saving to Cloudflare Worker first ---
 							let apiSuccess = false;
+							// Add detailed logging before the fetch attempt
+							console.log("Prepared newItem for API:", JSON.stringify(newItem));
 							try {
 								console.log(
 									`Attempting to POST item to Worker: ${workerUrl}`,
@@ -160,7 +162,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 								apiSuccess = true;
 							} catch (apiError) {
-								console.error("Error saving item via Worker API:", apiError);
+								// Add more detailed logging in the catch block
+								console.error("Caught API Error during fetch:", apiError);
+								if (apiError instanceof Error) {
+									console.error("API Error Name:", apiError.name);
+									console.error("API Error Message:", apiError.message);
+									console.error("API Error Stack:", apiError.stack);
+								}
 								// Don't send response yet, try local save first
 							}
 

@@ -213,21 +213,54 @@ export default {
 					if (authResult.status === "error") {
 						return authResult.response; // Return the error response directly
 					}
-					const userId = authResult.userId; // Get authenticated userId
+					const clerkUserId = authResult.userId; // Get authenticated Clerk userId (renamed to avoid conflict)
 					// ---------------------------------
 
-					console.log(`Listing items for authenticated user: ${userId}`);
+					// Get optional email from query parameters for fallback lookup
+					const email = url.searchParams.get("email");
+
+					console.log(
+						`Listing items for authenticated user: ${clerkUserId} (Fallback email: ${email || "N/A"})`, // Use clerkUserId
+					);
 
 					try {
-						// List keys using the authenticated user's ID as a prefix for efficiency
-						const listResult = await env.SAVED_ITEMS_KV.list({
-							prefix: `${userId}:`,
+						// Fetch items based on Clerk User ID prefix
+						const userItemsPromise = env.SAVED_ITEMS_KV.list({
+							prefix: `${clerkUserId}:`, // Use clerkUserId
 						});
 
-						// Get all values for the user's keys
+						// Fetch items based on Email prefix (if provided)
+						const emailItemsPromise = email
+							? env.SAVED_ITEMS_KV.list({ prefix: `${email}:` })
+							: Promise.resolve(null); // Resolve to null if no email
+
+						// Wait for both lists to resolve
+						const [userListResult, emailListResult] = await Promise.all([
+							userItemsPromise,
+							emailItemsPromise,
+						]);
+
+						// Combine keys, ensuring uniqueness
+						// Correct Map type: Key is string, Value is the KV Key object (Metadata type can be unknown)
+						const combinedKeys = new Map<string, KVNamespaceListKey<unknown>>();
+						// Use for...of loop instead of forEach
+						for (const key of userListResult.keys) {
+							combinedKeys.set(key.name, key);
+						}
+						if (emailListResult) {
+							// Use for...of loop instead of forEach
+							for (const key of emailListResult.keys) {
+								combinedKeys.set(key.name, key);
+							}
+						}
+
+						console.log(
+							`Found ${combinedKeys.size} unique keys for user/email.`,
+						);
+
+						// Get all values for the unique keys
 						const items: SavedItem[] = [];
-						for (const key of listResult.keys) {
-							// key.name already includes the prefix (userId:itemId)
+						for (const key of combinedKeys.values()) {
 							const value = await env.SAVED_ITEMS_KV.get(key.name);
 							if (value) {
 								try {

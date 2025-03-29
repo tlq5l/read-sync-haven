@@ -12,7 +12,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@types/bun": "latest",
-		"@types/chrome": "^0.0.312",
+		"@types/chrome": "^0.0.313",
 		"copyfiles": "^2.4.1",
 		"vite": "^6.2.3",
 		"vite-plugin-static-copy": "^2.3.0"
