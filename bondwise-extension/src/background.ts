@@ -161,54 +161,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 								}
 
 								apiSuccess = true;
-
-								// --- Notify open web app tabs ---
-								console.log(
-									"[EXT DEBUG] Checking apiSuccess value before if:",
-									apiSuccess,
-								); // DEBUG LOG
-								if (apiSuccess) {
-									console.log(
-										"[EXT DEBUG] Entering if(apiSuccess) block. Querying tabs...",
-									); // Updated DEBUG LOG
-									const webAppUrls = [
-										// Re-add variable declaration
-										"http://localhost:8080/*",
-										"https://read-sync-haven.pages.dev/*",
-										"https://staging.read-sync-haven.pages.dev/*",
-									];
-									console.log("[EXT DEBUG] About to call chrome.tabs.query"); // DEBUG LOG
-									chrome.tabs.query({ url: webAppUrls }, (tabs) => {
-										console.log(
-											"[EXT DEBUG] chrome.tabs.query callback executed.",
-										); // DEBUG LOG
-										if (chrome.runtime.lastError) {
-											console.error(
-												"Error querying tabs:",
-												chrome.runtime.lastError.message,
-											);
-											return;
-										}
-										console.log("[EXT DEBUG] Found tabs:", tabs); // DEBUG LOG
-										for (const tab of tabs) {
-											// Use for...of loop
-											if (tab.id) {
-												console.log(
-													`[EXT DEBUG] Sending message to tab ${tab.id}`,
-												); // DEBUG LOG
-												chrome.tabs
-													.sendMessage(tab.id, { type: "NEW_CONTENT_SAVED" })
-													.catch((err) => {
-														// Catch errors if the tab cannot be reached (e.g., closed, content script not ready)
-														console.warn(
-															`Could not send message to tab ${tab.id}: ${err.message}`,
-														);
-													});
-											}
-										} // End of for...of loop
-									}); // End of chrome.tabs.query callback
-								}
-								// --------------------------------
 							} catch (apiError) {
 								// Add more detailed logging in the catch block
 								console.error("Caught API Error during fetch:", apiError);
@@ -219,6 +171,92 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 								}
 								// Don't send response yet, try local save first
 							}
+
+							// --- Save locally (cache/fallback) regardless of API success for now ---
+							// (In a more robust system, you might only save locally if API fails, or sync later)
+							try {
+								console.log(
+									"Attempting to save item to chrome.storage.local:",
+									newItem,
+								);
+								await chrome.storage.local.set({ [newItem.id]: newItem });
+								console.log(
+									"chrome.storage.local.set completed for ID:",
+									newItem.id,
+								);
+							} catch (localError) {
+								console.error("Error saving to local storage:", localError);
+								// If API also failed, report local error, otherwise API success takes precedence
+								if (!apiSuccess) {
+									sendResponse({
+										status: "error",
+										message: `Local storage error: ${localError instanceof Error ? localError.message : "Unknown error"}`,
+									});
+									return; // Exit early if both failed
+								}
+							}
+
+							// --- Send final response ---
+							if (apiSuccess) {
+								sendResponse({
+									status: "success",
+									message: "Saved item to cloud storage",
+								});
+							} else {
+								// If API failed but local save might have succeeded (or also failed)
+								sendResponse({
+									status: "partial",
+									message:
+										"Failed to save to cloud API. Saved locally as fallback.",
+								});
+							}
+
+							// --- Notify open web app tabs (Moved outside try...catch) ---
+							console.log(
+								"[EXT DEBUG] Checking apiSuccess value before notification block:",
+								apiSuccess,
+							); // DEBUG LOG
+							if (apiSuccess) {
+								console.log(
+									"[EXT DEBUG] Entering notification block. Querying tabs...",
+								); // Updated DEBUG LOG
+								const webAppUrls = [
+									"http://localhost:8080/*",
+									"https://read-sync-haven.pages.dev/*",
+									"https://staging.read-sync-haven.pages.dev/*",
+								];
+								console.log("[EXT DEBUG] About to call chrome.tabs.query"); // DEBUG LOG
+								chrome.tabs.query({ url: webAppUrls }, (tabs) => {
+									console.log(
+										"[EXT DEBUG] chrome.tabs.query callback executed.",
+									); // DEBUG LOG
+									if (chrome.runtime.lastError) {
+										console.error(
+											"Error querying tabs:",
+											chrome.runtime.lastError.message,
+										);
+										return;
+									}
+									console.log("[EXT DEBUG] Found tabs:", tabs); // DEBUG LOG
+									for (const tab of tabs) {
+										// Use for...of loop
+										if (tab.id) {
+											console.log(
+												`[EXT DEBUG] Sending message to tab ${tab.id}`,
+											); // DEBUG LOG
+											chrome.tabs
+												.sendMessage(tab.id, { type: "NEW_CONTENT_SAVED" })
+												.catch((err) => {
+													// Catch errors if the tab cannot be reached (e.g., closed, content script not ready)
+													console.warn(
+														`Could not send message to tab ${tab.id}: ${err.message}`,
+													);
+												});
+										}
+									} // End of for...of loop
+								}); // End of chrome.tabs.query callback
+							}
+							// ----------------------------------------------------------
 
 							// --- Save locally (cache/fallback) regardless of API success for now ---
 							// (In a more robust system, you might only save locally if API fails, or sync later)
