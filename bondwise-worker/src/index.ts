@@ -7,7 +7,8 @@ export interface Env {
 	SAVED_ITEMS_KV: KVNamespace;
 
 	// Variables
-	GCF_URL: string; // URL for the Google Cloud Function summarizer
+	GCF_SUMMARIZE_URL: string; // Renamed for clarity
+	GCF_CHAT_URL: string; // URL for the new GCF chat function
 	GEMINI_API_KEY: string; // Kept for potential future use/debugging
 	GCLOUD_PROJECT_NUMBER: string;
 	GCLOUD_WORKLOAD_IDENTITY_POOL_ID: string;
@@ -515,9 +516,11 @@ export default {
 					}
 
 					// --- 2. Prepare GCF Call ---
-					const gcfUrl = env.GCF_URL;
+					const gcfUrl = env.GCF_SUMMARIZE_URL; // Use renamed variable
 					if (!gcfUrl) {
-						console.error("GCF_URL environment variable is not configured.");
+						console.error(
+							"GCF_SUMMARIZE_URL environment variable is not configured.",
+						); // Update error message
 						return new Response(
 							JSON.stringify({
 								status: "error",
@@ -544,10 +547,10 @@ export default {
 						);
 					}
 
-					// --- 3. Prepare GCF Call with Shared Secret ---
+					// --- 3. Prepare GCF Call (Summarize) with Shared Secret ---
 					if (!env.GCF_AUTH_SECRET) {
 						console.error(
-							"GCF_AUTH_SECRET is not configured in worker environment.",
+							"GCF_AUTH_SECRET (shared secret) is not configured in worker environment.",
 						);
 						return new Response(
 							JSON.stringify({
@@ -562,8 +565,10 @@ export default {
 						);
 					}
 
-					// --- 4. Call the Google Cloud Function ---
-					console.log(`Calling GCF at ${gcfUrl} with shared secret...`); // Updated log
+					// --- 4. Call the Summarize GCF ---
+					console.log(
+						`Calling Summarize GCF at ${gcfUrl} with shared secret...`,
+					);
 					const gcfResponse = await fetch(gcfUrl, {
 						method: "POST",
 						headers: {
@@ -574,27 +579,25 @@ export default {
 						body: JSON.stringify({ content: content }),
 					});
 
-					// --- 5. Handle GCF Response ---
+					// --- 5. Handle Summarize GCF Response ---
 					if (!gcfResponse.ok) {
 						const errorBody = await gcfResponse.text();
 						console.error(
-							`GCF call failed with status ${gcfResponse.status}: ${errorBody}`,
+							`Summarize GCF call failed with status ${gcfResponse.status}: ${errorBody}`,
 						);
-						let errorMessage = `AI service request failed (Status: ${gcfResponse.status})`;
+						let errorMessage = `Summarization service request failed (Status: ${gcfResponse.status})`;
 						try {
 							const errorJson = JSON.parse(errorBody);
 							errorMessage =
 								errorJson.error ||
-								`AI service error: ${gcfResponse.statusText}`;
+								`Summarization service error: ${gcfResponse.statusText}`;
 						} catch (e) {
-							if (errorBody) {
-								errorMessage = `AI service error: ${errorBody}`;
-							}
+							// Keep simpler message if parsing fails
 						}
 						return new Response(
 							JSON.stringify({ status: "error", message: errorMessage }),
 							{
-								status: gcfResponse.status === 401 ? 401 : 502,
+								status: gcfResponse.status === 401 ? 401 : 502, // Propagate 401
 								headers: { "Content-Type": "application/json", ...corsHeaders },
 							},
 						);
@@ -602,11 +605,11 @@ export default {
 
 					const gcfResult = (await gcfResponse.json()) as { summary?: string };
 					if (!gcfResult.summary) {
-						console.error("GCF response missing 'summary' field.");
+						console.error("Summarize GCF response missing 'summary' field.");
 						return new Response(
 							JSON.stringify({
 								status: "error",
-								message: "AI service returned an invalid response.",
+								message: "Summarization service returned an invalid response.",
 							}),
 							{
 								status: 502,
@@ -630,6 +633,147 @@ export default {
 							message:
 								error.message ||
 								"Internal worker error processing summary request.",
+						}),
+						{
+							status: 500,
+							headers: { "Content-Type": "application/json", ...corsHeaders },
+						},
+					);
+				}
+			}
+
+			// POST /api/chat - Chat with content using Google Cloud Function
+			if (path === "/api/chat" && request.method === "POST") {
+				console.log("Processing /api/chat request...");
+				try {
+					// --- 1. Verify Clerk Token ---
+					const authResult = await authenticateRequestWithClerk(request, env);
+					if (authResult.status === "error") {
+						return authResult.response; // Return the error response directly
+					}
+					// const userId = authResult.userId; // We have the user ID if needed later
+
+					// --- 2. Prepare GCF Call (Chat) ---
+					const gcfChatUrl = env.GCF_CHAT_URL;
+					if (!gcfChatUrl) {
+						console.error(
+							"GCF_CHAT_URL environment variable is not configured.",
+						);
+						return new Response(
+							JSON.stringify({
+								status: "error",
+								message: "AI chat service URL is not configured.",
+							}),
+							{
+								status: 503, // Service Unavailable
+								headers: { "Content-Type": "application/json", ...corsHeaders },
+							},
+						);
+					}
+
+					const { content, message } = (await request.json()) as {
+						content?: string;
+						message?: string;
+					};
+					if (!content || !message) {
+						return new Response(
+							JSON.stringify({
+								status: "error",
+								message: "Missing 'content' or 'message' in request body",
+							}),
+							{
+								status: 400, // Bad Request
+								headers: { "Content-Type": "application/json", ...corsHeaders },
+							},
+						);
+					}
+
+					// --- 3. Prepare GCF Call (Chat) with Shared Secret ---
+					if (!env.GCF_AUTH_SECRET) {
+						console.error(
+							"GCF_AUTH_SECRET (shared secret) is not configured in worker environment.",
+						);
+						return new Response(
+							JSON.stringify({
+								status: "error",
+								message:
+									"Worker is missing configuration for backend authentication.",
+							}),
+							{
+								status: 500,
+								headers: { "Content-Type": "application/json", ...corsHeaders },
+							},
+						);
+					}
+
+					// --- 4. Call the Chat GCF ---
+					console.log(
+						`Calling Chat GCF at ${gcfChatUrl} with shared secret...`,
+					);
+					const gcfResponse = await fetch(gcfChatUrl, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							"X-Worker-Authorization": `Bearer ${env.GCF_AUTH_SECRET}`, // Shared secret header
+						},
+						body: JSON.stringify({ content: content, message: message }), // Send both content and message
+					});
+
+					// --- 5. Handle Chat GCF Response ---
+					if (!gcfResponse.ok) {
+						const errorBody = await gcfResponse.text();
+						console.error(
+							`Chat GCF call failed with status ${gcfResponse.status}: ${errorBody}`,
+						);
+						let errorMessage = `Chat service request failed (Status: ${gcfResponse.status})`;
+						try {
+							const errorJson = JSON.parse(errorBody);
+							errorMessage =
+								errorJson.error ||
+								`Chat service error: ${gcfResponse.statusText}`;
+						} catch (e) {
+							// Keep simpler message if parsing fails
+						}
+						return new Response(
+							JSON.stringify({ status: "error", message: errorMessage }),
+							{
+								status: gcfResponse.status === 401 ? 401 : 502, // Propagate 401
+								headers: { "Content-Type": "application/json", ...corsHeaders },
+							},
+						);
+					}
+
+					// Assuming GCF returns { response: "AI response text" }
+					const gcfResult = (await gcfResponse.json()) as { response?: string };
+					if (!gcfResult.response) {
+						console.error("Chat GCF response missing 'response' field.");
+						return new Response(
+							JSON.stringify({
+								status: "error",
+								message: "Chat service returned an invalid response.",
+							}),
+							{
+								status: 502, // Bad Gateway
+								headers: { "Content-Type": "application/json", ...corsHeaders },
+							},
+						);
+					}
+
+					// --- 6. Return Success Response ---
+					console.log("Successfully processed /api/chat request.");
+					return new Response(
+						JSON.stringify({ status: "success", response: gcfResult.response }),
+						{ headers: { "Content-Type": "application/json", ...corsHeaders } },
+					);
+				} catch (error: any) {
+					// Catch errors from Clerk verification, JSON parsing, or GCF call
+					console.error("Error processing /api/chat:", error);
+					return new Response(
+						JSON.stringify({
+							status: "error",
+							message:
+								error.message ||
+								"Internal worker error processing chat request.",
 						}),
 						{
 							status: 500,

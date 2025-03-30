@@ -3,11 +3,12 @@ import { base64ToArrayBuffer } from "@/services/epub";
 import type { Book, Rendition } from "epubjs";
 import ePub from "epubjs";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react"; // Removed useCallback
 
 interface EpubReaderProps {
 	fileData: string;
 	fileName?: string;
+	onTextExtracted: (text: string | null) => void; // Add callback prop
 }
 
 // Define missing types for EPUB.js
@@ -28,10 +29,25 @@ interface ExtendedRendition extends Rendition {
 			register: (callback: (section: any) => void) => void;
 		};
 	};
+	// Add request type if needed, based on epubjs source/docs
+	// request?: (url: string, options?: any) => Promise<ArrayBuffer | string | object>;
 }
 
-export default function EpubReader({ fileData, fileName }: EpubReaderProps) {
-	const [book, setBook] = useState<Book | null>(null);
+// Extend Book type if needed for request method
+interface ExtendedBook extends Book {
+	request?: (
+		url: string,
+		options?: any,
+	) => Promise<ArrayBuffer | string | object>;
+}
+
+// Correctly define the component and destructure props ONCE
+export default function EpubReader({
+	fileData,
+	fileName,
+	onTextExtracted, // Destructure the callback
+}: EpubReaderProps) {
+	const [book, setBook] = useState<ExtendedBook | null>(null); // Use ExtendedBook
 	const [rendition, setRendition] = useState<ExtendedRendition | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -43,7 +59,7 @@ export default function EpubReader({ fileData, fileName }: EpubReaderProps) {
 	useEffect(() => {
 		if (!fileData || !viewerRef.current) return;
 
-		let epubBook: Book | null = null;
+		let epubBook: ExtendedBook | null = null; // Use ExtendedBook
 
 		try {
 			setLoading(true);
@@ -53,7 +69,7 @@ export default function EpubReader({ fileData, fileName }: EpubReaderProps) {
 			const arrayBuffer = base64ToArrayBuffer(fileData);
 
 			// Create EPUB book instance
-			epubBook = ePub(arrayBuffer);
+			epubBook = ePub(arrayBuffer) as ExtendedBook; // Cast to ExtendedBook
 			setBook(epubBook);
 
 			// Create rendition when book is ready
@@ -75,7 +91,6 @@ export default function EpubReader({ fileData, fileName }: EpubReaderProps) {
 					) as ExtendedRendition;
 
 					// Listen for rendering events - use typed content hook
-					// Removed injected style tag
 					epubRendition.hooks.content.register((contents: EpubContents) => {
 						const body = contents.document.body;
 						if (body) {
@@ -89,35 +104,27 @@ export default function EpubReader({ fileData, fileName }: EpubReaderProps) {
 					epubRendition.display().then(() => {
 						setLoading(false);
 						setContentRendered(true);
-
-						// Log book display success
 						console.log("EPUB content displayed successfully");
 
 						// Function to apply styles to iframes
 						const applyIframeStyles = () => {
-							// Apply basic styles to iframe elements
 							const iframes = viewerRef.current?.querySelectorAll("iframe");
 							if (iframes?.length) {
 								for (const iframe of Array.from(iframes)) {
-									// Set basic iframe styles
 									iframe.style.border = "0";
 									iframe.style.width = "100%";
 									iframe.style.height = "100%";
-									// Removed minHeight and internal body styling attempts
-									iframe.style.overflow = "auto"; // Keep this? Or let scrolled-doc handle? Let's keep for now.
+									iframe.style.overflow = "auto";
 								}
 							}
 						};
-
-						// Apply styles initially
 						applyIframeStyles();
-						// Removed setTimeout call
 					});
 
 					// Store rendition for navigation
 					setRendition(epubRendition);
 
-					// Track location changes using optional chaining
+					// Track location changes
 					epubRendition.on("locationChanged", (loc) => {
 						if (loc?.start) {
 							setCurrentLocation(loc.start.cfi);
@@ -131,14 +138,74 @@ export default function EpubReader({ fileData, fileName }: EpubReaderProps) {
 							"EPUB section rendered:",
 							section?.href || "unknown section",
 						);
-
-						// Simplified: No longer attempting to force styles after render
 					});
+
+					// --- Extract Full Text ---
+					epubBook?.ready // Null check
+						.then(() => epubBook?.locations.generate(1000)) // Null check
+						.then(async () => {
+							if (!epubBook) {
+								// Null check
+								onTextExtracted(null);
+								return;
+							}
+							let fullText = "";
+							// Helper to load and extract text from a section
+							const loadSectionText = async (sectionHref: string) => {
+								if (!epubBook) return ""; // Null check
+								try {
+									const section = epubBook.spine.get(sectionHref);
+									if (section) {
+										// Try loading section by passing book's request method
+										if (
+											epubBook.request &&
+											typeof epubBook.request === "function"
+										) {
+											await section.load(epubBook.request); // Pass the book's request function
+											return section.contents?.textContent || "";
+										}
+										console.warn(
+											`epubBook.request method not found or not a function for section ${sectionHref}. Cannot extract text.`,
+										);
+										return "";
+									}
+								} catch (loadErr) {
+									console.warn(
+										`Could not load/extract text from section ${sectionHref}:`,
+										loadErr,
+									);
+								}
+								return "";
+							};
+
+							// Iterate through spine items sequentially
+							if (epubBook?.spine?.items) {
+								for (const section of epubBook.spine.items) {
+									if (section.href) {
+										const sectionText = await loadSectionText(section.href);
+										fullText = `${fullText}${sectionText}\n\n`; // Use template literal
+									}
+								}
+							} else {
+								console.warn("EPUB spine items not found for text extraction.");
+							}
+							console.log(
+								"EPUB Full Text Extracted (first 200 chars):",
+								fullText.substring(0, 200),
+							);
+							onTextExtracted(fullText.trim()); // Call callback
+						})
+						.catch((textErr) => {
+							console.error("Error extracting EPUB text:", textErr);
+							onTextExtracted(null); // Indicate failure
+						});
+					// --- End Extract Full Text ---
 				})
 				.catch((err) => {
 					console.error("Error rendering EPUB:", err);
 					setError("Failed to render EPUB file. Please try again.");
 					setLoading(false);
+					onTextExtracted(null); // Indicate failure on render error too
 				});
 		} catch (err) {
 			console.error("Error initializing EPUB:", err);
@@ -157,9 +224,8 @@ export default function EpubReader({ fileData, fileName }: EpubReaderProps) {
 					console.error("Error destroying EPUB book:", err);
 				}
 			}
-			// Removed style cleanup as style is no longer injected
 		};
-	}, [fileData]);
+	}, [fileData, onTextExtracted]); // Add onTextExtracted to dependency array
 
 	// Navigation handlers
 	const handlePrevPage = () => {

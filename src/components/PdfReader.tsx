@@ -16,9 +16,15 @@ import { Button } from "./ui/button";
 interface PdfReaderProps {
 	fileData: string;
 	fileName?: string;
+	onTextExtracted: (text: string | null) => void; // Add callback prop
 }
 
-export default function PdfReader({ fileData, fileName }: PdfReaderProps) {
+export default function PdfReader({
+	fileData,
+	fileName,
+	onTextExtracted,
+}: PdfReaderProps) {
+	// Destructure callback
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -51,13 +57,20 @@ export default function PdfReader({ fileData, fileName }: PdfReaderProps) {
 			console.error("Error processing PDF:", err);
 			setError("Failed to load PDF file");
 			setIsLoading(false);
+			onTextExtracted(null); // Signal text extraction failure/unsupported
 			return undefined;
 		}
-	}, [fileData]);
+	}, [fileData, onTextExtracted]); // Add callback to dependencies
 
-	// Handle iframe load event
+	// Handle iframe load event - Signal that text extraction is not supported here
 	const handleIframeLoad = () => {
 		setIsLoading(false);
+		// Since we can't easily extract text from the iframe's sandboxed PDF viewer,
+		// we signal that text is unavailable.
+		onTextExtracted(null);
+		console.log(
+			"PDF iframe loaded, but text extraction is not supported with this viewer.",
+		);
 	};
 
 	// Handle iframe error event

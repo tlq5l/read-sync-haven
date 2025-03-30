@@ -27,10 +27,13 @@ import {
 	Maximize2,
 	Minimize2,
 	PanelRightOpen,
+	Send, // Add Send icon
 	// PanelRightOpen, // Removed duplicate
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react"; // Add useCallback and sort
 import { useNavigate, useParams } from "react-router-dom";
+import { Input } from "./ui/input"; // Add Input import
+import { ScrollArea } from "./ui/scroll-area"; // Add ScrollArea import
 // import { useAuth } from "@clerk/clerk-react"; // Removed duplicate import
 
 export default function ArticleReader() {
@@ -47,14 +50,35 @@ export default function ArticleReader() {
 	const [isSummarizing, setIsSummarizing] = useState(false);
 	const [summary, setSummary] = useState<string | null>(null);
 	const [summaryError, setSummaryError] = useState<string | null>(null);
+	const [fullTextContent, setFullTextContent] = useState<string | null>(null); // State for extracted text
+	const [chatHistory, setChatHistory] = useState<
+		Array<{ sender: "user" | "ai"; text: string }>
+	>([]);
+	const [chatInput, setChatInput] = useState("");
+	const [isChatting, setIsChatting] = useState(false);
+	const [chatError, setChatError] = useState<string | null>(null);
+	const chatScrollAreaRef = useRef<HTMLDivElement>(null);
+
+	// Callback for child components to provide extracted text
+	const handleTextExtracted = useCallback((text: string | null) => {
+		console.log(
+			"Text extracted:",
+			text ? `${text.substring(0, 100)}...` : "null",
+		);
+		setFullTextContent(text);
+	}, []);
 
 	// Removed the old getGoogleAuthToken function
 
-	// Mutation for summarizing content using Google Cloud Function (Authenticated)
+	// Mutation for summarizing content using Google Cloud Function (Authenticated) - Uses fullTextContent
 	const summarizeMutation = useMutation({
-		mutationFn: async (textContent: string) => {
+		mutationFn: async () => {
+			// No argument needed, uses state
+			if (!fullTextContent) {
+				throw new Error("Article content not available for summarization.");
+			}
 			let response: Response;
-			const requestBody = JSON.stringify({ content: textContent }); // Use const
+			const requestBody = JSON.stringify({ content: fullTextContent }); // Use state
 
 			if (import.meta.env.DEV) {
 				// --- DEVELOPMENT: Call GCF directly via Vite Proxy ---
@@ -141,6 +165,117 @@ export default function ArticleReader() {
 			setIsSummarizing(false);
 		},
 	});
+
+	// Mutation for chatting with content using Cloudflare Worker -> GCF
+	const chatMutation = useMutation({
+		mutationFn: async (userMessage: string) => {
+			if (!fullTextContent) {
+				throw new Error("Article content not available for chat.");
+			}
+			if (!userMessage.trim()) {
+				throw new Error("Cannot send an empty message.");
+			}
+
+			let response: Response;
+			const requestBody = JSON.stringify({
+				content: fullTextContent,
+				message: userMessage,
+			});
+
+			// Always call the worker proxy (handles dev/prod logic internally if needed, but currently points to prod worker)
+			console.log("Calling Cloudflare Worker proxy for chat...");
+			const clerkToken = await getToken();
+			if (!clerkToken) {
+				throw new Error("User not authenticated (Clerk token missing).");
+			}
+
+			response = await fetch(
+				"https://bondwise-sync-api.vikione.workers.dev/api/chat", // Absolute path to worker chat endpoint
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${clerkToken}`, // Send Clerk token
+					},
+					body: requestBody,
+				},
+			);
+
+			const data = await response.json();
+
+			if (!response.ok) {
+				throw new Error(
+					data?.message ||
+						data?.error ||
+						`Chat request failed with status ${response.status}`,
+				);
+			}
+
+			if (!data.response) {
+				// Expecting 'response' field from chat GCF
+				throw new Error(
+					"Invalid response from chat service (missing response).",
+				);
+			}
+
+			return data.response; // Return the AI response text
+		},
+		onMutate: (userMessage: string) => {
+			setIsChatting(true);
+			setChatError(null);
+			// Add user message to history immediately
+			setChatHistory((prev) => [
+				...prev,
+				{ sender: "user", text: userMessage },
+			]);
+			setChatInput(""); // Clear input field
+		},
+		onSuccess: (aiResponse: string) => {
+			// Add AI response to history
+			setChatHistory((prev) => [...prev, { sender: "ai", text: aiResponse }]);
+		},
+		onError: (error: Error) => {
+			setChatError(error.message);
+			// Optionally add error message to chat history
+			setChatHistory((prev) => [
+				...prev,
+				{ sender: "ai", text: `Error: ${error.message}` },
+			]);
+		},
+		onSettled: () => {
+			setIsChatting(false);
+			// Scroll to bottom after message exchange
+			setTimeout(() => {
+				chatScrollAreaRef.current?.scrollTo({
+					top: chatScrollAreaRef.current.scrollHeight,
+					behavior: "smooth",
+				});
+			}, 100); // Small delay to allow DOM update
+		},
+	});
+
+	// Handle chat submission
+	const handleChatSubmit = (e?: React.FormEvent<HTMLFormElement>) => {
+		e?.preventDefault(); // Prevent form submission page reload
+		if (chatInput.trim() && !isChatting && fullTextContent) {
+			chatMutation.mutate(chatInput.trim());
+		} else if (!fullTextContent) {
+			setChatError("Article content not yet extracted or available.");
+		}
+	};
+
+	// Scroll chat to bottom when new messages are added
+	useEffect(() => {
+		if (chatScrollAreaRef.current) {
+			// Scroll to bottom whenever the ref is available (e.g., after initial render)
+			// and potentially after new messages (though the mutation's onSettled handles that too)
+			chatScrollAreaRef.current.scrollTop =
+				chatScrollAreaRef.current.scrollHeight;
+		}
+		// No dependency array needed if we only want this on mount/ref change,
+		// or keep chatHistory if we want it to scroll on every message addition
+		// Let's remove chatHistory as per the lint rule, scrolling is handled in onSettled
+	}, []); // Remove chatHistory dependency
 
 	useEffect(() => {
 		const fetchArticle = async () => {
@@ -293,22 +428,28 @@ export default function ArticleReader() {
 								<SheetDescription />
 							</SheetHeader>
 							<Tabs defaultValue="summary" className="mt-4">
-								<TabsList>
+								<TabsList className="grid w-full grid-cols-4">
+									{" "}
+									{/* Adjust grid columns */}
 									<TabsTrigger value="summary">Summary</TabsTrigger>
+									<TabsTrigger value="chat">Chat</TabsTrigger>{" "}
+									{/* Add Chat Trigger */}
 									<TabsTrigger value="notes">Notes</TabsTrigger>
 									<TabsTrigger value="metadata">Metadata</TabsTrigger>
 								</TabsList>
+								{/* Summary Tab Content */}
 								<TabsContent value="summary" className="mt-4 space-y-4">
 									<Button
 										onClick={() => {
-											const textContent = contentRef.current?.textContent;
-											if (textContent) {
-												summarizeMutation.mutate(textContent);
+											if (fullTextContent) {
+												summarizeMutation.mutate(); // Mutate without args
 											} else {
-												setSummaryError("Could not extract article text.");
+												setSummaryError(
+													"Article content not yet extracted or available.",
+												);
 											}
 										}}
-										disabled={isSummarizing}
+										disabled={isSummarizing || !fullTextContent} // Disable if no content
 									>
 										{isSummarizing ? (
 											<Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -328,14 +469,85 @@ export default function ArticleReader() {
 										</p>
 									)}
 									{summary && (
-										<div className="prose prose-sm max-w-none">
+										<div className="prose prose-sm max-w-none dark:prose-invert">
 											<p>{summary}</p>
 										</div>
 									)}
 								</TabsContent>
+								{/* Chat Tab Content */}
+								<TabsContent
+									value="chat"
+									className="mt-4 flex flex-col h-[calc(100vh-200px)]"
+								>
+									{" "}
+									{/* Adjust height as needed */}
+									<ScrollArea
+										className="flex-1 mb-4 pr-4"
+										ref={chatScrollAreaRef}
+									>
+										<div className="space-y-4">
+											{chatHistory.map((msg, index) => (
+												<div
+													// Use a more stable key than just index
+													key={`${msg.sender}-${index}-${msg.text.substring(0, 10)}`}
+													className={cn(
+														"p-3 rounded-lg max-w-[80%]",
+														msg.sender === "user"
+															? "bg-primary text-primary-foreground self-end ml-auto"
+															: "bg-muted text-muted-foreground self-start mr-auto",
+													)}
+												>
+													<p className="text-sm whitespace-pre-wrap">
+														{msg.text}
+													</p>
+												</div>
+											))}
+											{isChatting &&
+												chatHistory[chatHistory.length - 1]?.sender ===
+													"user" && (
+													<div className="bg-muted text-muted-foreground self-start mr-auto p-3 rounded-lg max-w-[80%]">
+														<Loader2 className="h-4 w-4 animate-spin" />
+													</div>
+												)}
+										</div>
+									</ScrollArea>
+									{chatError && (
+										<p className="text-sm text-destructive mb-2">
+											Chat Error: {chatError}
+										</p>
+									)}
+									<form
+										onSubmit={handleChatSubmit}
+										className="flex items-center gap-2"
+									>
+										<Input
+											type="text"
+											placeholder={
+												fullTextContent
+													? "Ask about the content..."
+													: "Extracting content..."
+											}
+											value={chatInput}
+											onChange={(e) => setChatInput(e.target.value)}
+											disabled={isChatting || !fullTextContent}
+											className="flex-1"
+										/>
+										<Button
+											type="submit"
+											size="icon"
+											disabled={
+												isChatting || !chatInput.trim() || !fullTextContent
+											}
+										>
+											<Send className="h-4 w-4" />
+										</Button>
+									</form>
+								</TabsContent>
+								{/* Notes Tab Content */}
 								<TabsContent value="notes" className="mt-4">
 									<p>Notes functionality to be added.</p>
 								</TabsContent>
+								{/* Metadata Tab Content */}
 								<TabsContent value="metadata" className="mt-4">
 									<p>Metadata display to be added.</p>
 								</TabsContent>
@@ -367,6 +579,7 @@ export default function ArticleReader() {
 						<EpubReader
 							fileData={article.fileData}
 							fileName={article.fileName}
+							onTextExtracted={handleTextExtracted} // Pass callback
 						/>
 					</div>
 				</div>
@@ -393,15 +606,27 @@ export default function ArticleReader() {
 						<PdfReader
 							fileData={article.fileData}
 							fileName={article.fileName}
+							onTextExtracted={handleTextExtracted} // Pass callback
 						/>
 					</div>
 				</div>
 			) : (
 				// Otherwise, render the regular article content
 				<div
-					ref={contentRef}
+					ref={(node) => {
+						// Combine ref logic
+						if (node && !isEpub && !isPdf && !fullTextContent) {
+							// Set initial text content for HTML articles
+							handleTextExtracted(node.textContent);
+						}
+						// Assign to contentRef as well for scrolling
+						(
+							contentRef as React.MutableRefObject<HTMLDivElement | null>
+						).current = node;
+					}}
 					className={`flex-1 overflow-y-auto px-4 md:px-8 py-6 ${textColorClass}`}
 				>
+					{/* Removed the corrupted duplicate ref section */}
 					<div className="reader-content">
 						<h1 className="text-3xl font-bold mb-4">{article.title}</h1>
 						{article.author && (

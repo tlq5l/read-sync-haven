@@ -13,9 +13,11 @@ kv_namespaces = [
 # Actual values are set in Cloudflare dashboard for deployment
 # and in .env file for local development
 [vars]
-GEMINI_API_KEY = "" # Value ignored, declares variable (kept for potential future use)
-# GCF_URL = ""        # REMOVED - Value is managed via wrangler secret
-# GCF_AUTH_KEY = "" # Removed - Using Workload Identity Federation now
+# GCF URLs are now managed via secrets, but we declare them here for clarity/local dev fallback if needed
+GCF_SUMMARIZE_URL = "" # Value ignored, declares variable
+GCF_CHAT_URL = ""      # Value ignored, declares variable for the new chat function
+GEMINI_API_KEY = ""    # Value ignored, declares variable (kept for potential future use)
+# GCF_AUTH_KEY = ""    # Removed - Using Workload Identity Federation now
 
 # Variables for Workload Identity Federation
 GCLOUD_PROJECT_NUMBER = "98706481155"

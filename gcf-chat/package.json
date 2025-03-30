@@ -1,0 +1,26 @@
+{
+	"name": "gemini-chat-gcf",
+	"version": "1.0.0",
+	"description": "Google Cloud Function to chat with content using Gemini API",
+	"main": "dist/index.js",
+	"type": "module",
+	"scripts": {
+		"build": "tsc",
+		"start": "functions-framework --target=chatWithContent",
+		"deploy": "gcloud functions deploy chatWithContent --gen2 --runtime=nodejs20 --region=YOUR_REGION --source=. --entry-point=chatWithContent --trigger-http --allow-unauthenticated --set-secrets=gcf-gemini-api-key=gcf-gemini-api-key:latest,gcf-worker-auth-secret=gcf-worker-auth-secret:latest"
+	},
+	"dependencies": {
+		"@google-cloud/functions-framework": "^3.3.0",
+		"@google-cloud/secret-manager": "^6.0.1",
+		"@google/generative-ai": "^0.16.0",
+		"@types/cors": "^2.8.17",
+		"cors": "^2.8.5"
+	},
+	"devDependencies": {
+		"@types/node": "^20.11.5",
+		"typescript": "^5.3.3"
+	},
+	"engines": {
+		"node": "20"
+	}
+}

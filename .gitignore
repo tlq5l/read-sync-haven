@@ -33,3 +33,4 @@ bun-path.ps1
 # package-lock.json
 # bun.lockb
 .aider*
+node_modules/
