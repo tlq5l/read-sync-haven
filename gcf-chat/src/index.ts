@@ -35,8 +35,8 @@ async function accessSecretVersion(secretName: string): Promise<string | null> {
 }
 
 // Define the Cloudflare AI Gateway URL (replace with your actual gateway ID if different)
-const CLOUDFLARE_AI_GATEWAY_BASE_URL = 'https://gateway.ai.cloudflare.com/v1/6a32f9bf367ec8dd7e99cd9ca96fb651/bondwise-gemini/google-ai-studio';
-
+const CLOUDFLARE_AI_GATEWAY_BASE_URL =
+	"https://gateway.ai.cloudflare.com/v1/6a32f9bf367ec8dd7e99cd9ca96fb651/bondwise-gemini/google-ai-studio";
 
 // Define allowed origins (adjust if needed for chat function)
 const allowedOrigins = [
@@ -91,11 +91,12 @@ const handleChatRequest = async (
 		const genAI = new GoogleGenerativeAI(geminiApiKey);
 		// Use the Cloudflare AI Gateway baseUrl
 		const model = genAI.getGenerativeModel(
-			{ model: "gemini-1.5-flash" }, // Using flash for potentially faster responses
+			{ model: "gemini-2.5-pro-exp-03-25" }, // Using flash for potentially faster responses
 			{ baseUrl: CLOUDFLARE_AI_GATEWAY_BASE_URL }, // Add baseUrl here
 		);
 		const generationConfig = { temperature: 0.7, maxOutputTokens: 2048 }; // Adjust as needed
-		const safetySettings = [ // Keep safety settings
+		const safetySettings = [
+			// Keep safety settings
 			{
 				category: HarmCategory.HARM_CATEGORY_HARASSMENT,
 				threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
@@ -165,15 +166,17 @@ Answer:`;
 
 		// Return the AI's response
 		res.status(200).send({ response: aiResponse }); // Changed 'summary' to 'response'
-
 	} catch (error) {
 		console.error("Error calling Gemini API for chat:", error);
-		res.status(500).send({ error: "Internal Server Error during chat generation." });
+		res
+			.status(500)
+			.send({ error: "Internal Server Error during chat generation." });
 	}
 };
 
 // Main exported function, handles CORS preflight and then the request
-export const chatWithContent: HttpFunction = async ( // Renamed function
+export const chatWithContent: HttpFunction = async (
+	// Renamed function
 	req: Request,
 	res: Response,
 ) => {
