@@ -34,12 +34,9 @@ async function accessSecretVersion(secretName: string): Promise<string | null> {
 	}
 }
 
-// Environment variables are now fetched inside the handler using Secret Manager
-const AI_GATEWAY_URL = process.env.AI_GATEWAY_URL; // Keep this one if set via deployment env var is okay
-if (!AI_GATEWAY_URL)
-	console.warn(
-		"WARN: AI_GATEWAY_URL environment variable is not set. Calls will go directly to Google.",
-	);
+// Define the Cloudflare AI Gateway URL (replace with your actual gateway ID if different)
+const CLOUDFLARE_AI_GATEWAY_BASE_URL = 'https://gateway.ai.cloudflare.com/v1/6a32f9bf367ec8dd7e99cd9ca96fb651/bondwise-gemini/google-ai-studio';
+
 
 // Define allowed origins (adjust if needed for chat function)
 const allowedOrigins = [
@@ -92,17 +89,13 @@ const handleChatRequest = async (
 	// Call Gemini
 	try {
 		const genAI = new GoogleGenerativeAI(geminiApiKey);
-		const modelOptions = AI_GATEWAY_URL
-			? { baseUrl: AI_GATEWAY_URL }
-			: undefined;
+		// Use the Cloudflare AI Gateway baseUrl
 		const model = genAI.getGenerativeModel(
-			// Consider using a model suitable for chat/RAG if available, e.g., gemini-pro
 			{ model: "gemini-1.5-flash" }, // Using flash for potentially faster responses
-			modelOptions,
+			{ baseUrl: CLOUDFLARE_AI_GATEWAY_BASE_URL }, // Add baseUrl here
 		);
 		const generationConfig = { temperature: 0.7, maxOutputTokens: 2048 }; // Adjust as needed
-		const safetySettings = [
-			// Keep safety settings
+		const safetySettings = [ // Keep safety settings
 			{
 				category: HarmCategory.HARM_CATEGORY_HARASSMENT,
 				threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
@@ -172,17 +165,15 @@ Answer:`;
 
 		// Return the AI's response
 		res.status(200).send({ response: aiResponse }); // Changed 'summary' to 'response'
+
 	} catch (error) {
 		console.error("Error calling Gemini API for chat:", error);
-		res
-			.status(500)
-			.send({ error: "Internal Server Error during chat generation." });
+		res.status(500).send({ error: "Internal Server Error during chat generation." });
 	}
 };
 
 // Main exported function, handles CORS preflight and then the request
-export const chatWithContent: HttpFunction = async (
-	// Renamed function
+export const chatWithContent: HttpFunction = async ( // Renamed function
 	req: Request,
 	res: Response,
 ) => {
