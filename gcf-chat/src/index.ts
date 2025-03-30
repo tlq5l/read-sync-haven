@@ -34,10 +34,6 @@ async function accessSecretVersion(secretName: string): Promise<string | null> {
 	}
 }
 
-// Define the Cloudflare AI Gateway URL (replace with your actual gateway ID if different)
-const CLOUDFLARE_AI_GATEWAY_BASE_URL =
-	"https://gateway.ai.cloudflare.com/v1/6a32f9bf367ec8dd7e99cd9ca96fb651/bondwise-gemini/google-ai-studio";
-
 // Define allowed origins (adjust if needed for chat function)
 const allowedOrigins = [
 	"http://localhost:8080", // Local development
@@ -89,10 +85,10 @@ const handleChatRequest = async (
 	// Call Gemini
 	try {
 		const genAI = new GoogleGenerativeAI(geminiApiKey);
-		// Use the Cloudflare AI Gateway baseUrl
+		// Remove Cloudflare AI Gateway baseUrl
 		const model = genAI.getGenerativeModel(
-			{ model: "gemini-2.5-pro-exp-03-25" }, // Using flash for potentially faster responses
-			{ baseUrl: CLOUDFLARE_AI_GATEWAY_BASE_URL }, // Add baseUrl here
+			{ model: "gemini-2.5-pro-exp-03-25" } // Using flash for potentially faster responses
+			// No baseUrl option needed
 		);
 		const generationConfig = { temperature: 0.7, maxOutputTokens: 2048 }; // Adjust as needed
 		const safetySettings = [
