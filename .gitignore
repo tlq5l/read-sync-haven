@@ -34,3 +34,4 @@ bun-path.ps1
 # bun.lockb
 .aider*
 node_modules/
+bondwise-worker/.dev.vars
