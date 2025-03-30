@@ -67,34 +67,15 @@ export default function EpubReader({ fileData, fileName }: EpubReaderProps) {
 						{
 							width: "100%",
 							height: "100%",
-							flow: "scrolled", // Simple scrolled view
+							flow: "scrolled-doc", // Use scrolled-doc flow
 							ignoreClass: "annotator-hl",
 							spread: "none",
 							manager: "continuous", // Add continuous manager for better scrolling
 						},
 					) as ExtendedRendition;
 
-					// Add CSS to make EPUB content scrollable
-					const style = document.createElement("style");
-					style.innerHTML = `
-						.epub-container {
-							min-height: 100%;
-							height: auto !important;
-						}
-						.epub-view {
-							height: auto !important;
-							min-height: 100vh;
-							overflow: auto !important;
-						}
-						.epub-view iframe {
-							height: 100% !important;
-							overflow: auto !important;
-							border: none !important;
-						}
-					`;
-					document.head.appendChild(style);
-
 					// Listen for rendering events - use typed content hook
+					// Removed injected style tag
 					epubRendition.hooks.content.register((contents: EpubContents) => {
 						const body = contents.document.body;
 						if (body) {
@@ -114,47 +95,23 @@ export default function EpubReader({ fileData, fileName }: EpubReaderProps) {
 
 						// Function to apply styles to iframes
 						const applyIframeStyles = () => {
-							// Apply styles to make content scrollable
+							// Apply basic styles to iframe elements
 							const iframes = viewerRef.current?.querySelectorAll("iframe");
 							if (iframes?.length) {
-								// Use for...of instead of forEach per linter
 								for (const iframe of Array.from(iframes)) {
-									// Set iframe styles
+									// Set basic iframe styles
 									iframe.style.border = "0";
 									iframe.style.width = "100%";
 									iframe.style.height = "100%";
-									iframe.style.minHeight = "600px"; // Ensure tall enough to scroll
-									iframe.style.overflow = "auto";
-
-									// Force scroll setting on content document
-									try {
-										const doc =
-											iframe.contentDocument || iframe.contentWindow?.document;
-										if (doc?.body) {
-											// Set body styles
-											doc.body.style.overflow = "auto";
-											doc.body.style.height = "auto";
-											doc.body.style.minHeight = "100%";
-											doc.body.style.width = "100%";
-											doc.body.style.maxWidth = "100%";
-
-											// Add listener for document clicks to detect if user is inside iframe
-											doc.addEventListener("click", () => {
-												console.log("Content document clicked");
-											});
-										}
-									} catch (e) {
-										console.warn("Could not access iframe content document", e);
-									}
+									// Removed minHeight and internal body styling attempts
+									iframe.style.overflow = "auto"; // Keep this? Or let scrolled-doc handle? Let's keep for now.
 								}
 							}
 						};
 
 						// Apply styles initially
 						applyIframeStyles();
-
-						// And again after a short delay to ensure everything is loaded
-						setTimeout(applyIframeStyles, 500);
+						// Removed setTimeout call
 					});
 
 					// Store rendition for navigation
@@ -175,25 +132,7 @@ export default function EpubReader({ fileData, fileName }: EpubReaderProps) {
 							section?.href || "unknown section",
 						);
 
-						// Force re-check iframe styles after render
-						setTimeout(() => {
-							const newIframes = viewerRef.current?.querySelectorAll("iframe");
-							if (newIframes?.length) {
-								for (const iframe of Array.from(newIframes)) {
-									iframe.style.height = "100%";
-									iframe.style.overflow = "auto";
-
-									// Check if we can modify iframe content directly
-									try {
-										if (iframe.contentWindow && iframe.contentDocument?.body) {
-											iframe.contentDocument.body.style.overflow = "auto";
-										}
-									} catch (e) {
-										// CORS might prevent access
-									}
-								}
-							}
-						}, 200);
+						// Simplified: No longer attempting to force styles after render
 					});
 				})
 				.catch((err) => {
@@ -218,14 +157,7 @@ export default function EpubReader({ fileData, fileName }: EpubReaderProps) {
 					console.error("Error destroying EPUB book:", err);
 				}
 			}
-
-			// Remove the style element if it exists
-			const epubStyles = document.querySelectorAll("style");
-			for (const styleEl of Array.from(epubStyles)) {
-				if (styleEl.innerHTML.includes(".epub-container")) {
-					styleEl.remove();
-				}
-			}
+			// Removed style cleanup as style is no longer injected
 		};
 	}, [fileData]);
 
