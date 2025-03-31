@@ -93,7 +93,7 @@ const handleSummarizeRequest = async (
 		const genAI = new GoogleGenerativeAI(geminiApiKey); // Use the passed argument
 		// Remove Cloudflare AI Gateway baseUrl
 		const model = genAI.getGenerativeModel(
-			{ model: "gemini-2.5-pro-exp-03-25" }
+			{ model: "gemini-2.5-pro-exp-03-25" },
 			// No modelOptions with baseUrl needed anymore
 		);
 		const generationConfig = { temperature: 0.7, maxOutputTokens: 2048 };

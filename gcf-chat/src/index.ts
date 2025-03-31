@@ -87,7 +87,7 @@ const handleChatRequest = async (
 		const genAI = new GoogleGenerativeAI(geminiApiKey);
 		// Remove Cloudflare AI Gateway baseUrl
 		const model = genAI.getGenerativeModel(
-			{ model: "gemini-2.5-pro-exp-03-25" } // Using flash for potentially faster responses
+			{ model: "gemini-2.5-pro-exp-03-25" }, // Using flash for potentially faster responses
 			// No baseUrl option needed
 		);
 		const generationConfig = { temperature: 0.7, maxOutputTokens: 2048 }; // Adjust as needed
