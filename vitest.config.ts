@@ -1,44 +1,42 @@
-import { type ConfigEnv, loadEnv } from "vite"; // Import loadEnv from vite
 /// <reference types="vitest" />
-import { type UserConfig, defineConfig, mergeConfig } from "vitest/config";
-import viteConfigFn from "./vite.config"; // Import the function
+import path from "node:path";
+import { defineConfig } from "vitest/config";
+import react from "@vitejs/plugin-react-swc";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
-// Define a default environment for resolving the Vite config for tests
-const testEnv: ConfigEnv = { command: "serve", mode: "test" };
-
-// --- Resolve both configurations to objects ---
-
-// 1. Resolve the Vite config object
-const resolvedViteConfig = viteConfigFn(testEnv) as UserConfig;
-
-// 2. Define the Vitest config function
-const vitestConfigFn = ({ mode }: ConfigEnv): UserConfig => {
-	// Load .env files based on the mode (usually 'test')
-	// Load base .env file regardless of mode for test environment
-	const env = loadEnv("", process.cwd(), ""); // Use empty string for mode to load base .env
-	return {
-		// Define environment variables at the top level for Vitest
-		define: {
-			"import.meta.env.VITE_CLERK_PUBLISHABLE_KEY": JSON.stringify(
-				env.VITE_CLERK_PUBLISHABLE_KEY,
-			),
-			// Add other VITE_ variables needed by your tests here if any
+export default defineConfig({
+	plugins: [
+		react(), // Include React plugin
+		nodePolyfills({ // Include node polyfills
+			globals: {
+				process: true,
+				Buffer: true,
+				global: true,
+			},
+			include: ["util", "path", "events"],
+			protocolImports: true,
+		}),
+	],
+	test: {
+		globals: true,
+		environment: "jsdom", // Keep jsdom environment
+		setupFiles: "./src/setupTests.ts", // Keep setup file
+		// Optional: Configure coverage
+		// coverage: {
+		//   provider: 'v8',
+		//   reporter: ['text', 'json', 'html'],
+		// },
+	},
+	resolve: {
+		alias: {
+			"@": path.resolve(__dirname, "./src"), // Keep path alias
 		},
-		test: {
-			globals: true,
-			environment: "jsdom",
-			setupFiles: "./src/setupTests.ts",
-			// Optional: Configure coverage
-			// coverage: {
-			//   provider: 'v8',
-			//   reporter: ['text', 'json', 'html'],
-			// },
-		},
-	};
-};
-
-// 3. Resolve the Vitest config object using the test environment
-const resolvedVitestConfig = vitestConfigFn(testEnv);
-
-// --- Merge the resolved configuration objects ---
-export default mergeConfig(resolvedViteConfig, resolvedVitestConfig);
+		dedupe: ["react", "react-dom"], // Keep dedupe
+	},
+	define: {
+		global: "globalThis", // Keep global define
+		// If your tests need environment variables, load and define them here
+		// Example:
+		// 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(process.env.VITE_CLERK_PUBLISHABLE_KEY),
+	},
+});
