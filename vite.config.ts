@@ -98,7 +98,7 @@ export default defineConfig(({ mode }) => ({
 				Buffer: true,
 				global: true,
 			},
-			include: ["util", "path", "events"],
+			include: ["util", "path", "events", "stream"], // Add 'stream'
 			protocolImports: true,
 		}),
 	],
