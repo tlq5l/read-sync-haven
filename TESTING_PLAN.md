@@ -14,25 +14,25 @@
 2.  **Focus on Core Logic:** Prioritize testing functions that implement critical application logic.
 3.  **Gradual Expansion:** Once a foundation is laid, incrementally add tests for hooks, components, and services.
 
-**Initial Steps (The Plan):**
+**Initial Steps (Completed - 2025-04-01):**
 
-1.  **Target File:** We'll start with `src/lib/utils.ts`, which contains helper functions for CSS classes and keyboard shortcut logic.
-2.  **Identify Test Candidates:** The functions `isInputElement` and `shouldIgnoreShortcut` are excellent first candidates. They are relatively isolated and crucial for the keyboard shortcut feature.
-3.  **Create Test File:** A new file, `src/lib/utils.test.ts`, will be created alongside `utils.ts` to house the tests.
-4.  **Write Tests for `isInputElement`:**
+1.  **Target File:** `src/lib/utils.ts` - ✅ Completed.
+2.  **Identify Test Candidates:** `isInputElement` and `shouldIgnoreShortcut` - ✅ Completed.
+3.  **Create Test File:** `src/lib/utils.test.ts` created - ✅ Completed.
+4.  **Write Tests for `isInputElement`:** Tests added - ✅ Completed.
     *   Test cases for standard input elements (`<input>`, `<textarea>`, `<select>`).
     *   Test case for elements with the `contenteditable` attribute.
     *   Test cases for elements that should *not* be considered input elements (e.g., `<div>`, `<button>`).
     *   Test case for `null` input.
-5.  **Write Tests for `shouldIgnoreShortcut`:**
+5.  **Write Tests for `shouldIgnoreShortcut`:** Tests added - ✅ Completed.
     *   Test cases where the event target *is* an input element (should return `true`).
     *   Test cases where the event target *is not* an input element (should generally return `false`, unless other conditions apply).
     *   Test cases for common edit shortcuts (like Ctrl+C, Ctrl+V) when the active element *is* an input (should return `true`).
     *   Test cases for common edit shortcuts when the active element *is not* an input (should return `false`).
     *   Test cases for other key combinations that *should not* be ignored.
-    *   *(Note: These tests will likely require mocking basic `KeyboardEvent` and `Element` objects, which Vitest handles well).*
-6.  **Run Tests:** Execute the tests using your configured test script (likely `bun test` or similar) to ensure they pass.
-7.  **Commit:** Commit the new test file and any necessary setup.
+    *   *(Note: Resolved environment issues by mocking `document.activeElement` and using type assertions).*
+6.  **Run Tests:** Tests executed and passed using `bun test` - ✅ Completed.
+7.  **Commit:** Changes committed with message "test: Add unit tests for utils" - ✅ Completed.
 
 **Future Steps (Beyond Initial Implementation):**
 
