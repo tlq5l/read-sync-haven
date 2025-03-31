@@ -19,6 +19,7 @@ import { useChat } from "@/hooks/useChat";
 import { useSummarize } from "@/hooks/useSummarize";
 import { cn } from "@/lib/utils";
 import { Loader2, Send } from "lucide-react";
+import { debounce } from "lodash"; // Import debounce
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -84,23 +85,27 @@ export default function ArticleReader() {
 	// --- Effects ---
 	// Track reading progress for HTML content
 	useEffect(() => {
-		if (!article || !contentRef.current || article.type !== "article") return; // Only track scroll for standard 'article' type
+		if (!article || !contentRef.current || article.type !== "article") return;
+
+		// Debounce the progress update function
+		const debouncedUpdateProgress = debounce((progress: number) => {
+			updateReadingProgress(article._id, progress);
+		}, 500); // Debounce by 500ms
 
 		const trackProgress = () => {
 			if (!contentRef.current) return;
 
 			const { scrollTop, scrollHeight, clientHeight } = contentRef.current;
-			// Avoid division by zero or NaN if scrollHeight equals clientHeight
 			const scrollableHeight = scrollHeight - clientHeight;
-			if (scrollableHeight <= 0) return; // Nothing to scroll
+			if (scrollableHeight <= 0) return;
 
 			const progress = Math.min(
 				100,
-				Math.max(0, Math.floor((scrollTop / scrollableHeight) * 100)), // Ensure progress is between 0 and 100
+				Math.max(0, Math.floor((scrollTop / scrollableHeight) * 100)),
 			);
 
-			// Debounce or throttle this update if performance becomes an issue
-			updateReadingProgress(article._id, progress);
+			// Call the debounced function
+			debouncedUpdateProgress(progress);
 		};
 
 		const ref = contentRef.current;
@@ -108,8 +113,10 @@ export default function ArticleReader() {
 
 		return () => {
 			ref.removeEventListener("scroll", trackProgress);
+			debouncedUpdateProgress.cancel(); // Cancel any pending debounced calls on cleanup
 		};
-	}, [article, updateReadingProgress]); // Rerun if article changes
+		// Ensure debounce is recreated if dependencies change, though unlikely here
+	}, [article, updateReadingProgress]);
 
 	// --- Render Logic ---
 	if (loading) {
