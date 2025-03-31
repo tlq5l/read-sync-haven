@@ -1,8 +1,8 @@
 // src/services/db/tags.ts
 
 import { v4 as uuidv4 } from "uuid";
-import type { Tag } from "./types";
 import { tagsDb } from "./config"; // Import the initialized DB instance
+import type { Tag } from "./types";
 import { executeWithRetry } from "./utils";
 
 /**

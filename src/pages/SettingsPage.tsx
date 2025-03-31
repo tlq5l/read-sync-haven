@@ -10,7 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
-import { databases } from "@/services/db";
+import {
+	type Article,
+	type Highlight,
+	type Tag,
+	articlesDb,
+	highlightsDb,
+	tagsDb,
+} from "@/services/db"; // Import specific DBs and types
 import {
 	ArrowLeft,
 	Database,
@@ -31,18 +38,28 @@ export default function SettingsPage() {
 	const exportData = async () => {
 		setIsExportingData(true);
 		try {
-			// Get all data from PouchDB
-			const articles = await databases.articles.allDocs({ include_docs: true });
-			const highlights = await databases.highlights.allDocs({
+			// Get all data from PouchDB using specific DB instances
+			const articles = await articlesDb.allDocs<Article>({
 				include_docs: true,
 			});
-			const tags = await databases.tags.allDocs({ include_docs: true });
+			const highlights = await highlightsDb.allDocs<Highlight>({
+				include_docs: true,
+			});
+			const tags = await tagsDb.allDocs<Tag>({ include_docs: true });
 
-			// Create a JSON object with all data
+			// Create a JSON object with all data, adding explicit types to map parameters
 			const exportData = {
-				articles: articles.rows.map((row) => row.doc),
-				highlights: highlights.rows.map((row) => row.doc),
-				tags: tags.rows.map((row) => row.doc),
+				articles: articles.rows.map(
+					(row: PouchDB.Core.AllDocsResponse<Article>["rows"][number]) =>
+						row.doc,
+				),
+				highlights: highlights.rows.map(
+					(row: PouchDB.Core.AllDocsResponse<Highlight>["rows"][number]) =>
+						row.doc,
+				),
+				tags: tags.rows.map(
+					(row: PouchDB.Core.AllDocsResponse<Tag>["rows"][number]) => row.doc,
+				),
 				exportDate: new Date().toISOString(),
 			};
 

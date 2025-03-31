@@ -7,13 +7,19 @@ import {
 	getArticle, // Add getArticle import
 	initializeDatabase,
 	saveArticle,
-	saveEpubFile,
-	savePdfFile,
 	updateArticle,
 } from "@/services/db";
-import { isValidEpub } from "@/services/epub";
+import {
+	arrayBufferToBase64 as epubToBase64,
+	extractEpubMetadata,
+	isValidEpub,
+} from "@/services/epub"; // Import necessary epub functions
 import { parseArticle } from "@/services/parser";
-import { isValidPdf } from "@/services/pdf";
+import {
+	extractPdfMetadata,
+	isValidPdf,
+	arrayBufferToBase64 as pdfToBase64,
+} from "@/services/pdf"; // Import necessary pdf functions
 import { useAuth, useUser } from "@clerk/clerk-react"; // Import useUser
 import type React from "react";
 import {
@@ -153,7 +159,9 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					console.log(
 						`Attempting to load articles from cache for user ${userId}...`,
 					);
-					const cachedArticles = await getAllArticles({ userId: userId });
+					const cachedArticles = await getAllArticles({
+						userIds: userId ? [userId] : undefined,
+					});
 
 					if (isMounted && cachedArticles && cachedArticles.length > 0) {
 						console.log(`Loaded ${cachedArticles.length} articles from cache.`);
@@ -276,7 +284,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				// --- Re-fetch from local DB AFTER saving cloud data ---
 				console.log("Re-fetching articles from local DB after sync...");
 				const localArticlesAfterSync = await getAllArticles({
-					userId: userId ?? undefined,
+					userIds: userId ? [userId] : undefined, // Handle null userId
 				}); // Handle null userId
 				console.log(
 					`Fetched ${localArticlesAfterSync.length} articles locally after sync.`,
@@ -350,7 +358,9 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 								"Running one-time sync for existing local EPUB/PDF files...",
 							);
 							// Get local EPUB/PDFs
-							const localArticles = await getAllArticles({ userId: userId });
+							const localArticles = await getAllArticles({
+								userIds: userId ? [userId] : undefined,
+							});
 							const localFilesToSync = localArticles.filter(
 								(a) => a.type === "epub" || a.type === "pdf",
 							);
@@ -532,7 +542,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// --- Re-fetch from local DB AFTER saving cloud data ---
 			console.log("Re-fetching articles from local DB after refresh...");
 			const localArticlesAfterRefresh = await getAllArticles({
-				userId: userId ?? undefined,
+				userIds: userId ? [userId] : undefined, // Handle null userId
 			}); // Handle null userId
 			console.log(
 				`Fetched ${localArticlesAfterRefresh.length} articles locally after refresh.`,
@@ -596,10 +606,17 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			try {
 				const parsedArticle = await parseArticle(url);
 
-				// Add user ID to the article
-				const articleWithUser = {
+				// Add user ID and default fields to the article
+				const articleWithUser: Omit<Article, "_id" | "_rev"> & {
+					_id?: string;
+					_rev?: string;
+				} = {
 					...parsedArticle,
 					userId,
+					savedAt: Date.now(), // Add default savedAt
+					isRead: false, // Add default isRead
+					favorite: false, // Add default favorite
+					tags: [], // Add default tags
 				};
 
 				const savedArticle = await saveArticle(articleWithUser);
@@ -652,8 +669,30 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			try {
 				// Check file type and validate
 				if (isValidEpub(file)) {
-					// Save EPUB file with user ID
-					const savedArticle = await saveEpubFile(file, userId);
+					const fileBuffer = await file.arrayBuffer();
+					const metadata = await extractEpubMetadata(fileBuffer);
+					const base64Content = epubToBase64(fileBuffer); // Use imported helper
+
+					const articleToSave: Omit<Article, "_id" | "_rev"> & {
+						_id?: string;
+						_rev?: string;
+					} = {
+						userId,
+						title: metadata.title || file.name.replace(/\.epub$/i, ""),
+						type: "epub",
+						content: base64Content, // Store base64 content
+						url: `local-epub://${file.name}`, // Create a local URL identifier
+						savedAt: Date.now(),
+						isRead: false,
+						favorite: false,
+						tags: [],
+						author: metadata.author,
+						publishedDate: metadata.publishedDate,
+						excerpt: metadata.description || "EPUB file", // Use description as excerpt
+						// Add other relevant metadata if needed
+					};
+
+					const savedArticle = await saveArticle(articleToSave);
 
 					// --- Sync to Cloud (fire and forget with logging) ---
 					saveItemToCloud(savedArticle)
@@ -681,15 +720,38 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 					toast({
 						title: "EPUB saved",
-						description: `"${file.name}" has been saved to your library.`,
+						description: `"${savedArticle.title}" has been saved to your library.`,
 					});
 
 					return savedArticle;
 				}
 
 				if (isValidPdf(file)) {
-					// Save PDF file with user ID
-					const savedArticle = await savePdfFile(file, userId);
+					const fileBuffer = await file.arrayBuffer();
+					const metadata = await extractPdfMetadata(file, fileBuffer); // Pass file for name extraction if needed
+					const base64Content = pdfToBase64(fileBuffer); // Use imported helper
+
+					const articleToSave: Omit<Article, "_id" | "_rev"> & {
+						_id?: string;
+						_rev?: string;
+					} = {
+						userId,
+						title: metadata.title || file.name.replace(/\.pdf$/i, ""),
+						type: "pdf",
+						content: base64Content, // Store base64 content
+						url: `local-pdf://${file.name}`, // Create a local URL identifier
+						savedAt: Date.now(),
+						isRead: false,
+						favorite: false,
+						tags: [],
+						author: metadata.author,
+						publishedDate: metadata.publishedDate,
+						excerpt: metadata.description || "PDF file", // Use description as excerpt
+						pageCount: metadata.pageCount,
+						// Add other relevant metadata if needed
+					};
+
+					const savedArticle = await saveArticle(articleToSave);
 
 					// --- Sync to Cloud (fire and forget with logging) ---
 					saveItemToCloud(savedArticle)
@@ -717,7 +779,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 					toast({
 						title: "PDF saved",
-						description: `"${file.name}" has been saved to your library.`,
+						description: `"${savedArticle.title}" has been saved to your library.`,
 					});
 
 					return savedArticle;

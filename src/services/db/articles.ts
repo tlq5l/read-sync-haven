@@ -1,8 +1,8 @@
 // src/services/db/articles.ts
 
 import { v4 as uuidv4 } from "uuid";
-import type { Article } from "./types";
 import { articlesDb } from "./config"; // Import the initialized DB instance
+import type { Article } from "./types";
 import { executeWithRetry } from "./utils";
 
 /**

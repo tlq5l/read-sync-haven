@@ -1,8 +1,8 @@
 // src/services/db/highlights.ts
 
 import { v4 as uuidv4 } from "uuid";
-import type { Highlight } from "./types";
 import { highlightsDb } from "./config"; // Import the initialized DB instance
+import type { Highlight } from "./types";
 import { executeWithRetry } from "./utils";
 
 /**
