@@ -8,4 +8,6 @@ interface ImportMetaEnv {
 
 interface ImportMeta {
 	readonly env: ImportMetaEnv;
+	// Add type definition for Vitest's injected property
+	readonly vitest?: typeof import("vitest");
 }

@@ -1,6 +1,7 @@
 // src/services/db/config.ts
 
 import PouchDB from "pouchdb-browser";
+import PouchDBAdapterMemory from "pouchdb-adapter-memory"; // Import memory adapter
 import PouchDBFind from "pouchdb-find";
 import type { Article, Highlight, Tag } from "./types";
 import { executeWithRetry } from "./utils";
@@ -11,8 +12,10 @@ if (typeof PouchDB.plugin === "function") {
 	try {
 		PouchDB.plugin(PouchDBFind);
 		console.log("PouchDBFind plugin registered.");
+		PouchDB.plugin(PouchDBAdapterMemory); // Register memory adapter
+		console.log("PouchDB Memory Adapter plugin registered.");
 	} catch (e) {
-		console.error("Error registering PouchDBFind plugin:", e);
+		console.error("Error registering PouchDB plugins:", e);
 	}
 } else {
 	console.error(
@@ -44,9 +47,27 @@ function createDbInstance<T extends object>(
 	name: string,
 	options: PouchDB.Configuration.DatabaseConfiguration = defaultDbOptions,
 ): PouchDB.Database<T> {
+	// --- Test Environment Specific Logic ---
+	if (import.meta.vitest) {
+		console.log(`[TEST ENV] Creating PouchDB instance: ${name} using memory adapter`);
+		try {
+			// Directly use memory adapter for tests
+			return new PouchDB<T>(name, { ...options, adapter: "memory" });
+		} catch (testErr) {
+			console.error(
+				`[TEST ENV] FATAL: Failed to create memory PouchDB instance ${name}:`,
+				testErr,
+			);
+			throw new Error(
+				`[TEST ENV] Could not initialize database ${name} with memory adapter.`,
+			);
+		}
+	}
+
+	// --- Production/Development Logic ---
 	try {
 		console.log(`Attempting to create PouchDB instance: ${name}`);
-		const db = new PouchDB<T>(name, options);
+		const db = new PouchDB<T>(name, options); // Use original options
 		// Perform an immediate info() call to test the connection
 		db.info()
 			.then((info) =>
@@ -54,13 +75,14 @@ function createDbInstance<T extends object>(
 			)
 			.catch((err) => {
 				console.error(`Initial connection test failed for ${name}:`, err);
-				// Depending on the error, might attempt fallback here, but
-				// initializeDatabase handles the main fallback logic.
+				// Fallback logic is handled below if needed
 			});
 		return db;
 	} catch (err) {
 		console.error(`FATAL: Failed to create PouchDB instance ${name}:`, err);
 		// Fallback to memory adapter immediately if constructor fails
+		// This fallback is for non-test environments
+		console.error(`FATAL: Failed to create PouchDB instance ${name}:`, err);
 		console.warn(`Falling back to memory adapter for ${name}.`);
 		try {
 			return new PouchDB<T>(name, { ...options, adapter: "memory" });
@@ -69,8 +91,6 @@ function createDbInstance<T extends object>(
 				`FATAL: Failed to create memory fallback for ${name}:`,
 				memErr,
 			);
-			// If even memory fails, something is seriously wrong.
-			// Throw a custom error or return a dummy object to prevent app crash.
 			throw new Error(`Could not initialize database ${name}, even in memory.`);
 		}
 	}
@@ -80,6 +100,15 @@ function createDbInstance<T extends object>(
 export let articlesDb = createDbInstance<Article>(ARTICLES_DB_NAME);
 export let highlightsDb = createDbInstance<Highlight>(HIGHLIGHTS_DB_NAME);
 export let tagsDb = createDbInstance<Tag>(TAGS_DB_NAME);
+
+// Re-assign exported variables for the test environment *after* declaration
+// This ensures PouchDB uses the memory adapter specifically for tests.
+if (import.meta.vitest) {
+	console.log("[TEST ENV] Re-initializing DB variables with memory adapter.");
+	articlesDb = createDbInstance<Article>(ARTICLES_DB_NAME);
+	highlightsDb = createDbInstance<Highlight>(HIGHLIGHTS_DB_NAME);
+	tagsDb = createDbInstance<Tag>(TAGS_DB_NAME);
+}
 
 // --- Index Management ---
 

@@ -1,4 +1,4 @@
-/** @vitest-environment jsdom */
+// Removed /** @vitest-environment jsdom */ to rely on vitest.config.ts
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"; // Add beforeEach
 import {
 	DURATION,
@@ -54,16 +54,20 @@ describe("lib/animation", () => {
 
 		it("should return false for other media queries", () => {
 			// Mock matchMedia to return false for the specific query
-			vi.stubGlobal("matchMedia", (query: string) => ({
-				matches: false, // Specifically return false regardless of query for this test
-				media: query,
-				onchange: null,
-				addListener: vi.fn(),
-				removeListener: vi.fn(),
-				addEventListener: vi.fn(),
-				removeEventListener: vi.fn(),
-				dispatchEvent: vi.fn(),
-			}));
+			// Replace stubGlobal with spyOn for consistency
+			vi.spyOn(window, "matchMedia").mockImplementation(
+				(query: string) =>
+					({
+						matches: false, // Specifically return false regardless of query for this test
+						media: query,
+						onchange: null,
+						addListener: vi.fn(),
+						removeListener: vi.fn(),
+						addEventListener: vi.fn(),
+						removeEventListener: vi.fn(),
+						dispatchEvent: vi.fn(),
+					}) as MediaQueryList,
+			);
 			expect(prefersReducedMotion()).toBe(false);
 		});
 	});
