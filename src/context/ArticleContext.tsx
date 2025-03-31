@@ -339,6 +339,100 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				}
 				// Reset fetch lock when done
 				fetchLockRef.current = false;
+
+				// --- One-time sync for existing local files ---
+				if (isMounted && isSignedIn && userId) {
+					const syncFlagKey = `hasSyncedExistingFiles_${userId}`;
+					try {
+						const hasSynced = localStorage.getItem(syncFlagKey);
+						if (!hasSynced) {
+							console.log(
+								"Running one-time sync for existing local EPUB/PDF files...",
+							);
+							// Get local EPUB/PDFs
+							const localArticles = await getAllArticles({ userId: userId });
+							const localFilesToSync = localArticles.filter(
+								(a) => a.type === "epub" || a.type === "pdf",
+							);
+
+							if (localFilesToSync.length > 0) {
+								// Get cloud IDs
+								const token = await getToken();
+								const userEmail = user?.primaryEmailAddress?.emailAddress;
+								let cloudIds: Set<string> = new Set();
+								if (token) {
+									const cloudItems = await fetchCloudItems(token, userEmail);
+									cloudIds = new Set(cloudItems.map((item) => item._id));
+								} else {
+									console.warn(
+										"Could not get token for one-time sync check. Skipping cloud ID check.",
+									);
+								}
+
+								// Identify unsynced files
+								const unsyncedFiles = localFilesToSync.filter(
+									(localFile) => !cloudIds.has(localFile._id),
+								);
+
+								console.log(
+									`Found ${unsyncedFiles.length} local EPUB/PDF files to sync.`,
+								);
+
+								// Sync them
+								let syncErrors = 0;
+								for (const articleToSync of unsyncedFiles) {
+									try {
+										const success = await saveItemToCloud(articleToSync);
+										if (success) {
+											console.log(
+												`One-time sync: Successfully synced ${articleToSync._id} (${articleToSync.type})`,
+											);
+										} else {
+											syncErrors++;
+											console.warn(
+												`One-time sync: Failed to sync ${articleToSync._id} (API returned false)`,
+											);
+										}
+									} catch (syncErr) {
+										syncErrors++;
+										console.error(
+											`One-time sync: Error syncing ${articleToSync._id}:`,
+											syncErr,
+										);
+									}
+								}
+
+								if (syncErrors === 0) {
+									console.log(
+										"One-time sync completed successfully for all files.",
+									);
+									localStorage.setItem(syncFlagKey, "true");
+								} else {
+									console.warn(
+										`One-time sync completed with ${syncErrors} errors. Will retry on next load.`,
+									);
+									// Don't set the flag if there were errors, so it retries
+								}
+							} else {
+								console.log(
+									"No local EPUB/PDF files found requiring one-time sync.",
+								);
+								localStorage.setItem(syncFlagKey, "true"); // Mark as done even if none found
+							}
+						} else {
+							console.log(
+								"One-time sync for existing files already completed.",
+							);
+						}
+					} catch (oneTimeSyncError) {
+						console.error(
+							"Error during one-time sync process:",
+							oneTimeSyncError,
+						);
+						// Don't set the flag, allow retry on next load
+					}
+				}
+				// --- End one-time sync ---
 			}
 		};
 
