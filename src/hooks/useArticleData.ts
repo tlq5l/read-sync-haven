@@ -1,4 +1,4 @@
-import { useArticles } from "@/context/ArticleContext";
+// import { useArticles } from "@/context/ArticleContext"; // Removed as unused
 import { type Article, getArticle } from "@/services/db";
 import { useEffect, useState } from "react";
 
@@ -11,7 +11,7 @@ export function useArticleData(id: string | undefined) {
 	const [article, setArticle] = useState<Article | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const { updateArticleStatus } = useArticles(); // Get context function
+	// const { updateArticleStatus } = useArticles(); // Removed as unused after fixing loop
 
 	useEffect(() => {
 		const fetchArticle = async () => {
