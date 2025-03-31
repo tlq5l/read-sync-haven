@@ -18,8 +18,8 @@ import { useArticleData } from "@/hooks/useArticleData";
 import { useChat } from "@/hooks/useChat";
 import { useSummarize } from "@/hooks/useSummarize";
 import { cn } from "@/lib/utils";
-import { Loader2, Send } from "lucide-react";
 import { debounce } from "lodash"; // Import debounce
+import { Loader2, Send } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 

@@ -67,19 +67,48 @@ export async function saveArticle(
 		} catch (error: any) {
 			// Handle conflicts specifically for updates
 			if (error.name === "conflict") {
-				console.warn(`Conflict saving article ${docId}. Retrying...`, error);
+				// Removed the initial warning log from here
 				try {
 					// Fetch the latest revision
 					const latestDoc = await articlesDb.get(docId);
 					// Merge changes onto the latest revision
 					// Be careful here: naive merge might overwrite intermediate changes.
 					// A more robust strategy might involve comparing fields or using a merge function.
-					// For now, we assume the incoming 'article' data is the desired state.
+					// Refined merge strategy: Prioritize incoming content, preserve local state.
+					const latestArticle = latestDoc as Article; // Cast for type safety
 					const docToRetry: Article = {
-						...(latestDoc as Article), // Base on latest
-						...article, // Apply incoming changes
-						_id: docId, // Ensure ID is correct
-						_rev: latestDoc._rev, // Use the latest revision
+						// Base fields from latestDoc
+						_id: latestArticle._id, // Use ID from latest doc (should match docId)
+						_rev: latestArticle._rev, // CRITICAL: Use latest rev
+						userId: latestArticle.userId, // Keep existing userId from local doc
+
+						// Fields primarily from incoming 'article' (source of truth for content)
+						// Use nullish coalescing (??) to fall back to latestDoc value if incoming is null/undefined
+						title: article.title ?? latestArticle.title,
+						url: article.url ?? latestArticle.url,
+						// Content should exist due to filtering in useArticleSync, but fallback just in case
+						content: article.content ?? latestArticle.content,
+						excerpt: article.excerpt ?? latestArticle.excerpt,
+						htmlContent: article.htmlContent ?? latestArticle.htmlContent,
+						type: article.type ?? latestArticle.type,
+						savedAt: article.savedAt ?? latestArticle.savedAt, // Usually from cloud
+
+						// Fields primarily from 'latestDoc' (local state) unless overridden by incoming 'article'
+						isRead: article.isRead ?? latestArticle.isRead,
+						favorite: article.favorite ?? latestArticle.favorite,
+						tags: article.tags ?? latestArticle.tags,
+						readAt: article.readAt ?? latestArticle.readAt,
+						scrollPosition:
+							article.scrollPosition ?? latestArticle.scrollPosition,
+
+						// Other optional fields, prioritize incoming if present
+						siteName: article.siteName ?? latestArticle.siteName,
+						author: article.author ?? latestArticle.author,
+						publishedDate: article.publishedDate ?? latestArticle.publishedDate, // Corrected typo
+						estimatedReadTime:
+							article.estimatedReadTime ?? latestArticle.estimatedReadTime,
+						coverImage: article.coverImage ?? latestArticle.coverImage,
+						language: article.language ?? latestArticle.language,
 					};
 					const retryResponse = await articlesDb.put(docToRetry);
 					if (retryResponse.ok) {
@@ -94,6 +123,11 @@ export async function saveArticle(
 						)}`,
 					);
 				} catch (retryError) {
+					// Log the original conflict warning ONLY if the retry fails
+					+console.warn(
+						`Conflict saving article ${docId}. Initial error:`,
+						error,
+					);
 					console.error(
 						`Error saving article ${docId} after conflict retry:`,
 						retryError,

@@ -26,6 +26,12 @@ export interface Article {
 	fileName?: string; // Original filename for local files
 	pageCount?: number; // Number of pages (primarily for PDF)
 	userId?: string; // User ID associated with this article (e.g., from Clerk)
+
+	// Optional fields added based on usage elsewhere
+	htmlContent?: string; // Raw HTML content, if available
+	scrollPosition?: number; // Last reading scroll position (e.g., pixel value)
+	coverImage?: string; // URL or base64 data for a cover image
+	language?: string; // Detected language code (e.g., 'en', 'vi')
 }
 
 /**

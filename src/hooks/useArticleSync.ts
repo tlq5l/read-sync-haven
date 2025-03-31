@@ -1,5 +1,6 @@
 import { useToast } from "@/hooks/use-toast";
-import { fetchCloudItems, saveItemToCloud } from "@/services/cloudSync";
+import { filterAndSortArticles, runOneTimeFileSync } from "@/lib/articleUtils";
+import { fetchCloudItems } from "@/services/cloudSync";
 import { type Article, getAllArticles, saveArticle } from "@/services/db";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,103 +26,68 @@ export function useArticleSync(
 	const { userId, isSignedIn, isLoaded, getToken } = useAuth();
 	const { user } = useUser();
 
-	// --- Main Load and Sync Effect ---
-	useEffect(() => {
-		if (!isInitialized || !isLoaded) {
-			// If not initialized or auth not loaded, reset state if needed
-			if (!isInitialized) setIsLoading(true); // Keep loading if DB not ready
-			if (!isLoaded) setIsLoading(true); // Keep loading if auth not ready
-			setArticles([]); // Clear articles if dependencies aren't met
-			setIsRefreshing(false);
-			setError(null);
-			return;
-		}
+	// --- Internal Core Logic Functions (Wrapped in useCallback) ---
 
-		// Use fetch lock to prevent concurrent fetches/syncs
-		if (fetchLockRef.current) {
-			console.log(
-				"Sync Hook: Load/Sync operation already in progress, skipping",
-			);
-			return;
-		}
+	const loadArticlesFromCache = useCallback(
+		async (isMounted: boolean): Promise<boolean> => {
+			if (!isSignedIn || !userId) return false;
 
-		let isMounted = true;
-		let syncTimeoutId: NodeJS.Timeout | null = null;
+			try {
+				console.log(
+					`Sync Hook: Attempting to load articles from cache for user ${userId}...`,
+				);
+				const cachedArticles = await getAllArticles({ userIds: [userId] });
 
-		const loadAndSyncArticles = async () => {
-			fetchLockRef.current = true;
-			let loadedFromCache = false;
-
-			// Reset error state at the beginning of a fetch attempt
-			// but only if we are not already in a refreshing state (to avoid flicker)
-			if (!isRefreshing) {
-				setError(null);
-			}
-
-			// --- 1. Attempt to load from local cache first ---
-			if (isSignedIn && userId) {
-				try {
+				if (isMounted && cachedArticles && cachedArticles.length > 0) {
 					console.log(
-						`Sync Hook: Attempting to load articles from cache for user ${userId}...`,
+						`Sync Hook: Loaded ${cachedArticles.length} articles from cache.`,
 					);
-					const cachedArticles = await getAllArticles({ userIds: [userId] });
-
-					if (isMounted && cachedArticles && cachedArticles.length > 0) {
-						console.log(
-							`Sync Hook: Loaded ${cachedArticles.length} articles from cache.`,
-						);
-						const filteredCached = filterAndSortArticles(
-							cachedArticles,
-							currentView,
-						);
-						setArticles(filteredCached);
-						setIsLoading(false);
-						setIsRefreshing(true); // Start background refresh
-						// setError(null); // Already reset above
-						loadedFromCache = true;
-					} else if (isMounted) {
-						console.log(
-							"Sync Hook: No articles found in cache or component unmounted.",
-						);
-						setIsLoading(true); // Need to load from cloud
-						setIsRefreshing(false);
-						setArticles([]); // Ensure articles are empty if cache is empty
-					}
-				} catch (cacheErr) {
-					console.error(
-						"Sync Hook: Error loading articles from cache:",
-						cacheErr,
+					const filteredCached = filterAndSortArticles(
+						cachedArticles,
+						currentView,
 					);
-					if (isMounted) {
-						setIsLoading(true); // Need to try cloud
-						setIsRefreshing(false);
-						setArticles([]); // Clear articles on cache error
-					}
-				}
-			} else {
-				// Not signed in
-				if (isMounted) {
-					setArticles([]);
+					setArticles(filteredCached);
 					setIsLoading(false);
-					setIsRefreshing(false);
-					setError(null);
+					setIsRefreshing(true); // Start background refresh after cache load
+					return true; // Loaded from cache
 				}
-				fetchLockRef.current = false;
-				return;
+				if (isMounted) {
+					console.log(
+						"Sync Hook: No articles found in cache or component unmounted.",
+					);
+					setIsLoading(true); // Need to load from cloud
+					setIsRefreshing(false);
+					setArticles([]); // Ensure articles are empty if cache is empty
+				}
+			} catch (cacheErr) {
+				console.error(
+					"Sync Hook: Error loading articles from cache:",
+					cacheErr,
+				);
+				if (isMounted) {
+					setIsLoading(true); // Need to try cloud
+					setIsRefreshing(false);
+					setArticles([]); // Clear articles on cache error
+				}
 			}
+			return false; // Not loaded from cache
+		},
+		// Dependencies: These influence the cache query or filtering
+		[isSignedIn, userId, currentView],
+	);
 
-			// --- 2. Sync with Cloud (always runs if signed in) ---
-			if (!isSignedIn || !userId) {
-				fetchLockRef.current = false;
-				return;
-			}
+	const performCloudSync = useCallback(
+		async (isMounted: boolean, loadedFromCache: boolean) => {
+			if (!isSignedIn || !userId) return;
 
 			if (!loadedFromCache && isMounted) {
 				setIsLoading(true);
 				setIsRefreshing(false);
 			}
 
+			let syncTimeoutId: NodeJS.Timeout | null = null;
 			let syncInProgress = true;
+
 			syncTimeoutId = setTimeout(() => {
 				if (isMounted && syncInProgress) {
 					console.warn(
@@ -129,7 +95,7 @@ export function useArticleSync(
 					);
 					if (isMounted) {
 						setIsRefreshing(false);
-						fetchLockRef.current = false;
+						fetchLockRef.current = false; // Release lock on timeout
 						const timeoutError = new Error(
 							`Syncing ${currentView} articles timed out. Displaying cached data.`,
 						);
@@ -144,7 +110,7 @@ export function useArticleSync(
 			}, 15000); // 15 second timeout
 
 			try {
-				console.log("Sync Hook: Starting background sync with cloud...");
+				console.log("Sync Hook: Starting sync with cloud...");
 				const token = await getToken();
 				const userEmail = user?.primaryEmailAddress?.emailAddress;
 
@@ -153,19 +119,31 @@ export function useArticleSync(
 				}
 
 				const fetchedArticles = await fetchCloudItems(token, userEmail);
-				syncInProgress = false;
+				syncInProgress = false; // Mark sync as complete before processing
 				if (syncTimeoutId) clearTimeout(syncTimeoutId);
 
 				console.log(
 					`Sync Hook: Synced ${fetchedArticles.length} articles from cloud for user ${userId} / ${userEmail}`,
 				);
 
+				// Filter out incomplete articles before saving
+				const completeArticles = fetchedArticles.filter((article) => {
+					const hasEssentialFields =
+						article.title && article.url && article.content;
+					if (!hasEssentialFields) {
+						console.warn(
+							`Sync Hook: Skipping save for incomplete article ${article._id} (missing title, url, or content)`,
+						);
+					}
+					return hasEssentialFields;
+				});
+
 				// Save/Update fetched articles locally
-				if (fetchedArticles.length > 0) {
+				if (completeArticles.length > 0) {
 					console.log(
-						`Sync Hook: Attempting to save/update ${fetchedArticles.length} synced articles locally...`,
+						`Sync Hook: Attempting to save/update ${completeArticles.length} complete synced articles locally...`,
 					);
-					for (const article of fetchedArticles) {
+					for (const article of completeArticles) {
 						try {
 							await saveArticle({ ...article, userId });
 						} catch (saveErr) {
@@ -201,11 +179,10 @@ export function useArticleSync(
 					setError(null); // Clear error on successful sync
 				}
 
-				// --- One-time sync for existing local files ---
+				// Run one-time sync for existing local files
 				await runOneTimeFileSync(userId, getToken, user);
-				// --- End one-time sync ---
 			} catch (syncErr) {
-				syncInProgress = false;
+				syncInProgress = false; // Mark sync as complete on error too
 				if (syncTimeoutId) clearTimeout(syncTimeoutId);
 				console.error(
 					`Sync Hook: Failed to sync articles for ${currentView} view:`,
@@ -217,7 +194,7 @@ export function useArticleSync(
 						syncErr instanceof Error
 							? syncErr
 							: new Error("Failed to sync articles");
-					// Only set global error if cache didn't load
+					// Only set global error if cache didn't load initially
 					if (!loadedFromCache) {
 						setError(error);
 						setArticles([]); // Clear articles if sync fails AND cache didn't load
@@ -233,127 +210,159 @@ export function useArticleSync(
 					setIsLoading(false);
 					setIsRefreshing(false);
 				}
-				fetchLockRef.current = false;
+				// Lock is released within the main effect or refresh function
+			}
+		},
+		// Dependencies: These influence the cloud sync operation
+		// filterAndSortArticles and runOneTimeFileSync are stable imports from "@/lib/articleUtils"
+		[isSignedIn, userId, getToken, user, currentView, toast],
+	);
+
+	// --- Main Load and Sync Effect ---
+	useEffect(() => {
+		let isMounted = true; // Track mount status for async operations
+
+		const loadData = async () => {
+			if (!isInitialized || !isLoaded) {
+				if (!isInitialized) setIsLoading(true);
+				if (!isLoaded) setIsLoading(true);
+				setArticles([]);
+				setIsRefreshing(false);
+				setError(null);
+				return;
+			}
+
+			if (fetchLockRef.current) {
+				console.log("Sync Hook: Load/Sync already in progress, skipping");
+				return;
+			}
+
+			fetchLockRef.current = true;
+			if (!isRefreshing) {
+				setError(null); // Clear error only if not already refreshing
+			}
+
+			try {
+				// 1. Load from cache
+				const loadedFromCache = await loadArticlesFromCache(isMounted);
+
+				// 2. Sync with cloud (always runs if signed in and cache load finished)
+				if (isSignedIn && userId) {
+					await performCloudSync(isMounted, loadedFromCache);
+				} else if (isMounted) {
+					// Not signed in, ensure state is clean
+					setArticles([]);
+					setIsLoading(false);
+					setIsRefreshing(false);
+					setError(null);
+				}
+			} catch (err) {
+				// Catch errors from loadArticlesFromCache if any (though it handles internally)
+				console.error("Sync Hook: Unexpected error during loadData:", err);
+				if (isMounted) {
+					setError(
+						err instanceof Error
+							? err
+							: new Error("An unexpected error occurred"),
+					);
+					setIsLoading(false);
+					setIsRefreshing(false);
+				}
+			} finally {
+				if (isMounted) {
+					// Ensure loading/refreshing states are eventually false
+					// performCloudSync handles its own state updates, but this is a safeguard
+					setIsLoading(false);
+					// Don't set refreshing false here if sync started it
+				}
+				fetchLockRef.current = false; // Release lock
 			}
 		};
 
-		loadAndSyncArticles();
+		loadData();
 
 		return () => {
 			isMounted = false;
-			if (syncTimeoutId) clearTimeout(syncTimeoutId);
+			// Cleanup logic (e.g., clear timeouts) is now handled within performCloudSync
 		};
 	}, [
 		isInitialized,
-		currentView,
-		isSignedIn,
 		isLoaded,
-		getToken,
-		user,
+		isSignedIn,
 		userId,
-		toast,
-		isRefreshing,
-	]); // Combined dependencies
+		// currentView is implicitly handled via loadArticlesFromCache/performCloudSync deps
+		loadArticlesFromCache,
+		performCloudSync,
+		isRefreshing, // Keep isRefreshing to reset error correctly
+	]);
 
 	// --- Refresh Function ---
 	const refreshArticles = useCallback(async () => {
-		if (!isInitialized || !isLoaded) return articles; // Return current articles if not ready
+		// Use a local isMounted flag for this specific callback instance
+		let isMounted = true;
+		const cleanup = () => {
+			isMounted = false;
+		};
+
+		if (!isInitialized || !isLoaded) {
+			cleanup();
+			return articles; // Return current articles if not ready
+		}
+		if (!isSignedIn || !userId) {
+			console.log(
+				"Sync Hook: User not signed in, clearing articles on refresh.",
+			);
+			setArticles([]);
+			setIsLoading(false);
+			setIsRefreshing(false);
+			setError(null);
+			cleanup();
+			return []; // Return empty array if not signed in
+		}
 
 		if (fetchLockRef.current) {
 			console.log("Sync Hook: Refresh operation already in progress, skipping");
+			cleanup();
 			return articles;
 		}
 
 		console.log("Sync Hook: Manual refresh triggered.");
-		setIsRefreshing(true); // Indicate manual refresh start
-		setError(null); // Clear previous errors on manual refresh
+		setIsRefreshing(true);
+		setError(null);
 		fetchLockRef.current = true;
 
 		try {
-			let fetchedArticles: Article[] = [];
-			if (isSignedIn && userId) {
-				const token = await getToken();
-				const userEmail = user?.primaryEmailAddress?.emailAddress;
-				if (token) {
-					fetchedArticles = await fetchCloudItems(token, userEmail);
-					console.log(
-						`Sync Hook: Refreshed ${fetchedArticles.length} articles from cloud for user ${userId} / ${userEmail}`,
-					);
-
-					// Save/Update locally
-					if (fetchedArticles.length > 0) {
-						console.log(
-							`Sync Hook: Saving/updating ${fetchedArticles.length} refreshed articles locally...`,
-						);
-						for (const article of fetchedArticles) {
-							try {
-								await saveArticle({ ...article, userId });
-							} catch (saveErr) {
-								console.warn(
-									`Sync Hook: Failed to save/update refreshed article ${article._id} locally:`,
-									saveErr,
-								);
-							}
-						}
-					}
-				} else {
-					throw new Error(
-						"Could not retrieve authentication token for refresh.",
-					);
-				}
-			} else {
-				// Not signed in, clear local state on manual refresh
-				setArticles([]);
-				console.log(
-					"Sync Hook: User not signed in, clearing articles on refresh.",
-				);
-				return []; // Return empty array
-			}
-
-			// Re-fetch from local DB after saving cloud data
-			console.log(
-				"Sync Hook: Re-fetching articles from local DB after refresh...",
-			);
-			const localArticlesAfterRefresh = await getAllArticles({
-				userIds: [userId],
-			});
-			console.log(
-				`Sync Hook: Fetched ${localArticlesAfterRefresh.length} articles locally after refresh.`,
-			);
-
-			const filteredArticles = filterAndSortArticles(
-				localArticlesAfterRefresh,
-				currentView,
-			);
-			setArticles(filteredArticles);
-			setError(null); // Clear error on success
-			return filteredArticles;
+			// Directly call performCloudSync for refresh logic
+			// Pass true for loadedFromCache because we want to show existing data while refreshing
+			await performCloudSync(isMounted, true);
+			// Re-fetch happens inside performCloudSync, state is updated there
+			// Return the latest state after sync completes (or potentially cached on error)
+			// Need to get the latest state value after async operation
+			const finalArticles = await getAllArticles({ userIds: [userId] }); // Re-fetch to ensure latest
+			const filteredFinal = filterAndSortArticles(finalArticles, currentView);
+			if (isMounted) setArticles(filteredFinal); // Update state if still mounted
+			cleanup();
+			return filteredFinal;
 		} catch (err) {
-			console.error("Sync Hook: Failed to refresh articles:", err);
-			const error =
-				err instanceof Error ? err : new Error("Failed to refresh articles");
-			setError(error);
-			toast({
-				title: "Refresh Failed",
-				description: error.message,
-				variant: "destructive",
-			});
-			return articles; // Return existing articles on error
+			// performCloudSync handles its internal errors and toasts
+			console.error("Sync Hook: Error during refreshArticles wrapper:", err);
+			// Error state is set within performCloudSync if needed
+			cleanup();
+			return articles; // Return existing articles on outer error
 		} finally {
-			setIsRefreshing(false);
-			setIsLoading(false); // Ensure loading is also false
-			fetchLockRef.current = false;
+			// performCloudSync sets refreshing/loading to false internally
+			fetchLockRef.current = false; // Release lock here
+			if (!isMounted) cleanup(); // Ensure cleanup if error happened before return
 		}
 	}, [
 		isInitialized,
 		isLoaded,
 		isSignedIn,
 		userId,
-		getToken,
-		user,
-		currentView,
-		toast,
-		articles, // Include articles to return it on error/skip
+		performCloudSync, // Depend on the core sync logic
+		articles, // Return existing articles on error/skip
+		currentView, // Needed for final filter/sort
+		// filterAndSortArticles is a stable import, no need to list
 	]);
 
 	// --- Retry Function ---
@@ -371,129 +380,12 @@ export function useArticleSync(
 		});
 		// The main useEffect will re-run due to state changes or dependencies
 		// Alternatively, directly call refreshArticles if preferred
-		refreshArticles(); // Trigger refresh on retry
-	}, [currentView, toast, refreshArticles]); // Dependencies for retry
+		// Directly trigger the main effect logic by changing a dependency or state
+		// Or, more directly, call refreshArticles which now encapsulates the sync
+		refreshArticles();
+	}, [refreshArticles, currentView, toast]); // Add missing dependencies
 
-	// --- Helper Functions ---
-	const filterAndSortArticles = (
-		articlesToFilter: Article[],
-		view: ArticleView,
-	): Article[] => {
-		let filtered = articlesToFilter;
-		if (view === "unread") {
-			filtered = articlesToFilter.filter((a) => !a.isRead);
-		} else if (view === "favorites") {
-			filtered = articlesToFilter.filter((a) => a.favorite);
-		}
-		// Sort by savedAt descending
-		filtered.sort((a, b) => b.savedAt - a.savedAt);
-		return filtered;
-	};
-
-	const runOneTimeFileSync = async (
-		currentUserId: string | null | undefined,
-		getTokenFn: () => Promise<string | null>,
-		currentUser: any, // Consider defining a stricter type for user if possible
-	) => {
-		if (!currentUserId) return;
-
-		const syncFlagKey = `hasSyncedExistingFiles_${currentUserId}`;
-		try {
-			const hasSynced = localStorage.getItem(syncFlagKey);
-			if (!hasSynced) {
-				console.log(
-					"Sync Hook: Running one-time sync for existing local EPUB/PDF files...",
-				);
-				const localArticles = await getAllArticles({
-					userIds: [currentUserId],
-				});
-				const localFilesToSync = localArticles.filter(
-					(a) => a.type === "epub" || a.type === "pdf",
-				);
-
-				if (localFilesToSync.length > 0) {
-					const token = await getTokenFn();
-					const userEmail = currentUser?.primaryEmailAddress?.emailAddress;
-					let cloudIds: Set<string> = new Set();
-					if (token) {
-						try {
-							const cloudItems = await fetchCloudItems(token, userEmail);
-							cloudIds = new Set(cloudItems.map((item) => item._id));
-						} catch (fetchErr) {
-							console.warn(
-								"Sync Hook: Error fetching cloud items for one-time sync check:",
-								fetchErr,
-							);
-							// Proceed without cloud check if fetch fails
-						}
-					} else {
-						console.warn(
-							"Sync Hook: Could not get token for one-time sync check. Skipping cloud ID check.",
-						);
-					}
-
-					const unsyncedFiles = localFilesToSync.filter(
-						(localFile) => !cloudIds.has(localFile._id),
-					);
-
-					console.log(
-						`Sync Hook: Found ${unsyncedFiles.length} local EPUB/PDF files to sync.`,
-					);
-
-					let syncErrors = 0;
-					for (const articleToSync of unsyncedFiles) {
-						try {
-							// Ensure the article has the correct user ID before syncing
-							const articleWithCorrectUser = {
-								...articleToSync,
-								userId: currentUserId,
-							};
-							const success = await saveItemToCloud(articleWithCorrectUser);
-							if (success) {
-								console.log(
-									`Sync Hook: One-time sync: Successfully synced ${articleToSync._id} (${articleToSync.type})`,
-								);
-							} else {
-								syncErrors++;
-								console.warn(
-									`Sync Hook: One-time sync: Failed to sync ${articleToSync._id} (API returned false)`,
-								);
-							}
-						} catch (syncErr) {
-							syncErrors++;
-							console.error(
-								`Sync Hook: One-time sync: Error syncing ${articleToSync._id}:`,
-								syncErr,
-							);
-						}
-					}
-
-					if (syncErrors === 0) {
-						console.log(
-							"Sync Hook: One-time sync completed successfully for all files.",
-						);
-						localStorage.setItem(syncFlagKey, "true");
-					} else {
-						console.warn(
-							`Sync Hook: One-time sync completed with ${syncErrors} errors. Will retry on next load.`,
-						);
-					}
-				} else {
-					console.log(
-						"Sync Hook: No local EPUB/PDF files found requiring one-time sync.",
-					);
-					localStorage.setItem(syncFlagKey, "true");
-				}
-			} else {
-				// console.log("Sync Hook: One-time sync for existing files already completed.");
-			}
-		} catch (oneTimeSyncError) {
-			console.error(
-				"Sync Hook: Error during one-time sync process:",
-				oneTimeSyncError,
-			);
-		}
-	};
+	// Helper functions are now imported from @/lib/articleUtils
 
 	return {
 		articles,
