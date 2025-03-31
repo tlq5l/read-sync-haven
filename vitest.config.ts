@@ -9,11 +9,7 @@ export default defineConfig({
 		react(), // Include React plugin
 		nodePolyfills({
 			// Include node polyfills
-			globals: {
-				process: true,
-				Buffer: true,
-				global: true,
-			},
+			// Removed globals section as it might conflict with jsdom
 			include: ["util", "path", "events"],
 			protocolImports: true,
 		}),
