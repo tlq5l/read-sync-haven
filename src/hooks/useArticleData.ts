@@ -34,11 +34,11 @@ export function useArticleData(id: string | undefined) {
 					setError("Article not found");
 				} else {
 					setArticle(articleData);
-					// Mark as read if not already
-					if (!articleData.isRead) {
-						// Use the context function directly
-						updateArticleStatus(id, true);
-					}
+					// Mark as read logic should be handled elsewhere (e.g., on component mount/unmount or user action)
+					// Removing this call to prevent potential loops
+					// if (!articleData.isRead) {
+					// 	// updateArticleStatus(id, true); // Removed problematic call
+					// }
 				}
 			} catch (err) {
 				console.error("Error fetching article:", err);
@@ -49,7 +49,7 @@ export function useArticleData(id: string | undefined) {
 		};
 
 		fetchArticle();
-	}, [id, updateArticleStatus]); // Add updateArticleStatus dependency
+	}, [id]); // Remove unused updateArticleStatus dependency
 
 	return { article, loading, error, setArticle }; // Return setArticle for local updates like favorite toggle
 }
