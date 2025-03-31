@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isInputElement, shouldIgnoreShortcut } from "./utils";
+import { cn, isInputElement, shouldIgnoreShortcut } from "./utils";
 
 // Mocking minimal Element-like objects for testing
 const createMockElement = (
@@ -197,5 +197,51 @@ describe("lib/utils", () => {
 			const event = createMockEvent("k", "div", false, false, true);
 			expect(shouldIgnoreShortcut(event as KeyboardEvent)).toBe(false);
 		});
+	});
+});
+
+describe("cn", () => {
+	it("should concatenate basic strings", () => {
+		expect(cn("a", "b", "c")).toBe("a b c");
+	});
+
+	it("should handle conditional classes (object syntax)", () => {
+		expect(cn("a", { b: true, c: false, d: true })).toBe("a b d");
+	});
+
+	it("should handle conditional classes (array syntax)", () => {
+		expect(cn("a", ["b", true && "c", false && "d"])).toBe("a b c");
+	});
+
+	it("should handle mixed types", () => {
+		expect(cn("a", { b: true }, ["c", null, undefined, "d"], "e")).toBe(
+			"a b c d e",
+		);
+	});
+
+	it("should merge tailwind classes correctly (last one wins)", () => {
+		expect(cn("p-4", "p-2")).toBe("p-2");
+		expect(cn("text-red-500", "text-blue-500")).toBe("text-blue-500");
+		expect(cn("bg-black", "p-4", "bg-white", "p-2")).toBe("bg-white p-2");
+	});
+
+	it("should handle null, undefined, and false values gracefully", () => {
+		expect(cn("a", null, "b", undefined, false, "c")).toBe("a b c");
+	});
+
+	it("should handle empty inputs", () => {
+		expect(cn()).toBe("");
+		expect(cn("")).toBe("");
+		expect(cn("", "", "")).toBe("");
+	});
+
+	it("should handle complex nested arrays and objects", () => {
+		expect(
+			cn("base", [
+				"p-4",
+				{ "m-2": true, "m-4": false },
+				["text-red-500", undefined, { "font-bold": true }],
+			]),
+		).toBe("base p-4 m-2 text-red-500 font-bold");
 	});
 });
