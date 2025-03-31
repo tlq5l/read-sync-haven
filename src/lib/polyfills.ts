@@ -6,9 +6,8 @@ if (typeof window !== "undefined") {
 	} else {
 		console.warn("JSZip not found. EPUB functionality may be limited.");
 	}
-
 	// Ensure process is defined for React and other libs that expect it
-	if (typeof window.process === "undefined") {
+	if (typeof window.process === "undefined" && !import.meta.env.VITEST) {
 		// Define minimal process object
 		const minimalProcess = {
 			env: {},
@@ -23,12 +22,16 @@ if (typeof window !== "undefined") {
 				openssl: "0.0.0",
 			},
 			nextTick: (cb: () => void) => setTimeout(cb, 0),
+			// Add dummy listeners method to satisfy Vitest/Node expectations
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
+			listeners: (_event: string) => [] as Array<() => void>,
 		};
 
 		// Use type assertion to avoid TypeScript errors
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(window as any).process = minimalProcess;
 	}
+
 
 	// Required for PouchDB in some environments
 	if (
