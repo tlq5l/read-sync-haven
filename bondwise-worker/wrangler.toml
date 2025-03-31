@@ -14,9 +14,6 @@ kv_namespaces = [
 # and in .env file for local development
 [vars]
 # GCF URLs are now managed via secrets, but we declare them here for clarity/local dev fallback if needed
-GCF_SUMMARIZE_URL = "" # Value ignored, declares variable
-GCF_CHAT_URL = ""      # Value ignored, declares variable for the new chat function
-GEMINI_API_KEY = ""    # Value ignored, declares variable (kept for potential future use)
 # GCF_AUTH_KEY = ""    # Removed - Using Workload Identity Federation now
 
 # Variables for Workload Identity Federation
