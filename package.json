@@ -13,7 +13,7 @@
 		"validate": "bun run format && bun run typecheck && bun run check",
 		"preview": "vite preview",
 		"typecheck": "tsc --noEmit -p .tscheckrc.json",
-		"test": "vitest",
+		"test": "vitest run",
 		"prepare": "husky"
 	},
 	"dependencies": {
