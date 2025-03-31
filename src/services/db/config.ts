@@ -1,7 +1,7 @@
 // src/services/db/config.ts
 
-import PouchDB from "pouchdb-browser";
 import PouchDBAdapterMemory from "pouchdb-adapter-memory"; // Import memory adapter
+import PouchDB from "pouchdb-browser";
 import PouchDBFind from "pouchdb-find";
 import type { Article, Highlight, Tag } from "./types";
 import { executeWithRetry } from "./utils";
@@ -49,7 +49,9 @@ function createDbInstance<T extends object>(
 ): PouchDB.Database<T> {
 	// --- Test Environment Specific Logic ---
 	if (import.meta.vitest) {
-		console.log(`[TEST ENV] Creating PouchDB instance: ${name} using memory adapter`);
+		console.log(
+			`[TEST ENV] Creating PouchDB instance: ${name} using memory adapter`,
+		);
 		try {
 			// Directly use memory adapter for tests
 			return new PouchDB<T>(name, { ...options, adapter: "memory" });
