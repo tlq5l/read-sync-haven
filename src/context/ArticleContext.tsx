@@ -1,5 +1,5 @@
 import { useToast } from "@/hooks/use-toast";
-import { fetchCloudItems } from "@/services/cloudSync"; // Import the cloud fetch function
+import { fetchCloudItems, saveItemToCloud } from "@/services/cloudSync"; // Import the cloud fetch and save functions
 import {
 	type Article,
 	deleteArticle,
@@ -561,6 +561,27 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 					// Save EPUB file with user ID
 					const savedArticle = await saveEpubFile(file, userId);
 
+					// --- Sync to Cloud (fire and forget with logging) ---
+					saveItemToCloud(savedArticle)
+						.then((success) => {
+							if (success) {
+								console.log(
+									`Successfully synced EPUB ${savedArticle._id} to cloud.`,
+								);
+							} else {
+								console.warn(
+									`Failed to sync EPUB ${savedArticle._id} to cloud (API returned false).`,
+								);
+							}
+						})
+						.catch((err) => {
+							console.error(
+								`Error syncing EPUB ${savedArticle._id} to cloud:`,
+								err,
+							);
+						});
+					// ----------------------------------------------------
+
 					// Update articles list to include new article
 					setArticles((prevArticles) => [savedArticle, ...prevArticles]);
 
@@ -575,6 +596,27 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				if (isValidPdf(file)) {
 					// Save PDF file with user ID
 					const savedArticle = await savePdfFile(file, userId);
+
+					// --- Sync to Cloud (fire and forget with logging) ---
+					saveItemToCloud(savedArticle)
+						.then((success) => {
+							if (success) {
+								console.log(
+									`Successfully synced PDF ${savedArticle._id} to cloud.`,
+								);
+							} else {
+								console.warn(
+									`Failed to sync PDF ${savedArticle._id} to cloud (API returned false).`,
+								);
+							}
+						})
+						.catch((err) => {
+							console.error(
+								`Error syncing PDF ${savedArticle._id} to cloud:`,
+								err,
+							);
+						});
+					// ----------------------------------------------------
 
 					// Update articles list to include new article
 					setArticles((prevArticles) => [savedArticle, ...prevArticles]);
