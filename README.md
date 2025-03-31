@@ -39,6 +39,28 @@ npm install
 npm run dev
 ```
 
+### Running Tests
+
+Tests are written using Vitest. Due to an incompatibility between Bun's built-in test runner (`bun test`) and the `jsdom` environment configuration in `vitest.config.ts`, tests requiring a DOM environment (like those for animation utilities) will fail if run with `bun test`.
+
+**To run tests correctly, use:**
+
+```sh
+bunx vitest run
+```
+
+Alternatively, the `package.json` `test` script has been updated, so you can also run:
+
+```sh
+bun test
+```
+
+This command now correctly executes `vitest run` behind the scenes.
+
+**Test Configuration Notes:**
+- PouchDB tests use `pouchdb-adapter-memory` to provide an in-memory database during testing.
+- Browser APIs like `window` and `document` are provided by the `jsdom` environment specified in `vitest.config.ts`.
+
 ## Project Structure
 
 - `/src/components` - UI components
