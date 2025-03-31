@@ -30,8 +30,11 @@
     *   Test cases for common edit shortcuts (like Ctrl+C, Ctrl+V) when the active element *is* an input (should return `true`).
     *   Test cases for common edit shortcuts when the active element *is not* an input (should return `false`).
     *   Test cases for other key combinations that *should not* be ignored.
-    *   *(Note: Resolved environment issues by mocking `document.activeElement` and using type assertions).*
-6.  **Run Tests:** Tests executed and passed using `bun test` - ✅ Completed.
+    *   *(Note: Initial environment issues were encountered, requiring mocking `document.activeElement` and type assertions).*
+   6.  **Run Tests & Debug:** Initial runs with `bun test` revealed failures in tests requiring a DOM environment (`src/lib/animation.test.ts`) and PouchDB initialization (`src/lib/articleUtils.test.ts`). Debugging identified:
+       *   An incompatibility where `bun test` did not correctly load the `jsdom` environment specified in `vitest.config.ts`.
+       *   PouchDB required explicit configuration with `pouchdb-adapter-memory` for the test environment.
+       *   **Resolution:** Tests now pass reliably using `bunx vitest run`. The `package.json` `test` script has been updated to use `vitest run`, so `bun test` now works correctly. PouchDB configuration was updated for the test environment. - ✅ Completed.
 7.  **Commit:** Changes committed with message "test: Add unit tests for utils" - ✅ Completed.
 
 **Future Steps (Beyond Initial Implementation):**
