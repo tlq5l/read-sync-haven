@@ -1,22 +1,15 @@
 /// <reference types="vitest" />
 import path from "node:path";
 import react from "@vitejs/plugin-react-swc";
-import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
 	plugins: [
 		react(), // Include React plugin
-		nodePolyfills({
-			// Include node polyfills
-			// Removed globals section as it might conflict with jsdom
-			include: ["util", "path", "events"],
-			protocolImports: true,
-		}),
 	],
 	test: {
 		globals: true,
-		environment: "jsdom", // Keep jsdom environment
+		environment: "jsdom", // Revert back to jsdom environment
 		setupFiles: "./src/setupTests.ts", // Keep setup file
 		// Optional: Configure coverage
 		// coverage: {

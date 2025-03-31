@@ -7,29 +7,30 @@ if (typeof window !== "undefined") {
 		console.warn("JSZip not found. EPUB functionality may be limited.");
 	}
 	// Ensure process is defined for React and other libs that expect it
-	if (typeof window.process === "undefined" && !import.meta.env.VITEST) {
-		// Define minimal process object
-		const minimalProcess = {
-			env: {},
-			versions: {
-				node: "0.0.0",
-				v8: "0.0.0",
-				uv: "0.0.0",
-				zlib: "0.0.0",
-				ares: "0.0.0",
-				modules: "0.0.0",
-				http_parser: "0.0.0",
-				openssl: "0.0.0",
-			},
-			nextTick: (cb: () => void) => setTimeout(cb, 0),
-			// Add dummy listeners method to satisfy Vitest/Node expectations
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			listeners: (_event: string) => [] as Array<() => void>,
-		};
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const proc = (window as any).process;
 
-		// Use type assertion to avoid TypeScript errors
+	if (typeof proc === "undefined") {
+		// If process is completely missing, define a minimal version
+		// (Avoid doing this during Vitest runs unless explicitly testing the polyfill)
+		if (!import.meta.env.VITEST) {
+			// Define minimal process object
+			const minimalProcess = {
+				env: {},
+				versions: { node: "0.0.0" /* ... other versions */ },
+				nextTick: (cb: () => void) => setTimeout(cb, 0),
+				// Add dummy listeners method
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				listeners: (_event: string) => [] as Array<() => void>,
+			};
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(window as any).process = minimalProcess;
+		}
+	} else if (typeof proc.listeners === "undefined") {
+		// If process exists but listeners is missing, add the dummy listeners method
+		// This might help stabilize Vitest's error handling in certain environments
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		(window as any).process = minimalProcess;
+		(window as any).process.listeners = (_event: string) => [] as Array<() => void>;
 	}
 
 

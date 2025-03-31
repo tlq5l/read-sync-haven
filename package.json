@@ -101,6 +101,7 @@
 		"autoprefixer": "^10.4.21",
 		"globals": "^15.15.0",
 		"google-auth-library": "^9.15.1",
+		"happy-dom": "^17.4.4",
 		"husky": "^9.1.7",
 		"lovable-tagger": "^1.1.8",
 		"postcss": "^8.5.3",
