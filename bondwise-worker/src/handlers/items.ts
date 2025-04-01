@@ -3,6 +3,21 @@
 import type { Env, WorkerArticle } from "../types";
 import { createUserItemKey, errorResponse, jsonResponse } from "../utils";
 
+// Helper function to estimate read time (words per minute)
+function calculateReadTime(content: string | undefined): number | undefined {
+	if (!content) {
+		return undefined;
+	}
+	// Basic word count - strips HTML tags, might not be perfect for complex HTML
+	const textContent = content.replace(/<[^>]*>/g, " "); // Strip HTML tags
+	const wordCount = textContent.split(/\s+/).filter(Boolean).length;
+	if (wordCount === 0) {
+		return 1; // Minimum 1 minute
+	}
+	const readTime = Math.ceil(wordCount / 200); // Assume 200 WPM
+	return readTime === 0 ? 1 : readTime;
+}
+
 /**
  * Handles GET /items requests. Lists items for the authenticated user.
  */
@@ -61,12 +76,52 @@ export async function handleListItems(
 			const value = await env.SAVED_ITEMS_KV.get(key.name);
 			if (value) {
 				try {
-					items.push(JSON.parse(value) as WorkerArticle);
+					const parsedItem = JSON.parse(value) as WorkerArticle;
+
+					// Ensure siteName exists
+					if (!parsedItem.siteName && parsedItem.url) {
+						try {
+							// Extract hostname, removing 'www.' if present
+							let hostname = new URL(parsedItem.url).hostname;
+							hostname = hostname.startsWith("www.") ? hostname.substring(4) : hostname;
+							parsedItem.siteName = hostname;
+						} catch {
+							parsedItem.siteName = "Unknown Source"; // Fallback on URL parse error
+						}
+					} else if (!parsedItem.siteName) {
+						// Fallback if URL is also missing or invalid
+						if (parsedItem.type === 'pdf') {
+							parsedItem.siteName = "PDF Document";
+						} else if (parsedItem.type === 'epub') {
+							parsedItem.siteName = "EPUB Book";
+						} else {
+							parsedItem.siteName = "Unknown Source";
+						}
+					}
+
+					// Ensure estimatedReadTime exists
+					if (
+						parsedItem.estimatedReadTime === undefined ||
+						parsedItem.estimatedReadTime === null ||
+					       Number.isNaN(parsedItem.estimatedReadTime) // Also check for NaN
+					) {
+						// Calculate only if content exists, otherwise leave as undefined (or default to 1?)
+						if (parsedItem.content) {
+					         parsedItem.estimatedReadTime = calculateReadTime(parsedItem.content);
+					       } else {
+					         // Decide fallback: undefined or 1? Let's default to 1 min if content is missing.
+					         parsedItem.estimatedReadTime = 1;
+					       }
+					}
+
+					items.push(parsedItem); // Push the potentially modified item
+
 				} catch (parseError) {
 					console.error(
 						`Failed to parse item with key ${key.name}:`,
 						parseError,
 					);
+					// Optionally push a placeholder or skip the item
 				}
 			}
 		}

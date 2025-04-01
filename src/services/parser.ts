@@ -238,16 +238,18 @@ export async function parseArticle(
 		finalEstimatedReadTime = 1; // Ensure minimum 1 minute read time
 	}
 
-	return {
-		title: article.title || "Untitled Article",
-		url: normalizedUrl,
-		content: sanitizedHtml, // Store sanitized HTML
-		excerpt,
-		author: article.byline || undefined,
-		siteName: article.siteName || new URL(normalizedUrl).hostname,
-		estimatedReadTime: finalEstimatedReadTime, // Use the adjusted value
-		type: "article",
-	};
+ const result = {
+  title: article.title || "Untitled Article",
+  url: normalizedUrl,
+  content: sanitizedHtml, // Store sanitized HTML
+  excerpt,
+  author: article.byline || undefined,
+  siteName: article.siteName || new URL(normalizedUrl).hostname,
+  estimatedReadTime: finalEstimatedReadTime, // Use the adjusted value
+  type: "article" as const, // Explicitly assert type
+ };
+
+ return result;
 }
 
 // Helper function to extract text content from HTML
