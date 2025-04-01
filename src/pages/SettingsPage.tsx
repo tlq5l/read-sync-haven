@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
+import { useArticleActions } from "@/hooks/useArticleActions";
 import {
 	type Article,
 	type Highlight,
@@ -33,7 +34,16 @@ export default function SettingsPage() {
 	const { toast } = useToast();
 	const { theme } = useTheme();
 	const [isExportingData, setIsExportingData] = useState(false);
+	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false); // Add state for cleanup button
 	const [activeTab, setActiveTab] = useState("profile");
+
+	// Get the action function - needs a refresh callback, maybe null for now or a dummy?
+	// Let's assume a refresh isn't strictly needed immediately after cleanup,
+	// but ideally, the parent component provides a way to refresh the main article list.
+	// For now, provide a dummy refresh that does nothing.
+	const { removeDuplicateLocalArticles } = useArticleActions(async () => {
+		console.log("Dummy refresh called after duplicate cleanup.");
+	});
 
 	const exportData = async () => {
 		setIsExportingData(true);
@@ -99,6 +109,20 @@ export default function SettingsPage() {
 		}
 	};
 
+	// Function to handle duplicate cleanup
+	const handleCleanDuplicates = async () => {
+		setIsCleaningDuplicates(true);
+		try {
+			await removeDuplicateLocalArticles();
+			// Toast messages are handled within the hook
+		} catch (error) {
+			// Error toast is also handled within the hook, but log here just in case
+			console.error("Error triggering duplicate cleanup from settings:", error);
+		} finally {
+			setIsCleaningDuplicates(false);
+		}
+	};
+
 	return (
 		<div className="container py-8 max-w-3xl mx-auto">
 			<div className="flex items-center mb-8">
@@ -150,7 +174,9 @@ export default function SettingsPage() {
 								<CardHeader>
 									<CardTitle>Appearance</CardTitle>
 								</CardHeader>
-								<CardContent className="space-y-4">
+								<CardContent className="space-y-6">
+									{" "}
+									{/* Increased spacing */}
 									<div className="flex items-center justify-between">
 										<div className="space-y-0.5">
 											<Label htmlFor="dark-mode">Dark Mode</Label>
@@ -162,9 +188,7 @@ export default function SettingsPage() {
 										</div>
 										<ThemeToggle showLabel={false} />
 									</div>
-
 									<Separator />
-
 									<div className="flex items-center justify-between">
 										<div className="space-y-0.5">
 											<Label htmlFor="font-size">Larger Text</Label>
@@ -177,6 +201,7 @@ export default function SettingsPage() {
 								</CardContent>
 							</Card>
 						</div>
+						{/* [Removed duplicated cleanup section from Appearance tab] */}
 					</ScrollArea>
 				</TabsContent>
 
@@ -187,7 +212,7 @@ export default function SettingsPage() {
 
 							<Card>
 								<CardHeader>
-									<CardTitle>Data</CardTitle>
+									<CardTitle>Data Management</CardTitle> {/* Updated title */}
 								</CardHeader>
 								<CardContent className="space-y-4">
 									<div className="flex items-center justify-between">
