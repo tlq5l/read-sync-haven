@@ -3,9 +3,16 @@
 	"module": "index.ts",
 	"type": "module",
 	"private": true,
+	"scripts": {
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"coverage": "vitest run --coverage"
+	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20250321.0",
-		"@types/bun": "latest"
+		"@types/bun": "latest",
+		"vitest": "^3.1.1",
+		"vitest-environment-miniflare": "^2.14.4"
 	},
 	"peerDependencies": {
 		"typescript": "^5.8.2"
