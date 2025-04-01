@@ -1,194 +1,23 @@
-import { createClerkClient } from "@clerk/backend"; // Correct import
-import { GoogleAuth } from "google-auth-library";
+// bondwise-worker/src/index.ts
 
-// Define the environment interface for TypeScript
-export interface Env {
-	// Bindings
-	SAVED_ITEMS_KV: KVNamespace;
-
-	// Variables
-	GCF_SUMMARIZE_URL: string; // Renamed for clarity
-	GCF_CHAT_URL: string; // URL for the new GCF chat function
-	GEMINI_API_KEY: string; // Kept for potential future use/debugging
-	GCLOUD_PROJECT_NUMBER: string;
-	GCLOUD_WORKLOAD_IDENTITY_POOL_ID: string;
-	GCLOUD_WORKLOAD_IDENTITY_PROVIDER_ID: string;
-	GCLOUD_SERVICE_ACCOUNT_EMAIL: string;
-
-	// Secrets
-	CLERK_SECRET_KEY: string;
-	CLERK_PUBLISHABLE_KEY: string; // Added publishable key
-	GCF_AUTH_SECRET: string; // Added shared secret for GCF auth
-}
-
-// Define the structure for articles stored in KV (should match frontend Article)
-interface WorkerArticle {
-	_id: string; // Use _id to match PouchDB/frontend
-	_rev?: string; // Optional revision marker
-	userId: string;
-	url: string;
-	title: string;
-	content?: string; // For HTML articles or placeholders
-	fileData?: string; // For EPUB/PDF base64 content
-	htmlContent?: string; // Raw HTML if needed
-	excerpt?: string;
-	author?: string;
-	siteName?: string;
-	type: "article" | "epub" | "pdf" | "youtube" | "other"; // Add epub/pdf
-	savedAt: number; // Use number (timestamp) like frontend
-	publishedDate?: string;
-	isRead: boolean;
-	favorite: boolean;
-	tags?: string[];
-	readingProgress?: number; // 0-100
-	readAt?: number;
-	scrollPosition?: number;
-	// Add other fields from frontend Article type as needed
-	coverImage?: string;
-	language?: string;
-	pageCount?: number; // For PDF
-	estimatedReadTime?: number;
-}
-
-// Helper function to create user-specific keys
-function createUserItemKey(userId: string, itemId: string): string {
-	return `${userId}:${itemId}`;
-}
-
-// Helper function to parse user-specific keys
-function parseUserItemKey(
-	key: string,
-): { userId: string; itemId: string } | null {
-	const parts = key.split(":");
-	if (parts.length !== 2) return null;
-	return {
-		userId: parts[0],
-		itemId: parts[1],
-	};
-}
-
-// Helper function for Clerk Authentication
-async function authenticateRequestWithClerk(
-	request: Request,
-	env: Env,
-): Promise<
-	| { status: "error"; response: Response }
-	| { status: "success"; userId: string }
-> {
-	// Note: CORS headers added directly to error responses within this function
-	const corsHeaders = {
-		// Define CORS headers locally for use in error responses
-		"Access-Control-Allow-Origin": "*",
-		"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-		"Access-Control-Allow-Headers": "Content-Type, Authorization",
-	};
-	const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
-	try {
-		// Check for Authorization header before calling Clerk
-		const authHeader = request.headers.get("Authorization");
-		if (!authHeader || !authHeader.startsWith("Bearer ")) {
-			return {
-				status: "error",
-				response: new Response(
-					JSON.stringify({
-						status: "error",
-						message: "Missing Authorization Bearer token",
-					}),
-					{
-						status: 401,
-						headers: { "Content-Type": "application/json", ...corsHeaders },
-					},
-				),
-			};
-		}
-
-		const requestState = await clerk.authenticateRequest(request, {
-			secretKey: env.CLERK_SECRET_KEY,
-			publishableKey: env.CLERK_PUBLISHABLE_KEY,
-		});
-
-		if (requestState.status !== "signed-in") {
-			console.error("Clerk authentication failed:", requestState.reason);
-			return {
-				status: "error",
-				response: new Response(
-					JSON.stringify({
-						status: "error",
-						message: `Authentication failed: ${requestState.reason}`,
-					}),
-					{
-						status: 401,
-						headers: { "Content-Type": "application/json", ...corsHeaders },
-					},
-				),
-			};
-		}
-
-		const userId = requestState.toAuth().userId;
-		if (!userId) {
-			console.error("Clerk authentication succeeded but userId is missing.");
-			return {
-				status: "error",
-				response: new Response(
-					JSON.stringify({
-						status: "error",
-						message:
-							"Authentication succeeded but user ID could not be determined.",
-					}),
-					{
-						status: 401, // Or 500, as it's unexpected
-						headers: { "Content-Type": "application/json", ...corsHeaders },
-					},
-				),
-			};
-		}
-
-		console.log(`Clerk token verified successfully for user: ${userId}`);
-		return { status: "success", userId: userId };
-	} catch (clerkError: any) {
-		console.error("Clerk token verification failed:", clerkError);
-		// Check if the error is specifically about the header format/missing token
-		// Clerk's errors might be specific, adjust message if needed
-		let message = "Invalid or expired session token";
-		if (clerkError.message?.includes("header")) {
-			// Basic check
-			message = "Invalid Authorization header format or token.";
-		}
-
-		return {
-			status: "error",
-			response: new Response(
-				JSON.stringify({
-					status: "error",
-					message: message,
-					details: clerkError.message, // Keep original error for debugging
-				}),
-				{
-					status: 401,
-					headers: { "Content-Type": "application/json", ...corsHeaders },
-				},
-			),
-		};
-	}
-}
+import { authenticateRequestWithClerk } from "./auth";
+import type { Env, WorkerArticle } from "./types"; // Import types
+import {
+	corsHeaders,
+	createUserItemKey,
+	errorResponse,
+	jsonResponse,
+} from "./utils"; // Import utils
 
 export default {
-	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		console.log(
 			`WORKER FETCH HANDLER INVOKED: Method=${request.method}, URL=${request.url}`,
-		); // Add top-level log
-		// CORS headers for all responses
-		const corsHeaders = {
-			"Access-Control-Allow-Origin": "*",
-			"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-			"Access-Control-Allow-Headers": "Content-Type, Authorization",
-		};
+		);
 
 		// Handle OPTIONS requests (CORS preflight)
 		if (request.method === "OPTIONS") {
-			return new Response(null, {
-				headers: corsHeaders,
-			});
+			return new Response(null, { headers: corsHeaders });
 		}
 
 		try {
@@ -202,172 +31,98 @@ export default {
 			// Verify KV namespace is available
 			if (!env.SAVED_ITEMS_KV) {
 				console.error("KV namespace is not available");
-				throw new Error("Storage unavailable");
+				return errorResponse("Storage unavailable", 503);
 			}
 
-			// Root endpoint
+			// --- Root Endpoint ---
 			if (path === "/" || path === "") {
-				return new Response(
-					JSON.stringify({
-						status: "ok",
-						message: "Bondwise Sync API is running",
-						version: "1.0.0",
-						endpoints: ["/items"],
-					}),
-					{
-						headers: {
-							"Content-Type": "application/json",
-							...corsHeaders,
-						},
-					},
-				);
+				return jsonResponse({
+					status: "ok",
+					message: "Bondwise Sync API is running",
+					version: "1.0.1", // Updated version for refactor
+					endpoints: ["/items", "/api/summarize", "/api/chat"],
+				});
 			}
 
-			// Items collection endpoints
+			// --- /items Endpoints ---
 			if (pathParts[0] === "items") {
-				// GET /items - List all items for the authenticated user
+				// --- Authenticate all /items requests ---
+				const authResult = await authenticateRequestWithClerk(request, env);
+				if (authResult.status === "error") {
+					return authResult.response; // Return the error response directly
+				}
+				const userId = authResult.userId; // Get authenticated userId
+				// ---------------------------------------
+
+				// GET /items - List all items for the user
 				if (pathParts.length === 1 && request.method === "GET") {
-					// --- Authenticate the request ---
-					const authResult = await authenticateRequestWithClerk(request, env);
-					if (authResult.status === "error") {
-						return authResult.response; // Return the error response directly
-					}
-					const clerkUserId = authResult.userId; // Get authenticated Clerk userId (renamed to avoid conflict)
-					// ---------------------------------
-
-					// Get optional email from query parameters for fallback lookup
-					const email = url.searchParams.get("email");
-
+					const email = url.searchParams.get("email"); // For fallback lookup
 					console.log(
-						`Listing items for authenticated user: ${clerkUserId} (Fallback email: ${email || "N/A"})`, // Use clerkUserId
+						`Listing items for user: ${userId} (Fallback email: ${email || "N/A"})`,
 					);
-
 					try {
-						// Fetch items based on Clerk User ID prefix
-						const userItemsPromise = env.SAVED_ITEMS_KV.list({
-							prefix: `${clerkUserId}:`, // Use clerkUserId
-						});
-
-						// Fetch items based on Email prefix (if provided)
+						const userItemsPromise = env.SAVED_ITEMS_KV.list({ prefix: `${userId}:` });
 						const emailItemsPromise = email
 							? env.SAVED_ITEMS_KV.list({ prefix: `${email}:` })
-							: Promise.resolve(null); // Resolve to null if no email
+							: Promise.resolve(null);
 
-						// Wait for both lists to resolve
 						const [userListResult, emailListResult] = await Promise.all([
 							userItemsPromise,
 							emailItemsPromise,
 						]);
 
-						// Combine keys, ensuring uniqueness
-						// Correct Map type: Key is string, Value is the KV Key object (Metadata type can be unknown)
 						const combinedKeys = new Map<string, KVNamespaceListKey<unknown>>();
-						// Use for...of loop instead of forEach
-						for (const key of userListResult.keys) {
-							combinedKeys.set(key.name, key);
-						}
+						for (const key of userListResult.keys) combinedKeys.set(key.name, key);
 						if (emailListResult) {
-							// Use for...of loop instead of forEach
-							for (const key of emailListResult.keys) {
-								combinedKeys.set(key.name, key);
-							}
+							for (const key of emailListResult.keys) combinedKeys.set(key.name, key);
 						}
+						console.log(`Found ${combinedKeys.size} unique keys for user/email.`);
 
-						console.log(
-							`Found ${combinedKeys.size} unique keys for user/email.`,
-						);
-
-						// Get all values for the unique keys
-						const items: WorkerArticle[] = []; // Use updated interface
+						const items: WorkerArticle[] = [];
 						for (const key of combinedKeys.values()) {
 							const value = await env.SAVED_ITEMS_KV.get(key.name);
 							if (value) {
 								try {
-									// TODO: Add validation/migration logic if needed for old data format
-									items.push(JSON.parse(value) as WorkerArticle); // Use updated interface
+									items.push(JSON.parse(value) as WorkerArticle);
 								} catch (parseError) {
-									console.error(
-										`Failed to parse item with key ${key}:`,
-										parseError,
-									);
+									console.error(`Failed to parse item with key ${key.name}:`, parseError);
 								}
 							}
 						}
-
-						return new Response(JSON.stringify(items), {
-							headers: {
-								"Content-Type": "application/json",
-								...corsHeaders,
-							},
-						});
+						return jsonResponse(items);
 					} catch (listError) {
 						console.error("Error listing items:", listError);
-						throw new Error("Failed to list items");
+						return errorResponse("Failed to list items", 500);
 					}
 				}
 
-				// POST /items - Create a new item
+				// POST /items - Create/Update an item
 				if (pathParts.length === 1 && request.method === "POST") {
-					// Expecting a WorkerArticle object from the frontend
-					const item = (await request.json()) as WorkerArticle; // Use updated interface
-
-					// Validate required fields including userId
-					// Validate required fields based on the updated WorkerArticle interface
-					// Use _id instead of id
+					const item = (await request.json()) as WorkerArticle;
 					if (
-						!item ||
-						!item._id ||
-						!item.url ||
-						!item.title ||
-						!item.userId ||
-						!item.type ||
-						item.savedAt === undefined
+						!item || !item._id || !item.url || !item.title || !item.userId || !item.type || item.savedAt === undefined
 					) {
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message:
-									"Invalid article data - missing required fields (_id, url, title, userId, type, savedAt)",
-							}),
-							{
-								status: 400,
-								headers: {
-									"Content-Type": "application/json",
-									...corsHeaders,
-								},
-							},
-						);
+						return errorResponse("Invalid article data - missing required fields", 400);
 					}
 
-					console.log(
-						`Processing article: ${item._id} (Type: ${item.type}) for user: ${item.userId}`,
-					);
+					// Ensure the item's userId matches the authenticated user
+					if (item.userId !== userId) {
+						console.warn(`Attempt to save item for user ${item.userId} by authenticated user ${userId}`);
+						return errorResponse("User ID mismatch", 403); // Forbidden
+					}
 
+					console.log(`Processing article: ${item._id} (Type: ${item.type}) for user: ${userId}`);
 					try {
-						// Create a user-specific key
-						// Use _id for the key
 						const key = createUserItemKey(item.userId, item._id);
-
-						// Store the item in KV with the user-specific key
-						// Explicitly construct the object to save, ensuring important fields are included
 						const itemToSave: WorkerArticle = {
-							// Base required fields
-							_id: item._id,
-							userId: item.userId,
-							url: item.url,
-							title: item.title,
-							type: item.type,
-							savedAt: item.savedAt,
-							isRead: item.isRead ?? false, // Default if missing
-							favorite: item.favorite ?? false, // Default if missing
-
-							// Include optional fields if they exist in the incoming item
+							_id: item._id, userId: item.userId, url: item.url, title: item.title, type: item.type, savedAt: item.savedAt,
+							isRead: item.isRead ?? false, favorite: item.favorite ?? false,
 							...(item.content && { content: item.content }),
 							...(item.fileData && { fileData: item.fileData }),
 							...(item.htmlContent && { htmlContent: item.htmlContent }),
 							...(item.excerpt && { excerpt: item.excerpt }),
 							...(item.author && { author: item.author }),
-							...(item.siteName && { siteName: item.siteName }), // Explicitly include siteName
+							...(item.siteName && { siteName: item.siteName }),
 							...(item.publishedDate && { publishedDate: item.publishedDate }),
 							...(item.tags && { tags: item.tags }),
 							...(item.readingProgress && { readingProgress: item.readingProgress }),
@@ -376,512 +131,143 @@ export default {
 							...(item.coverImage && { coverImage: item.coverImage }),
 							...(item.language && { language: item.language }),
 							...(item.pageCount && { pageCount: item.pageCount }),
-							...(item.estimatedReadTime && { estimatedReadTime: item.estimatedReadTime }), // Explicitly include estimatedReadTime
-							// Include _rev only if it exists (for potential future update logic via POST)
+							...(item.estimatedReadTime && { estimatedReadTime: item.estimatedReadTime }),
 							...(item._rev && { _rev: item._rev }),
 						};
 
 						const kvPromise = env.SAVED_ITEMS_KV.put(key, JSON.stringify(itemToSave));
+						ctx.waitUntil(kvPromise.catch(err => console.error(`Background KV put failed for ${key}:`, err))); // Log background errors
+						await kvPromise; // Wait for completion before responding
 
-						// Use waitUntil to ensure operation completes even if response is sent
-						ctx.waitUntil(
-							kvPromise.then(
-								() => console.log(`Successfully wrote article ${key} to KV.`),
-								(err) =>
-									console.error(`Error writing article ${key} to KV:`, err),
-							),
-						);
-
-						// Wait for KV operation to complete before sending response
-						await kvPromise;
-
-						return new Response(
-							JSON.stringify({
-								status: "success",
-								message: "Article saved successfully",
-								item: item,
-								savedAt: new Date().toISOString(),
-							}),
-							{
-								status: 201,
-								headers: {
-									"Content-Type": "application/json",
-									...corsHeaders,
-								},
-							},
-						);
+						return jsonResponse({ status: "success", message: "Article saved successfully", item: itemToSave }, 201);
 					} catch (saveError) {
 						console.error(`Error saving article ${item._id}:`, saveError);
-						throw new Error("Failed to save article");
+						return errorResponse("Failed to save article", 500);
 					}
 				}
 
-				// GET /items/:id - Get a specific item for the authenticated user
+				// GET /items/:id - Get a specific item
 				if (pathParts.length === 2 && request.method === "GET") {
-					const id = pathParts[1]; // Get item ID from path
-
-					// --- Authenticate the request ---
-					const authResult = await authenticateRequestWithClerk(request, env);
-					if (authResult.status === "error") {
-						return authResult.response; // Return the error response directly
-					}
-					const userId = authResult.userId; // Get authenticated userId
-					// ---------------------------------
-
-					console.log(`Getting item ${id} for authenticated user: ${userId}`);
-
+					const id = pathParts[1];
+					console.log(`Getting item ${id} for user: ${userId}`);
 					try {
-						// Create the user-specific key using the authenticated userId
 						const key = createUserItemKey(userId, id);
 						const value = await env.SAVED_ITEMS_KV.get(key);
-
 						if (value === null) {
-							// Item not found *for this user*
-							return new Response(
-								JSON.stringify({
-									status: "error",
-									message: "Item not found",
-								}),
-								{
-									status: 404,
-									headers: {
-										"Content-Type": "application/json",
-										...corsHeaders,
-									},
-								},
-							);
+							return errorResponse("Item not found", 404);
 						}
-
-						return new Response(value, {
-							headers: {
-								"Content-Type": "application/json",
-								...corsHeaders,
-							},
-						});
+						// Assuming value is valid JSON stringified WorkerArticle
+						return jsonResponse(JSON.parse(value));
 					} catch (getError) {
 						console.error(`Error retrieving item ${id}:`, getError);
-						throw new Error("Failed to retrieve item");
+						return errorResponse("Failed to retrieve item", 500);
 					}
 				}
 
-				// DELETE /items/:id - Delete a specific item for the authenticated user
+				// DELETE /items/:id - Delete a specific item
 				if (pathParts.length === 2 && request.method === "DELETE") {
-					const id = pathParts[1]; // Get item ID from path
-
-					// --- Authenticate the request ---
-					const authResult = await authenticateRequestWithClerk(request, env);
-					if (authResult.status === "error") {
-						return authResult.response; // Return the error response directly
-					}
-					const userId = authResult.userId; // Get authenticated userId
-					// ---------------------------------
-
-					console.log(`Deleting item ${id} for authenticated user: ${userId}`);
-
+					const id = pathParts[1];
+					console.log(`Deleting item ${id} for user: ${userId}`);
 					try {
-						// Create the user-specific key using the authenticated userId
 						const key = createUserItemKey(userId, id);
-						// We might want to check if the item exists first, but for simplicity,
-						// just attempting delete is fine. KV delete is idempotent.
 						await env.SAVED_ITEMS_KV.delete(key);
-
-						return new Response(
-							JSON.stringify({
-								status: "success",
-								message: "Item deleted successfully",
-							}),
-							{
-								status: 200,
-								headers: {
-									"Content-Type": "application/json",
-									...corsHeaders,
-								},
-							},
-						);
+						return jsonResponse({ status: "success", message: "Item deleted successfully" });
 					} catch (deleteError) {
 						console.error(`Error deleting item ${id}:`, deleteError);
-						throw new Error("Failed to delete item");
+						return errorResponse("Failed to delete item", 500);
 					}
 				}
 			}
 
-			// POST /api/summarize - Summarize content using Google Cloud Function (with Clerk Auth & WIF)
+			// --- /api/summarize Endpoint ---
 			if (path === "/api/summarize" && request.method === "POST") {
 				console.log("Processing /api/summarize request...");
 				try {
-					// --- 1. Verify Clerk Token ---
-					// Removed temporary debug logging for keys
-					const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
-					const authHeader = request.headers.get("Authorization");
-					if (!authHeader || !authHeader.startsWith("Bearer ")) {
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "Missing Authorization Bearer token",
-							}),
-							{
-								status: 401,
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
-					}
-					// Note: Clerk verification often needs the full Request object
-					// We'll pass necessary parts or adapt if the SDK requires it.
-					// For now, assuming we just need the token itself for a basic check,
-					// but full request verification is more robust.
+					// Authentication is required
+					const authResult = await authenticateRequestWithClerk(request, env);
+					if (authResult.status === "error") return authResult.response;
 
-					try {
-						// Verify the token using Clerk SDK's request authentication
-						const requestState = await clerk.authenticateRequest(request, {
-							// Pass request first, then options
-							secretKey: env.CLERK_SECRET_KEY,
-							publishableKey: env.CLERK_PUBLISHABLE_KEY, // Add publishable key
-						});
-
-						// Check if the request is authenticated
-						if (requestState.status !== "signed-in") {
-							// Use hyphenated status
-							console.error(
-								"Clerk authentication failed:",
-								requestState.reason,
-							);
-							return new Response(
-								JSON.stringify({
-									status: "error",
-									message: `Authentication failed: ${requestState.reason}`,
-								}), // Use template literal
-								{
-									status: 401,
-									headers: {
-										"Content-Type": "application/json",
-										...corsHeaders,
-									},
-								},
-							);
-						}
-
-						console.log(
-							"Clerk token verified successfully via authenticateRequest.",
-						);
-						// Optional: Extract userId if needed
-						// const userId = requestState.toAuth().userId;
-						// const userId = claims.sub;
-					} catch (clerkError: any) {
-						console.error("Clerk token verification failed:", clerkError);
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "Invalid or expired session token",
-								details: clerkError.message,
-							}),
-							{
-								status: 401,
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
-					}
-
-					// --- 2. Prepare GCF Call ---
-					const gcfUrl = env.GCF_SUMMARIZE_URL; // Use renamed variable
-					if (!gcfUrl) {
-						console.error(
-							"GCF_SUMMARIZE_URL environment variable is not configured.",
-						); // Update error message
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "AI summarization service URL is not configured.",
-							}),
-							{
-								status: 503,
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
-					}
+					const gcfUrl = env.GCF_SUMMARIZE_URL;
+					if (!gcfUrl) return errorResponse("AI summarization service URL is not configured.", 503);
+					if (!env.GCF_AUTH_SECRET) return errorResponse("Worker is missing configuration for backend authentication.", 500);
 
 					const { content } = (await request.json()) as { content?: string };
-					if (!content) {
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "Missing 'content' in request body",
-							}),
-							{
-								status: 400,
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
-					}
+					if (!content) return errorResponse("Missing 'content' in request body", 400);
 
-					// --- 3. Prepare GCF Call (Summarize) with Shared Secret ---
-					if (!env.GCF_AUTH_SECRET) {
-						console.error(
-							"GCF_AUTH_SECRET (shared secret) is not configured in worker environment.",
-						);
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message:
-									"Worker is missing configuration for backend authentication.",
-							}),
-							{
-								status: 500,
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
-					}
-
-					// --- 4. Call the Summarize GCF ---
-					console.log(
-						`Calling Summarize GCF at ${gcfUrl} with shared secret...`,
-					);
+					console.log(`Calling Summarize GCF at ${gcfUrl} with shared secret...`);
 					const gcfResponse = await fetch(gcfUrl, {
 						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							// Add the shared secret header
-							"X-Worker-Authorization": `Bearer ${env.GCF_AUTH_SECRET}`,
-						},
+						headers: { "Content-Type": "application/json", "X-Worker-Authorization": `Bearer ${env.GCF_AUTH_SECRET}` },
 						body: JSON.stringify({ content: content }),
 					});
 
-					// --- 5. Handle Summarize GCF Response ---
 					if (!gcfResponse.ok) {
 						const errorBody = await gcfResponse.text();
-						console.error(
-							`Summarize GCF call failed with status ${gcfResponse.status}: ${errorBody}`,
-						);
+						console.error(`Summarize GCF call failed with status ${gcfResponse.status}: ${errorBody}`);
 						let errorMessage = `Summarization service request failed (Status: ${gcfResponse.status})`;
-						try {
-							const errorJson = JSON.parse(errorBody);
-							errorMessage =
-								errorJson.error ||
-								`Summarization service error: ${gcfResponse.statusText}`;
-						} catch (e) {
-							// Keep simpler message if parsing fails
-						}
-						return new Response(
-							JSON.stringify({ status: "error", message: errorMessage }),
-							{
-								status: gcfResponse.status === 401 ? 401 : 502, // Propagate 401
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
+						try { errorMessage = JSON.parse(errorBody).error || errorMessage; } catch (e) { /* ignore parsing error */ }
+						return errorResponse(errorMessage, gcfResponse.status === 401 ? 401 : 502);
 					}
 
 					const gcfResult = (await gcfResponse.json()) as { summary?: string };
-					if (!gcfResult.summary) {
-						console.error("Summarize GCF response missing 'summary' field.");
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "Summarization service returned an invalid response.",
-							}),
-							{
-								status: 502,
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
-					}
+					if (!gcfResult.summary) return errorResponse("Summarization service returned an invalid response.", 502);
 
-					// --- 6. Return Success Response ---
 					console.log("Successfully processed /api/summarize request.");
-					return new Response(
-						JSON.stringify({ status: "success", summary: gcfResult.summary }),
-						{ headers: { "Content-Type": "application/json", ...corsHeaders } },
-					);
+					return jsonResponse({ status: "success", summary: gcfResult.summary });
 				} catch (error: any) {
-					// Catch errors from Clerk verification, JSON parsing, or GCF call
 					console.error("Error processing /api/summarize:", error);
-					return new Response(
-						JSON.stringify({
-							status: "error",
-							message:
-								error.message ||
-								"Internal worker error processing summary request.",
-						}),
-						{
-							status: 500,
-							headers: { "Content-Type": "application/json", ...corsHeaders },
-						},
-					);
+					return errorResponse(error.message || "Internal worker error processing summary request.", 500);
 				}
 			}
 
-			// POST /api/chat - Chat with content using Google Cloud Function
+			// --- /api/chat Endpoint ---
 			if (path === "/api/chat" && request.method === "POST") {
 				console.log("Processing /api/chat request...");
 				try {
-					// --- 1. Verify Clerk Token ---
+					// Authentication is required
 					const authResult = await authenticateRequestWithClerk(request, env);
-					if (authResult.status === "error") {
-						return authResult.response; // Return the error response directly
-					}
-					// const userId = authResult.userId; // We have the user ID if needed later
+					if (authResult.status === "error") return authResult.response;
 
-					// --- 2. Prepare GCF Call (Chat) ---
 					const gcfChatUrl = env.GCF_CHAT_URL;
-					if (!gcfChatUrl) {
-						console.error(
-							"GCF_CHAT_URL environment variable is not configured.",
-						);
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "AI chat service URL is not configured.",
-							}),
-							{
-								status: 503, // Service Unavailable
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
-					}
+					if (!gcfChatUrl) return errorResponse("AI chat service URL is not configured.", 503);
+					if (!env.GCF_AUTH_SECRET) return errorResponse("Worker is missing configuration for backend authentication.", 500);
 
-					const { content, message } = (await request.json()) as {
-						content?: string;
-						message?: string;
-					};
-					if (!content || !message) {
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "Missing 'content' or 'message' in request body",
-							}),
-							{
-								status: 400, // Bad Request
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
-					}
+					const { content, message } = (await request.json()) as { content?: string; message?: string; };
+					if (!content || !message) return errorResponse("Missing 'content' or 'message' in request body", 400);
 
-					// --- 3. Prepare GCF Call (Chat) with Shared Secret ---
-					if (!env.GCF_AUTH_SECRET) {
-						console.error(
-							"GCF_AUTH_SECRET (shared secret) is not configured in worker environment.",
-						);
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message:
-									"Worker is missing configuration for backend authentication.",
-							}),
-							{
-								status: 500,
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
-					}
-
-					// --- 4. Call the Chat GCF ---
-					console.log(
-						`Calling Chat GCF at ${gcfChatUrl} with shared secret...`,
-					);
+					console.log(`Calling Chat GCF at ${gcfChatUrl} with shared secret...`);
 					const gcfResponse = await fetch(gcfChatUrl, {
 						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							"X-Worker-Authorization": `Bearer ${env.GCF_AUTH_SECRET}`, // Shared secret header
-						},
-						body: JSON.stringify({ content: content, message: message }), // Send both content and message
+						headers: { "Content-Type": "application/json", "X-Worker-Authorization": `Bearer ${env.GCF_AUTH_SECRET}` },
+						body: JSON.stringify({ content: content, message: message }),
 					});
 
-					// --- 5. Handle Chat GCF Response ---
 					if (!gcfResponse.ok) {
 						const errorBody = await gcfResponse.text();
-						console.error(
-							`Chat GCF call failed with status ${gcfResponse.status}: ${errorBody}`,
-						);
+						console.error(`Chat GCF call failed with status ${gcfResponse.status}: ${errorBody}`);
 						let errorMessage = `Chat service request failed (Status: ${gcfResponse.status})`;
-						try {
-							const errorJson = JSON.parse(errorBody);
-							errorMessage =
-								errorJson.error ||
-								`Chat service error: ${gcfResponse.statusText}`;
-						} catch (e) {
-							// Keep simpler message if parsing fails
-						}
-						return new Response(
-							JSON.stringify({ status: "error", message: errorMessage }),
-							{
-								status: gcfResponse.status === 401 ? 401 : 502, // Propagate 401
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
+						try { errorMessage = JSON.parse(errorBody).error || errorMessage; } catch (e) { /* ignore */ }
+						return errorResponse(errorMessage, gcfResponse.status === 401 ? 401 : 502);
 					}
 
-					// Assuming GCF returns { response: "AI response text" }
 					const gcfResult = (await gcfResponse.json()) as { response?: string };
-					if (!gcfResult.response) {
-						console.error("Chat GCF response missing 'response' field.");
-						return new Response(
-							JSON.stringify({
-								status: "error",
-								message: "Chat service returned an invalid response.",
-							}),
-							{
-								status: 502, // Bad Gateway
-								headers: { "Content-Type": "application/json", ...corsHeaders },
-							},
-						);
-					}
+					if (!gcfResult.response) return errorResponse("Chat service returned an invalid response.", 502);
 
-					// --- 6. Return Success Response ---
 					console.log("Successfully processed /api/chat request.");
-					return new Response(
-						JSON.stringify({ status: "success", response: gcfResult.response }),
-						{ headers: { "Content-Type": "application/json", ...corsHeaders } },
-					);
+					return jsonResponse({ status: "success", response: gcfResult.response });
 				} catch (error: any) {
-					// Catch errors from Clerk verification, JSON parsing, or GCF call
 					console.error("Error processing /api/chat:", error);
-					return new Response(
-						JSON.stringify({
-							status: "error",
-							message:
-								error.message ||
-								"Internal worker error processing chat request.",
-						}),
-						{
-							status: 500,
-							headers: { "Content-Type": "application/json", ...corsHeaders },
-						},
-					);
+					return errorResponse(error.message || "Internal worker error processing chat request.", 500);
 				}
 			}
 
-			// If we reach here, the endpoint was not found
-			return new Response(
-				JSON.stringify({
-					status: "error",
-					message: "Endpoint not found",
-				}),
-				{
-					status: 404,
-					headers: {
-						"Content-Type": "application/json",
-						...corsHeaders,
-					},
-				},
-			);
-		} catch (error) {
-			// Global error handler
-			console.error("Worker error:", error);
+			// --- Endpoint Not Found ---
+			return errorResponse("Endpoint not found", 404);
 
-			return new Response(
-				JSON.stringify({
-					status: "error",
-					message:
-						error instanceof Error ? error.message : "Unknown error occurred",
-					timestamp: new Date().toISOString(),
-				}),
-				{
-					status: 500,
-					headers: {
-						"Content-Type": "application/json",
-						...corsHeaders,
-					},
-				},
-			);
+		} catch (error) {
+			// --- Global Error Handler ---
+			console.error("Worker error:", error);
+			return errorResponse(error instanceof Error ? error.message : "Unknown error occurred", 500);
 		}
 	},
 };
