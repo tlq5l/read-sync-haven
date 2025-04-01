@@ -27,6 +27,32 @@ export const filterAndSortArticles = (
 };
 
 /**
+ * Removes duplicate articles from the provided array based on _id field.
+ * If duplicates are found, the most recent version (highest savedAt value) is kept.
+ *
+ * @param articles - Array of articles that may contain duplicates
+ * @returns A new array with duplicates removed, keeping the most recent versions
+ */
+export const deduplicateArticles = (articles: Article[]): Article[] => {
+	// Use a Map to track the most recent version of each article by _id
+	const articleMap = new Map<string, Article>();
+
+	// Process each article
+	for (const article of articles) {
+		if (!article._id) continue; // Skip articles without an _id
+
+		// If we haven't seen this article before or this version is newer
+		const existingArticle = articleMap.get(article._id);
+		if (!existingArticle || article.savedAt > existingArticle.savedAt) {
+			articleMap.set(article._id, article);
+		}
+	}
+
+	// Convert the Map values back to an array
+	return Array.from(articleMap.values());
+};
+
+/**
  * Performs a one-time sync for existing local EPUB/PDF files that haven't been synced to the cloud yet.
  * This prevents duplicate uploads on subsequent loads.
  *

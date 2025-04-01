@@ -1,5 +1,9 @@
 import { useToast } from "@/hooks/use-toast";
-import { filterAndSortArticles, runOneTimeFileSync } from "@/lib/articleUtils";
+import {
+	deduplicateArticles,
+	filterAndSortArticles,
+	runOneTimeFileSync,
+} from "@/lib/articleUtils";
 import { fetchCloudItems } from "@/services/cloudSync";
 import { type Article, getAllArticles, saveArticle } from "@/services/db";
 import { useAuth, useUser } from "@clerk/clerk-react";
@@ -42,8 +46,15 @@ export function useArticleSync(
 					console.log(
 						`Sync Hook: Loaded ${cachedArticles.length} articles from cache.`,
 					);
+					// Deduplicate articles before filtering and sorting
+					const dedupedArticles = deduplicateArticles(cachedArticles);
+					if (dedupedArticles.length < cachedArticles.length) {
+						console.log(
+							`Sync Hook: Removed ${cachedArticles.length - dedupedArticles.length} duplicate articles from cache.`,
+						);
+					}
 					const filteredCached = filterAndSortArticles(
-						cachedArticles,
+						dedupedArticles,
 						currentView,
 					);
 					setArticles(filteredCached);
@@ -199,8 +210,18 @@ export function useArticleSync(
 					`Sync Hook: Fetched ${localArticlesAfterSync.length} articles locally after sync.`,
 				);
 
-				const filteredArticles = filterAndSortArticles(
+				// Deduplicate articles after sync
+				const dedupedArticlesAfterSync = deduplicateArticles(
 					localArticlesAfterSync,
+				);
+				if (dedupedArticlesAfterSync.length < localArticlesAfterSync.length) {
+					console.log(
+						`Sync Hook: Removed ${localArticlesAfterSync.length - dedupedArticlesAfterSync.length} duplicate articles after sync.`,
+					);
+				}
+
+				const filteredArticles = filterAndSortArticles(
+					dedupedArticlesAfterSync,
 					currentView,
 				);
 
@@ -369,7 +390,19 @@ export function useArticleSync(
 			// Return the latest state after sync completes (or potentially cached on error)
 			// Need to get the latest state value after async operation
 			const finalArticles = await getAllArticles({ userIds: [userId] }); // Re-fetch to ensure latest
-			const filteredFinal = filterAndSortArticles(finalArticles, currentView);
+
+			// Deduplicate articles before filtering and returning
+			const dedupedFinalArticles = deduplicateArticles(finalArticles);
+			if (dedupedFinalArticles.length < finalArticles.length) {
+				console.log(
+					`Sync Hook: Removed ${finalArticles.length - dedupedFinalArticles.length} duplicate articles during refresh.`,
+				);
+			}
+
+			const filteredFinal = filterAndSortArticles(
+				dedupedFinalArticles,
+				currentView,
+			);
 			if (isMounted) setArticles(filteredFinal); // Update state if still mounted
 			cleanup();
 			return filteredFinal;
