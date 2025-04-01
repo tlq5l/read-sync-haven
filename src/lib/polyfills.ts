@@ -2,7 +2,10 @@
 if (typeof window !== "undefined") {
 	// Ensure JSZip is available to EPUB.js
 	// Skip JSZip check in test environment
-	const isTestEnv = typeof process !== 'undefined' && process.env && (process.env.NODE_ENV === 'test' || process.env.VITEST);
+	const isTestEnv =
+		typeof process !== "undefined" &&
+		process.env &&
+		(process.env.NODE_ENV === "test" || process.env.VITEST);
 
 	if (!isTestEnv) {
 		if (window.JSZip) {
@@ -32,9 +35,9 @@ if (typeof window !== "undefined") {
 		// If process exists but listeners is missing, add the dummy listeners method
 		// This helps stabilize Vitest's error handling in all environments
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		(window as any).process.listeners = (_event: string) => [] as Array<() => void>;
+		(window as any).process.listeners = (_event: string) =>
+			[] as Array<() => void>;
 	}
-
 
 	// Required for PouchDB in some environments
 	if (
@@ -44,7 +47,7 @@ if (typeof window !== "undefined") {
 		// Simple polyfill for crypto.getRandomValues
 		if (typeof window.crypto === "undefined") {
 			// If crypto is completely missing, create a minimal implementation
-			Object.defineProperty(window, 'crypto', {
+			Object.defineProperty(window, "crypto", {
 				value: {
 					getRandomValues: <T extends ArrayBufferView | null>(array: T): T => {
 						if (array instanceof Uint8Array) {
@@ -53,13 +56,13 @@ if (typeof window !== "undefined") {
 							}
 						}
 						return array;
-					}
+					},
 				},
-				configurable: true
+				configurable: true,
 			});
 		} else if (typeof window.crypto.getRandomValues === "undefined") {
 			// If only getRandomValues is missing, add it
-			Object.defineProperty(window.crypto, 'getRandomValues', {
+			Object.defineProperty(window.crypto, "getRandomValues", {
 				value: <T extends ArrayBufferView | null>(array: T): T => {
 					if (array instanceof Uint8Array) {
 						for (let i = 0; i < array.length; i++) {
@@ -68,7 +71,7 @@ if (typeof window !== "undefined") {
 					}
 					return array;
 				},
-				configurable: true
+				configurable: true,
 			});
 		}
 	}
@@ -100,5 +103,4 @@ if (typeof window !== "undefined") {
 	}
 }
 
-export { };
-
+export {};

@@ -17,7 +17,9 @@ declare global {
 if (window.JSZip) {
 	console.log("JSZip is available globally");
 } else {
-	console.log("JSZip not found in window global, setting it from imported package");
+	console.log(
+		"JSZip not found in window global, setting it from imported package",
+	);
 	// Set JSZip from the imported package
 	window.JSZip = JSZip;
 }

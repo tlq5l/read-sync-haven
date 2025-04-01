@@ -3,8 +3,8 @@ import * as matchers from "@testing-library/jest-dom/matchers";
 import { expect } from "vitest";
 
 // Ensure process.listeners exists for Vitest's error handlers
-if (typeof process !== 'undefined' && typeof process.listeners !== 'function') {
-  process.listeners = () => [];
+if (typeof process !== "undefined" && typeof process.listeners !== "function") {
+	process.listeners = () => [];
 }
 
 // Extend Vitest's expect with jest-dom matchers
