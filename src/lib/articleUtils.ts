@@ -1,7 +1,7 @@
 import type { ArticleView } from "@/hooks/useArticleView"; // Assuming this path is correct
 import { fetchCloudItems, saveItemToCloud } from "@/services/cloudSync";
 import type { Article } from "@/services/db";
-import { getAllArticles } from "@/services/db";
+import { getAllArticles, updateArticle } from "@/services/db"; // Import updateArticle
 import type { UserResource } from "@clerk/types"; // Import UserResource type
 
 /**
@@ -51,6 +51,56 @@ export const runOneTimeFileSync = async (
 			const localArticles = await getAllArticles({
 				userIds: [currentUserId],
 			});
+
+			// --- Start Local EPUB Migration ---
+			let migrationErrors = 0;
+			// Find local EPUBs with potential content as base64 data but missing fileData field
+			const localEpubsToMigrate = localArticles.filter(
+				(a) =>
+					a.type === "epub" &&
+					!a.fileData && // fileData is missing
+					a.content && a.content.length > 100 && // content exists and is long enough to be base64
+					!a.content.startsWith("<") && // Not likely HTML content
+					a._id &&
+					a._rev // Ensure we have ID and revision for update
+			);
+
+			if (localEpubsToMigrate.length > 0) {
+				console.log(
+					`Utils: Found ${localEpubsToMigrate.length} local EPUBs potentially needing migration.`,
+				);
+				for (const epub of localEpubsToMigrate) {
+					console.log(`Utils: Attempting migration for local EPUB ${epub._id}...`);
+					try {
+						// MIGRATE: Move content to fileData and set placeholder in content
+						const updates = {
+							_id: epub._id as string, // Already checked existence
+							_rev: epub._rev as string, // Already checked existence
+							fileData: epub.content, // Move content to fileData
+							content: "EPUB content migrated locally.", // Set placeholder
+						};
+						await updateArticle(updates);
+						console.log(
+							`Utils: Successfully migrated local EPUB ${epub._id}.`,
+						);
+					} catch (migrationErr) {
+						migrationErrors++;
+						console.error(
+							`Utils: Error migrating local EPUB ${epub._id}:`,
+							migrationErr,
+						);
+					}
+				}
+				if (migrationErrors > 0) {
+					console.warn(
+						`Utils: Completed local EPUB migration with ${migrationErrors} errors.`,
+					);
+				} else {
+					console.log("Utils: Local EPUB migration completed successfully.");
+				}
+			}
+			// --- End Local EPUB Migration ---
+
 			const localFilesToSync = localArticles.filter(
 				(a) => a.type === "epub" || a.type === "pdf",
 			);
@@ -129,7 +179,7 @@ export const runOneTimeFileSync = async (
 				localStorage.setItem(syncFlagKey, "true");
 			}
 		} else {
-			// console.log("Utils: One-time sync for existing files already completed.");
+			console.log("Utils: One-time sync for existing files already completed.");
 		}
 	} catch (oneTimeSyncError) {
 		console.error(

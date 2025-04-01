@@ -145,7 +145,37 @@ export function useArticleSync(
 					);
 					for (const article of completeArticles) {
 						try {
-							await saveArticle({ ...article, userId });
+							// Preprocess article before saving, especially EPUBs
+							const articleToSave = { ...article, userId }; // Create a mutable copy with userId
+
+							if (articleToSave.type === "epub") {
+								// Check if fileData is missing but content looks like Base64 (migration needed)
+								if (
+									!articleToSave.fileData &&
+									articleToSave.content &&
+									articleToSave.content.length > 100
+								) {
+									// Basic check for Base64-like content
+									console.warn(
+										`Sync Hook: Migrating EPUB ${articleToSave._id} from content to fileData during cloud sync.`,
+									);
+									articleToSave.fileData = articleToSave.content; // Move content to fileData
+									articleToSave.content =
+										"EPUB content migrated from content field."; // Set placeholder
+								} else if (articleToSave.fileData) {
+									// Ensure content is just a placeholder if fileData exists
+									articleToSave.content = "EPUB content is stored in fileData.";
+								} else {
+									// EPUB type but no fileData and content doesn't look like Base64
+									console.warn(
+										`Sync Hook: EPUB ${articleToSave._id} from cloud is missing fileData.`,
+									);
+									// Keep original content for now, might be a placeholder already
+								}
+							}
+							// TODO: Similar check might be needed for PDF if fileData is used there too
+
+							await saveArticle(articleToSave); // Save the potentially modified article
 						} catch (saveErr) {
 							console.warn(
 								`Sync Hook: Failed to save/update synced article ${article._id} locally:`,

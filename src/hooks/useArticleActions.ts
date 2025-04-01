@@ -115,7 +115,8 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 						userId,
 						title: metadata.title || file.name.replace(/\.epub$/i, ""),
 						type: "epub",
-						content: base64Content,
+						fileData: base64Content, // Store base64 in fileData for EPUB
+						content: "EPUB content is stored in fileData.", // Placeholder for content field
 						url: `local-epub://${file.name}`,
 						savedAt: Date.now(),
 						isRead: false,

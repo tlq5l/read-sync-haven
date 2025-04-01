@@ -21,15 +21,33 @@ export interface Env {
 	GCF_AUTH_SECRET: string; // Added shared secret for GCF auth
 }
 
-// Define the structure for saved items (consistent with extension)
-interface SavedItem {
-	id: string;
+// Define the structure for articles stored in KV (should match frontend Article)
+interface WorkerArticle {
+	_id: string; // Use _id to match PouchDB/frontend
+	_rev?: string; // Optional revision marker
+	userId: string;
 	url: string;
 	title: string;
-	content?: string;
-	scrapedAt: string;
-	type: "article" | "youtube" | "other";
-	userId: string; // Added userId field
+	content?: string; // For HTML articles or placeholders
+	fileData?: string; // For EPUB/PDF base64 content
+	htmlContent?: string; // Raw HTML if needed
+	excerpt?: string;
+	author?: string;
+	siteName?: string;
+	type: "article" | "epub" | "pdf" | "youtube" | "other"; // Add epub/pdf
+	savedAt: number; // Use number (timestamp) like frontend
+	publishedDate?: string;
+	isRead: boolean;
+	favorite: boolean;
+	tags?: string[];
+	readingProgress?: number; // 0-100
+	readAt?: number;
+	scrollPosition?: number;
+	// Add other fields from frontend Article type as needed
+	coverImage?: string;
+	language?: string;
+	pageCount?: number; // For PDF
+	estimatedReadTime?: number;
 }
 
 // Helper function to create user-specific keys
@@ -260,12 +278,13 @@ export default {
 						);
 
 						// Get all values for the unique keys
-						const items: SavedItem[] = [];
+						const items: WorkerArticle[] = []; // Use updated interface
 						for (const key of combinedKeys.values()) {
 							const value = await env.SAVED_ITEMS_KV.get(key.name);
 							if (value) {
 								try {
-									items.push(JSON.parse(value));
+									// TODO: Add validation/migration logic if needed for old data format
+									items.push(JSON.parse(value) as WorkerArticle); // Use updated interface
 								} catch (parseError) {
 									console.error(
 										`Failed to parse item with key ${key}:`,
@@ -289,15 +308,17 @@ export default {
 
 				// POST /items - Create a new item
 				if (pathParts.length === 1 && request.method === "POST") {
-					const item = (await request.json()) as SavedItem;
+					// Expecting a WorkerArticle object from the frontend
+					const item = (await request.json()) as WorkerArticle; // Use updated interface
 
 					// Validate required fields including userId
-					if (!item || !item.id || !item.url || !item.title || !item.userId) {
+					// Validate required fields based on the updated WorkerArticle interface
+					// Use _id instead of id
+					if (!item || !item._id || !item.url || !item.title || !item.userId || !item.type || item.savedAt === undefined) {
 						return new Response(
 							JSON.stringify({
 								status: "error",
-								message:
-									"Invalid item data - missing required fields (including userId)",
+								message: "Invalid article data - missing required fields (_id, url, title, userId, type, savedAt)",
 							}),
 							{
 								status: 400,
@@ -309,20 +330,22 @@ export default {
 						);
 					}
 
-					console.log(`Processing item: ${item.id} for user: ${item.userId}`);
+					console.log(`Processing article: ${item._id} (Type: ${item.type}) for user: ${item.userId}`);
 
 					try {
 						// Create a user-specific key
-						const key = createUserItemKey(item.userId, item.id);
+						// Use _id for the key
+						const key = createUserItemKey(item.userId, item._id);
 
 						// Store the item in KV with the user-specific key
+						// Ensure we save the complete item, including fileData if present
 						const kvPromise = env.SAVED_ITEMS_KV.put(key, JSON.stringify(item));
 
 						// Use waitUntil to ensure operation completes even if response is sent
 						ctx.waitUntil(
 							kvPromise.then(
-								() => console.log(`Successfully wrote item ${key} to KV.`),
-								(err) => console.error(`Error writing item ${key} to KV:`, err),
+								() => console.log(`Successfully wrote article ${key} to KV.`),
+								(err) => console.error(`Error writing article ${key} to KV:`, err),
 							),
 						);
 
@@ -332,7 +355,7 @@ export default {
 						return new Response(
 							JSON.stringify({
 								status: "success",
-								message: "Item saved successfully",
+								message: "Article saved successfully",
 								item: item,
 								savedAt: new Date().toISOString(),
 							}),
@@ -345,8 +368,8 @@ export default {
 							},
 						);
 					} catch (saveError) {
-						console.error(`Error saving item ${item.id}:`, saveError);
-						throw new Error("Failed to save item");
+						console.error(`Error saving article ${item._id}:`, saveError);
+						throw new Error("Failed to save article");
 					}
 				}
 

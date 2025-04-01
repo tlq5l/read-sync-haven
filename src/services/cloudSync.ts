@@ -1,15 +1,10 @@
 import type { Article } from "./db"; // Use type-only import
 
 // Interface for items from the Cloudflare Worker
-interface CloudItem {
-	id: string;
-	url: string;
-	title: string;
-	content?: string;
-	scrapedAt: string;
-	type: "article" | "youtube" | "other";
-	userId: string;
-}
+// Define the structure expected from the worker (should match WorkerArticle in worker)
+// We can reuse the Article type if it's identical or define a specific CloudArticle type
+// For now, let's assume the worker returns data compatible with the frontend Article type
+// interface CloudArticle extends Article {} // Example if needed
 
 /**
  * Fetches items for the authenticated user from the Cloudflare Worker using Clerk token
@@ -50,23 +45,13 @@ export async function fetchCloudItems(
 			throw new Error(`API error: ${response.status} ${response.statusText}`);
 		}
 
-		const items = (await response.json()) as CloudItem[];
+		// Expecting an array of objects matching the frontend Article structure (or WorkerArticle)
+		const items = (await response.json()) as Article[]; // Expect Article[] directly
 		console.log(`Retrieved ${items.length} items from cloud`);
 
-		// Convert to PouchDB Article format
-		return items.map((item) => ({
-			_id: item.id,
-			title: item.title,
-			url: item.url,
-			content: item.content || "",
-			excerpt: extractExcerpt(item.content || ""),
-			savedAt: new Date(item.scrapedAt).getTime(),
-			isRead: false,
-			favorite: false,
-			tags: [],
-			type: mapItemType(item.type),
-			userId: item.userId, // Keep original userId for debugging
-		}));
+		// No mapping needed if worker returns data matching the Article structure
+		// TODO: Add validation here if needed to ensure received data matches Article type
+		return items;
 	} catch (error) {
 		console.error("Error fetching cloud items:", error);
 		return [];
@@ -90,15 +75,9 @@ export async function saveItemToCloud(article: Article): Promise<boolean> {
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({
-					id: article._id,
-					url: article.url,
-					title: article.title,
-					content: article.content,
-					scrapedAt: new Date(article.savedAt).toISOString(),
-					type: mapArticleType(article.type),
-					userId: article.userId,
-				}),
+				// Send the entire Article object. The worker now expects fields
+				// like _id, savedAt (as number), fileData, and the correct type directly.
+				body: JSON.stringify(article),
 			},
 		);
 
@@ -122,34 +101,5 @@ function extractExcerpt(htmlContent: string, maxLength = 150): string {
 		: plainText;
 }
 
-/**
- * Map cloud item type to article type
- */
-function mapItemType(type: string): Article["type"] {
-	switch (type) {
-		case "article":
-			return "article";
-		case "youtube":
-			return "article"; // Map YouTube to article for now
-		default:
-			return "article";
-	}
-}
-
-/**
- * Map article type to cloud item type
- */
-function mapArticleType(
-	type: Article["type"],
-): "article" | "youtube" | "other" {
-	switch (type) {
-		case "article":
-			return "article";
-		case "pdf":
-		case "epub":
-		case "note":
-			return "other";
-		default:
-			return "article";
-	}
-}
+// Removed unused mapItemType function
+// Removed mapArticleType as we now send the original type directly
