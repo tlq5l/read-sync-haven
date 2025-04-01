@@ -1,8 +1,8 @@
 // bondwise-worker/src/auth.test.ts
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticateRequestWithClerk } from "./auth";
-import type { Env, AuthResult } from "./types";
+import type { AuthResult, Env } from "./types";
 import { errorResponse } from "./utils"; // Import for comparison
 
 // Mock the Clerk backend client
@@ -57,7 +57,9 @@ describe("Worker Authentication", () => {
 
 		expect(result.status).toBe("success");
 		// Type assertion to access userId
-		expect((result as { status: "success"; userId: string }).userId).toBe(testUserId);
+		expect((result as { status: "success"; userId: string }).userId).toBe(
+			testUserId,
+		);
 		expect(mockAuthenticateRequest).toHaveBeenCalledTimes(1);
 	});
 
@@ -67,7 +69,8 @@ describe("Worker Authentication", () => {
 		const result = await authenticateRequestWithClerk(mockRequest, mockEnv);
 
 		expect(result.status).toBe("error");
-		const response = (result as { status: "error"; response: Response }).response;
+		const response = (result as { status: "error"; response: Response })
+			.response;
 		expect(response.status).toBe(401);
 		const body = (await response.json()) as { message?: string };
 		expect(body.message).toBe("Missing Authorization Bearer token");
@@ -82,7 +85,8 @@ describe("Worker Authentication", () => {
 		const result = await authenticateRequestWithClerk(mockRequest, mockEnv);
 
 		expect(result.status).toBe("error");
-		const response = (result as { status: "error"; response: Response }).response;
+		const response = (result as { status: "error"; response: Response })
+			.response;
 		expect(response.status).toBe(401);
 		const body = (await response.json()) as { message?: string };
 		expect(body.message).toBe("Missing Authorization Bearer token"); // Current implementation checks prefix
@@ -102,17 +106,18 @@ describe("Worker Authentication", () => {
 		const result = await authenticateRequestWithClerk(mockRequest, mockEnv);
 
 		expect(result.status).toBe("error");
-		const response = (result as { status: "error"; response: Response }).response;
+		const response = (result as { status: "error"; response: Response })
+			.response;
 		expect(response.status).toBe(401);
 		const body = (await response.json()) as { message?: string };
 		expect(body.message).toContain("Authentication failed: token_expired");
 		expect(mockAuthenticateRequest).toHaveBeenCalledTimes(1);
 	});
 
-    it("should return error response when Clerk authentication fails (handshake)", async () => {
+	it("should return error response when Clerk authentication fails (handshake)", async () => {
 		mockAuthenticateRequest.mockResolvedValue({
 			status: "handshake",
-            reason: "needs_handshake",
+			reason: "needs_handshake",
 		});
 
 		mockRequest = new Request("http://example.com/items", {
@@ -122,13 +127,13 @@ describe("Worker Authentication", () => {
 		const result = await authenticateRequestWithClerk(mockRequest, mockEnv);
 
 		expect(result.status).toBe("error");
-		const response = (result as { status: "error"; response: Response }).response;
+		const response = (result as { status: "error"; response: Response })
+			.response;
 		expect(response.status).toBe(401);
 		const body = (await response.json()) as { message?: string };
 		expect(body.message).toContain("Authentication failed: needs_handshake");
 		expect(mockAuthenticateRequest).toHaveBeenCalledTimes(1);
 	});
-
 
 	it("should return error response when Clerk authentication succeeds but userId is missing", async () => {
 		mockAuthenticateRequest.mockResolvedValue({
@@ -143,7 +148,8 @@ describe("Worker Authentication", () => {
 		const result = await authenticateRequestWithClerk(mockRequest, mockEnv);
 
 		expect(result.status).toBe("error");
-		const response = (result as { status: "error"; response: Response }).response;
+		const response = (result as { status: "error"; response: Response })
+			.response;
 		expect(response.status).toBe(500); // Internal error
 		const body = (await response.json()) as { message?: string };
 		expect(body.message).toBe(
@@ -163,15 +169,16 @@ describe("Worker Authentication", () => {
 		const result = await authenticateRequestWithClerk(mockRequest, mockEnv);
 
 		expect(result.status).toBe("error");
-		const response = (result as { status: "error"; response: Response }).response;
+		const response = (result as { status: "error"; response: Response })
+			.response;
 		expect(response.status).toBe(401); // Defaults to 401 for thrown errors
 		const body = (await response.json()) as { message?: string; details?: any };
 		expect(body.message).toBe("Clerk SDK internal error"); // Uses the error message
-        expect(body.details).toBe("Clerk SDK internal error");
+		expect(body.details).toBe("Clerk SDK internal error");
 		expect(mockAuthenticateRequest).toHaveBeenCalledTimes(1);
 	});
 
-    it("should return specific error for header-related Clerk SDK errors", async () => {
+	it("should return specific error for header-related Clerk SDK errors", async () => {
 		const clerkError = new Error("Invalid Authorization header structure");
 		mockAuthenticateRequest.mockRejectedValue(clerkError);
 
@@ -182,14 +189,15 @@ describe("Worker Authentication", () => {
 		const result = await authenticateRequestWithClerk(mockRequest, mockEnv);
 
 		expect(result.status).toBe("error");
-		const response = (result as { status: "error"; response: Response }).response;
+		const response = (result as { status: "error"; response: Response })
+			.response;
 		expect(response.status).toBe(401);
 		const body = (await response.json()) as { message?: string; details?: any };
 		// Message check depends on the exact error message check in auth.ts
-        // Let's assume it contains 'header'
-        // expect(body.message).toBe("Invalid Authorization header format or token.");
-        expect(body.message).toBe("Invalid Authorization header format or token."); // Expect the generic message
-        expect(body.details).toBe("Invalid Authorization header structure");
+		// Let's assume it contains 'header'
+		// expect(body.message).toBe("Invalid Authorization header format or token.");
+		expect(body.message).toBe("Invalid Authorization header format or token."); // Expect the generic message
+		expect(body.details).toBe("Invalid Authorization header structure");
 		expect(mockAuthenticateRequest).toHaveBeenCalledTimes(1);
 	});
 });

@@ -1,9 +1,9 @@
 // bondwise-worker/src/handlers/api.test.ts
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { handleSummarize, handleChat } from "./api";
-import type { Env } from "../types";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as auth from "../auth"; // Import the auth module to mock it
+import type { Env } from "../types";
+import { handleChat, handleSummarize } from "./api";
 
 // Mock the global fetch function
 const mockFetch = vi.fn();
@@ -54,38 +54,58 @@ describe("Worker API Handlers", () => {
 		it("should return summary on successful GCF call", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
 			mockFetch.mockResolvedValue(
-				new Response(JSON.stringify({ summary: "Test summary" }), { status: 200 }),
+				new Response(JSON.stringify({ summary: "Test summary" }), {
+					status: 200,
+				}),
 			);
 
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({ content: "Some text to summarize" }),
 			});
 
 			const response = await handleSummarize(request, mockEnv);
 			expect(response.status).toBe(200);
-			const body = (await response.json()) as { status?: string; summary?: string };
+			const body = (await response.json()) as {
+				status?: string;
+				summary?: string;
+			};
 			expect(body).toEqual({ status: "success", summary: "Test summary" });
 			expect(mockedAuth).toHaveBeenCalledTimes(1);
 			expect(mockFetch).toHaveBeenCalledTimes(1);
-			expect(mockFetch).toHaveBeenCalledWith(mockEnv.GCF_SUMMARIZE_URL, expect.objectContaining({
-				method: "POST",
-				headers: expect.objectContaining({
-					"Content-Type": "application/json",
-					"X-Worker-Authorization": `Bearer ${mockEnv.GCF_AUTH_SECRET}`,
+			expect(mockFetch).toHaveBeenCalledWith(
+				mockEnv.GCF_SUMMARIZE_URL,
+				expect.objectContaining({
+					method: "POST",
+					headers: expect.objectContaining({
+						"Content-Type": "application/json",
+						"X-Worker-Authorization": `Bearer ${mockEnv.GCF_AUTH_SECRET}`,
+					}),
+					body: JSON.stringify({ content: "Some text to summarize" }),
 				}),
-				body: JSON.stringify({ content: "Some text to summarize" }),
-			}));
+			);
 		});
 
 		it("should return 401 if authentication fails", async () => {
-			const authErrorResponse = new Response(JSON.stringify({ status: "error", message: "Auth failed" }), { status: 401 });
-			mockedAuth.mockResolvedValue({ status: "error", response: authErrorResponse });
+			const authErrorResponse = new Response(
+				JSON.stringify({ status: "error", message: "Auth failed" }),
+				{ status: 401 },
+			);
+			mockedAuth.mockResolvedValue({
+				status: "error",
+				response: authErrorResponse,
+			});
 
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer invalid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer invalid",
+				},
 				body: JSON.stringify({ content: "Some text" }),
 			});
 
@@ -94,17 +114,20 @@ describe("Worker API Handlers", () => {
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
-        it("should return 400 if content is missing", async () => {
+		it("should return 400 if content is missing", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({}), // Missing content
 			});
 			const response = await handleSummarize(request, mockEnv);
 			expect(response.status).toBe(400);
-			         const body = (await response.json()) as { message?: string };
-            expect(body.message).toBe("Missing 'content' in request body");
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toBe("Missing 'content' in request body");
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
@@ -113,61 +136,83 @@ describe("Worker API Handlers", () => {
 			const envWithoutUrl = { ...mockEnv, GCF_SUMMARIZE_URL: "" }; // Simulate missing URL
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({ content: "Some text" }),
 			});
 			const response = await handleSummarize(request, envWithoutUrl);
 			expect(response.status).toBe(503);
-			         const body = (await response.json()) as { message?: string };
-            expect(body.message).toBe("AI summarization service URL is not configured.");
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toBe(
+				"AI summarization service URL is not configured.",
+			);
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
-        it("should return 500 if GCF secret is not configured", async () => {
+		it("should return 500 if GCF secret is not configured", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
 			const envWithoutSecret = { ...mockEnv, GCF_AUTH_SECRET: "" }; // Simulate missing secret
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({ content: "Some text" }),
 			});
 			const response = await handleSummarize(request, envWithoutSecret);
 			expect(response.status).toBe(500);
-			         const body = (await response.json()) as { message?: string };
-            expect(body.message).toBe("Worker is missing configuration for backend authentication.");
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toBe(
+				"Worker is missing configuration for backend authentication.",
+			);
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
 		it("should return 502 if GCF call fails", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			mockFetch.mockResolvedValue(new Response("Internal GCF Error", { status: 500 }));
+			mockFetch.mockResolvedValue(
+				new Response("Internal GCF Error", { status: 500 }),
+			);
 
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({ content: "Some text" }),
 			});
 
 			const response = await handleSummarize(request, mockEnv);
 			expect(response.status).toBe(502); // Bad Gateway
-			         const body = (await response.json()) as { message?: string };
-            expect(body.message).toContain("Summarization service request failed");
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toContain("Summarization service request failed");
 		});
 
-        it("should return 502 if GCF response is invalid", async () => {
+		it("should return 502 if GCF response is invalid", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			mockFetch.mockResolvedValue(new Response(JSON.stringify({ wrong_field: "data" }), { status: 200 })); // Missing 'summary'
+			mockFetch.mockResolvedValue(
+				new Response(JSON.stringify({ wrong_field: "data" }), { status: 200 }),
+			); // Missing 'summary'
 
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({ content: "Some text" }),
 			});
 
 			const response = await handleSummarize(request, mockEnv);
 			expect(response.status).toBe(502);
-			         const body = (await response.json()) as { message?: string };
-            expect(body.message).toBe("Summarization service returned an invalid response.");
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toBe(
+				"Summarization service returned an invalid response.",
+			);
 		});
 	});
 
@@ -176,38 +221,61 @@ describe("Worker API Handlers", () => {
 		it("should return chat response on successful GCF call", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
 			mockFetch.mockResolvedValue(
-				new Response(JSON.stringify({ response: "Test chat response" }), { status: 200 }),
+				new Response(JSON.stringify({ response: "Test chat response" }), {
+					status: 200,
+				}),
 			);
 
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({ content: "Context", message: "User query" }),
 			});
 
 			const response = await handleChat(request, mockEnv);
 			expect(response.status).toBe(200);
-			const body = (await response.json()) as { status?: string; response?: string };
-			expect(body).toEqual({ status: "success", response: "Test chat response" });
+			const body = (await response.json()) as {
+				status?: string;
+				response?: string;
+			};
+			expect(body).toEqual({
+				status: "success",
+				response: "Test chat response",
+			});
 			expect(mockedAuth).toHaveBeenCalledTimes(1);
 			expect(mockFetch).toHaveBeenCalledTimes(1);
-            expect(mockFetch).toHaveBeenCalledWith(mockEnv.GCF_CHAT_URL, expect.objectContaining({
-				method: "POST",
-				headers: expect.objectContaining({
-					"Content-Type": "application/json",
-					"X-Worker-Authorization": `Bearer ${mockEnv.GCF_AUTH_SECRET}`,
+			expect(mockFetch).toHaveBeenCalledWith(
+				mockEnv.GCF_CHAT_URL,
+				expect.objectContaining({
+					method: "POST",
+					headers: expect.objectContaining({
+						"Content-Type": "application/json",
+						"X-Worker-Authorization": `Bearer ${mockEnv.GCF_AUTH_SECRET}`,
+					}),
+					body: JSON.stringify({ content: "Context", message: "User query" }),
 				}),
-				body: JSON.stringify({ content: "Context", message: "User query" }),
-			}));
+			);
 		});
 
-        it("should return 401 if authentication fails", async () => {
-			const authErrorResponse = new Response(JSON.stringify({ status: "error", message: "Auth failed" }), { status: 401 });
-			mockedAuth.mockResolvedValue({ status: "error", response: authErrorResponse });
+		it("should return 401 if authentication fails", async () => {
+			const authErrorResponse = new Response(
+				JSON.stringify({ status: "error", message: "Auth failed" }),
+				{ status: 401 },
+			);
+			mockedAuth.mockResolvedValue({
+				status: "error",
+				response: authErrorResponse,
+			});
 
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer invalid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer invalid",
+				},
 				body: JSON.stringify({ content: "Context", message: "User query" }),
 			});
 
@@ -216,77 +284,98 @@ describe("Worker API Handlers", () => {
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
-        it("should return 400 if content or message is missing", async () => {
+		it("should return 400 if content or message is missing", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({ content: "Context only" }), // Missing message
 			});
 			const response = await handleChat(request, mockEnv);
 			expect(response.status).toBe(400);
-			         const body = (await response.json()) as { message?: string };
-            expect(body.message).toBe("Missing 'content' or 'message' in request body");
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toBe(
+				"Missing 'content' or 'message' in request body",
+			);
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
-        // Add tests similar to handleSummarize for missing URL/secret, GCF failure, invalid GCF response
-        it("should return 503 if GCF URL is not configured", async () => {
+		// Add tests similar to handleSummarize for missing URL/secret, GCF failure, invalid GCF response
+		it("should return 503 if GCF URL is not configured", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
 			const envWithoutUrl = { ...mockEnv, GCF_CHAT_URL: "" };
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({ content: "Context", message: "Query" }),
 			});
 			const response = await handleChat(request, envWithoutUrl);
 			expect(response.status).toBe(503);
-			         const body = (await response.json()) as { message?: string };
-            expect(body.message).toBe("AI chat service URL is not configured.");
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toBe("AI chat service URL is not configured.");
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
-        it("should return 500 if GCF secret is not configured", async () => {
+		it("should return 500 if GCF secret is not configured", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
 			const envWithoutSecret = { ...mockEnv, GCF_AUTH_SECRET: "" };
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({ content: "Context", message: "Query" }),
 			});
 			const response = await handleChat(request, envWithoutSecret);
 			expect(response.status).toBe(500);
-			         const body = (await response.json()) as { message?: string };
-            expect(body.message).toBe("Worker is missing configuration for backend authentication.");
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toBe(
+				"Worker is missing configuration for backend authentication.",
+			);
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
-        it("should return 502 if GCF call fails", async () => {
+		it("should return 502 if GCF call fails", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
 			mockFetch.mockResolvedValue(new Response("GCF Error", { status: 500 }));
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({ content: "Context", message: "Query" }),
 			});
 			const response = await handleChat(request, mockEnv);
 			expect(response.status).toBe(502);
-			         const body = (await response.json()) as { message?: string };
-            expect(body.message).toContain("Chat service request failed");
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toContain("Chat service request failed");
 		});
 
-        it("should return 502 if GCF response is invalid", async () => {
+		it("should return 502 if GCF response is invalid", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			mockFetch.mockResolvedValue(new Response(JSON.stringify({ wrong: "data" }), { status: 200 })); // Missing 'response'
+			mockFetch.mockResolvedValue(
+				new Response(JSON.stringify({ wrong: "data" }), { status: 200 }),
+			); // Missing 'response'
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
-				headers: { "Content-Type": "application/json", Authorization: "Bearer valid" },
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: "Bearer valid",
+				},
 				body: JSON.stringify({ content: "Context", message: "Query" }),
 			});
 			const response = await handleChat(request, mockEnv);
 			expect(response.status).toBe(502);
-			         const body = (await response.json()) as { message?: string };
-            expect(body.message).toBe("Chat service returned an invalid response.");
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toBe("Chat service returned an invalid response.");
 		});
 	});
 });

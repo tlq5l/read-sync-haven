@@ -1,7 +1,7 @@
 // bondwise-worker/src/auth.ts
 
 import { createClerkClient } from "@clerk/backend";
-import type { Env, AuthResult } from "./types";
+import type { AuthResult, Env } from "./types";
 import { errorResponse } from "./utils"; // Import errorResponse helper
 
 /**
@@ -21,7 +21,9 @@ export async function authenticateRequestWithClerk(
 		// Check for Authorization header before calling Clerk
 		const authHeader = request.headers.get("Authorization");
 		if (!authHeader || !authHeader.startsWith("Bearer ")) {
-			console.warn("Authentication failed: Missing Authorization Bearer token.");
+			console.warn(
+				"Authentication failed: Missing Authorization Bearer token.",
+			);
 			return {
 				status: "error",
 				response: errorResponse("Missing Authorization Bearer token", 401),

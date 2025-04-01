@@ -1,7 +1,7 @@
 /// <reference types="@testing-library/jest-dom" />
 
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { updateMissingMetadata } from "./migrations";
-import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // Mock the articlesDb
 vi.mock("./config", () => ({
@@ -25,10 +25,10 @@ vi.mock("@/services/epub", () => ({
 	getEstimatedReadingTime: vi.fn().mockReturnValue(60),
 }));
 
+import * as epubService from "@/services/epub";
+import * as pdfService from "@/services/pdf";
 // Import the mocked modules
 import { articlesDb } from "./config";
-import * as pdfService from "@/services/pdf";
-import * as epubService from "@/services/epub";
 
 describe("Database migrations", () => {
 	beforeEach(() => {

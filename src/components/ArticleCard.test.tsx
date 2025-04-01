@@ -1,10 +1,10 @@
 /// <reference types="@testing-library/jest-dom" />
 
-import ArticleCard from "./ArticleCard";
+import type { Article } from "@/services/db";
 import { render, screen } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
-import type { Article } from "@/services/db";
+import ArticleCard from "./ArticleCard";
 
 // Mock the context hook
 vi.mock("@/context/ArticleContext", () => ({

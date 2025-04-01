@@ -12,7 +12,11 @@ import type { Env } from "./types"; // Import types
 import { corsHeaders, errorResponse, jsonResponse } from "./utils"; // Import utils
 
 export default {
-	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+	async fetch(
+		request: Request,
+		env: Env,
+		ctx: ExecutionContext,
+	): Promise<Response> {
 		console.log(
 			`WORKER FETCH HANDLER INVOKED: Method=${request.method}, URL=${request.url}`,
 		);
@@ -87,11 +91,13 @@ export default {
 
 			// --- Endpoint Not Found ---
 			return errorResponse("Endpoint not found", 404);
-
 		} catch (error) {
 			// --- Global Error Handler ---
 			console.error("Worker error:", error);
-			return errorResponse(error instanceof Error ? error.message : "Unknown error occurred", 500);
+			return errorResponse(
+				error instanceof Error ? error.message : "Unknown error occurred",
+				500,
+			);
 		}
 	},
 };

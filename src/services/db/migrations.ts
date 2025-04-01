@@ -1,11 +1,11 @@
 // src/services/db/migrations.ts
 // Helper functions to update the database schema or fix data issues
 
+import { getEstimatedReadingTime as getEpubReadingTime } from "@/services/epub";
+import { getEstimatedReadingTime as getPdfReadingTime } from "@/services/pdf";
 import { articlesDb } from "./config";
 import type { Article } from "./types";
 import { executeWithRetry } from "./utils";
-import { getEstimatedReadingTime as getPdfReadingTime } from "@/services/pdf";
-import { getEstimatedReadingTime as getEpubReadingTime } from "@/services/epub";
 
 /**
  * Updates PDF and EPUB documents that are missing siteName and estimatedReadTime
