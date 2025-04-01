@@ -208,21 +208,24 @@ export function batchAnimate(
 					el.classList.add(className);
 				}
 
-				// Clean up after animation completes
-				if (cleanup) {
-					// Estimate animation duration from CSS (or use default)
-					const styles = window.getComputedStyle(elements[0]);
-					const duration =
-						Number.parseFloat(styles.transitionDuration) * 1000 ||
-						DURATION.normal;
+				// Estimate animation duration from CSS (or use default)
+				// Needed for cleanup timeout whether cleanup function exists or not
+				const styles = window.getComputedStyle(elements[0]);
+				const duration =
+					Number.parseFloat(styles.transitionDuration) * 1000 ||
+					DURATION.normal;
 
-					setTimeout(() => {
-						for (const el of elements) {
-							el.style.removeProperty("will-change");
-						}
+				// Clean up after animation completes
+				setTimeout(() => {
+					for (const el of elements) {
+						// Always remove will-change
+						el.style.removeProperty("will-change");
+					}
+					// Call cleanup function if it exists
+					if (cleanup) {
 						cleanup();
-					}, duration + 50);
-				}
+					}
+				}, duration + 50);
 			});
 		});
 	}, delayMs);

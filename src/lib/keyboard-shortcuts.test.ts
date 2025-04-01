@@ -1,6 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ShortcutKey } from "./keyboard-shortcuts";
-import { formatShortcut, matchesShortcut } from "./keyboard-shortcuts";
+import type {
+	ShortcutCategory, // Sorted
+	ShortcutGroup, // Sorted
+	ShortcutKey, // Sorted
+} from "./keyboard-shortcuts";
+import {
+	formatShortcut,
+	matchesShortcut,
+	shortcutGroups, // Added shortcutGroups import
+} from "./keyboard-shortcuts";
 
 // Helper to create mock KeyboardEvent
 const createMockEvent = (
@@ -178,6 +186,73 @@ describe("lib/keyboard-shortcuts", () => {
 				modifiers: { shift: true, ctrl: true, meta: true, alt: true },
 			};
 			expect(formatShortcut(shortcut)).toBe("Ctrl + Alt + Shift + Meta + Z");
+		});
+	});
+
+	describe("shortcutGroups", () => {
+		it("should be an array", () => {
+			expect(Array.isArray(shortcutGroups)).toBe(true);
+		});
+
+		it("should contain valid ShortcutGroup objects", () => {
+			const validCategories: ShortcutCategory[] = [
+				"navigation",
+				"content",
+				"interface",
+			];
+			for (const group of shortcutGroups) {
+				// Changed to for...of
+				expect(group).toHaveProperty("category");
+				expect(validCategories).toContain(group.category);
+				expect(group).toHaveProperty("title");
+				expect(typeof group.title).toBe("string");
+				expect(group).toHaveProperty("description");
+				expect(typeof group.description).toBe("string");
+				expect(group).toHaveProperty("shortcuts");
+				expect(Array.isArray(group.shortcuts)).toBe(true);
+
+				for (const shortcut of group.shortcuts) {
+					// Changed to for...of
+					expect(shortcut).toHaveProperty("id");
+					expect(typeof shortcut.id).toBe("string");
+					expect(shortcut).toHaveProperty("name");
+					expect(typeof shortcut.name).toBe("string");
+					expect(shortcut).toHaveProperty("description");
+					expect(typeof shortcut.description).toBe("string");
+					expect(shortcut).toHaveProperty("category");
+					expect(group.category).toBe(shortcut.category); // Ensure shortcut category matches group
+					expect(shortcut).toHaveProperty("keys");
+					expect(shortcut.keys).toHaveProperty("key");
+					expect(typeof shortcut.keys.key).toBe("string");
+					expect(shortcut.keys).toHaveProperty("modifiers");
+					expect(typeof shortcut.keys.modifiers).toBe("object");
+					// Optionally check modifier types
+					if (shortcut.keys.modifiers.ctrl !== undefined) {
+						expect(typeof shortcut.keys.modifiers.ctrl).toBe("boolean");
+					}
+					if (shortcut.keys.modifiers.alt !== undefined) {
+						expect(typeof shortcut.keys.modifiers.alt).toBe("boolean");
+					}
+					if (shortcut.keys.modifiers.shift !== undefined) {
+						expect(typeof shortcut.keys.modifiers.shift).toBe("boolean");
+					}
+					if (shortcut.keys.modifiers.meta !== undefined) {
+						expect(typeof shortcut.keys.modifiers.meta).toBe("boolean");
+					}
+					// Ensure no 'action' property exists in the definition
+					expect(shortcut).not.toHaveProperty("action");
+				}
+			}
+		});
+
+		it("should have unique shortcut IDs across all groups", () => {
+			const allIds = shortcutGroups.flatMap(
+				(
+					group: ShortcutGroup, // Added type annotation
+				) => group.shortcuts.map((s) => s.id),
+			);
+			const uniqueIds = new Set(allIds);
+			expect(allIds.length).toBe(uniqueIds.size);
 		});
 	});
 });
