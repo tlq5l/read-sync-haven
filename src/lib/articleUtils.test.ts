@@ -1,5 +1,5 @@
 import { fetchCloudItems, saveItemToCloud } from "@/services/cloudSync";
-import { updateArticle } from "@/services/db";
+import { getAllArticles, updateArticle } from "@/services/db";
 import type { Article } from "@/services/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -319,14 +319,14 @@ describe("lib/articleUtils", () => {
 					_id: "epub1",
 					_rev: "rev1",
 					type: "epub",
-					content: "base64content1", // Long base64 content
+					content: "base64content1".repeat(10), // Make content > 100 chars
 					userId: "user123",
 				},
 				{
 					_id: "epub2",
 					_rev: "rev2",
 					type: "epub",
-					content: "base64content2", // Long base64 content
+					content: "base64content2".repeat(10), // Make content > 100 chars
 					userId: "user123",
 				},
 			] as unknown as Article[];
@@ -336,7 +336,7 @@ describe("lib/articleUtils", () => {
 			vi.mocked(fetchCloudItems).mockResolvedValue([]);
 			vi.mocked(saveItemToCloud).mockResolvedValue(true);
 
-			require("@/services/db").getAllArticles.mockResolvedValue(mockEpubs);
+			vi.mocked(getAllArticles).mockResolvedValue(mockEpubs);
 
 			await runOneTimeFileSync("user123", async () => "mock-token", {
 				primaryEmailAddress: { emailAddress: "test@example.com" },
@@ -347,13 +347,13 @@ describe("lib/articleUtils", () => {
 			expect(vi.mocked(updateArticle)).toHaveBeenCalledWith({
 				_id: "epub1",
 				_rev: "rev1",
-				fileData: "base64content1",
+				fileData: "base64content1".repeat(10), // Expect repeated string
 				content: "EPUB content migrated locally.",
 			});
 			expect(vi.mocked(updateArticle)).toHaveBeenCalledWith({
 				_id: "epub2",
 				_rev: "rev2",
-				fileData: "base64content2",
+				fileData: "base64content2".repeat(10), // Expect repeated string
 				content: "EPUB content migrated locally.",
 			});
 
