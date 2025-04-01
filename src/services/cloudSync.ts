@@ -46,7 +46,19 @@ export async function fetchCloudItems(
 		}
 
 		// Expecting an array of objects matching the frontend Article structure (or WorkerArticle)
-		const items = (await response.json()) as Article[]; // Expect Article[] directly
+		const rawItems = await response.json();
+
+		// Map the incoming 'id' field to '_id'
+		const items: Article[] = rawItems.map((item: any) => ({
+			...item,
+			_id: item.id, // Map id to _id
+			// Ensure other fields match Article type, add defaults if necessary
+			savedAt: item.savedAt || Date.parse(item.scrapedAt) || Date.now(), // Use savedAt or parse scrapedAt
+			isRead: item.isRead ?? false,
+			favorite: item.favorite ?? false,
+			tags: item.tags || [],
+			// _rev will be undefined here, which is correct for initial fetch
+		}));
 		console.log(`Retrieved ${items.length} items from cloud`);
 
 		// No mapping needed if worker returns data matching the Article structure
