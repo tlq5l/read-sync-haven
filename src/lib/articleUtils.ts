@@ -2,7 +2,9 @@ import type { ArticleView } from "@/hooks/useArticleView"; // Assuming this path
 import { fetchCloudItems, saveItemToCloud } from "@/services/cloudSync";
 import type { Article } from "@/services/db";
 import { getAllArticles, updateArticle } from "@/services/db"; // Import updateArticle
+import { articlesDb } from "@/services/db/config"; // Import articlesDb for bulkDocs
 import type { UserResource } from "@clerk/types"; // Import UserResource type
+// import type PouchDB from "pouchdb-core"; // No longer needed
 
 /**
  * Filters and sorts articles based on the specified view.
@@ -69,6 +71,100 @@ export const runOneTimeFileSync = async (
 
 	const syncFlagKey = `hasSyncedExistingFiles_${currentUserId}`;
 	try {
+		// --- Start One-Time Duplicate Cleanup ---
+		const cleanupFlagKey = `hasCleanedUpDuplicates_v1_${currentUserId}`; // Use a versioned key
+		const hasCleanedUp = localStorage.getItem(cleanupFlagKey);
+
+		if (!hasCleanedUp) {
+			console.log("Utils: Running one-time duplicate article cleanup...");
+			let allLocalArticles: Article[] = [];
+			try {
+				allLocalArticles = await getAllArticles({ userIds: [currentUserId] });
+				const articlesById = new Map<string, Article[]>();
+
+				// Group articles by _id
+				for (const article of allLocalArticles) {
+					if (!article._id) continue;
+					const group = articlesById.get(article._id) || [];
+					group.push(article);
+					articlesById.set(article._id, group);
+				}
+
+				// Type allows full Article plus _deleted flag
+				const docsToDelete: (Article & { _deleted: true })[] = [];
+				let duplicateCount = 0;
+
+				// Identify duplicates in each group
+				for (const group of articlesById.values()) {
+					if (group.length > 1) {
+						// Sort by savedAt descending to find the latest
+						group.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+						// const latestArticle = group[0]; // Keep this one - Not needed directly
+
+						// Mark all others for deletion
+						for (let i = 1; i < group.length; i++) {
+							const duplicate = group[i];
+							// Ensure _id and _rev exist before marking for deletion
+							if (duplicate._id && duplicate._rev) {
+								// Push the full duplicate document with _deleted: true
+								// The if condition ensures _rev is present
+								docsToDelete.push({
+									...duplicate,
+									_rev: duplicate._rev, // Explicitly include checked _rev
+									_deleted: true,
+								});
+								duplicateCount++;
+							} else {
+								console.warn(
+									`Utils: Skipping deletion of duplicate article without _id or _rev: ${JSON.stringify(
+										duplicate,
+									)}`,
+								);
+							}
+						}
+					}
+				}
+
+				if (docsToDelete.length > 0) {
+					console.log(
+						`Utils: Found ${duplicateCount} duplicate document(s) to delete.`,
+					);
+					// Use bulkDocs for efficient deletion
+					// Add type annotation for the result items
+					// Use bulkDocs for efficient deletion
+					// Pass the correctly typed array to bulkDocs
+					const bulkResult = await articlesDb.bulkDocs(docsToDelete);
+					// Filter results to find errors using a type guard
+					const errors = bulkResult.filter(
+						(
+							res: PouchDB.Core.Response | PouchDB.Core.Error,
+						): res is PouchDB.Core.Error =>
+							"error" in res && res.error === true,
+					);
+					if (errors.length > 0) {
+						console.error(
+							"Utils: Errors encountered during bulk deletion of duplicates:",
+							errors,
+						);
+						// Decide if we should still set the flag or retry later
+						// For now, we'll log error but still set flag to avoid repeated attempts on same errors
+					} else {
+						console.log("Utils: Successfully deleted duplicate articles.");
+					}
+				} else {
+					console.log("Utils: No duplicate articles found to cleanup.");
+				}
+
+				// Set flag even if there were errors to prevent retrying problematic docs
+				localStorage.setItem(cleanupFlagKey, "true");
+				console.log("Utils: One-time duplicate cleanup process finished.");
+			} catch (cleanupErr) {
+				console.error("Utils: Error during duplicate cleanup:", cleanupErr);
+				// Don't set the flag if the process failed unexpectedly
+			}
+		}
+		// --- End One-Time Duplicate Cleanup ---
+
 		const hasSynced = localStorage.getItem(syncFlagKey);
 		if (!hasSynced) {
 			console.log(
