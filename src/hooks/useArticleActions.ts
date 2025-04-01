@@ -4,6 +4,7 @@ import {
 	type Article,
 	deleteArticle,
 	getArticle,
+	removeDuplicateArticles, // Import the new function
 	saveArticle,
 	updateArticle,
 } from "@/services/db";
@@ -404,11 +405,52 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 		[toast, userId, isSignedIn, refreshArticles],
 	);
 
+	// Remove duplicate articles locally
+	const removeDuplicateLocalArticles = useCallback(async () => {
+		if (!isSignedIn || !userId) {
+			toast({
+				title: "Authentication Required",
+				description: "Please sign in to manage articles.",
+				variant: "destructive",
+			});
+			return;
+		}
+
+		try {
+			console.log("Attempting to remove duplicate articles...");
+			const removedCount = await removeDuplicateArticles();
+
+			if (removedCount > 0) {
+				toast({
+					title: "Duplicates Removed",
+					description: `${removedCount} duplicate article(s) removed locally.`,
+				});
+				await refreshArticles(); // Refresh the list
+			} else {
+				toast({
+					title: "No Duplicates Found",
+					description: "No duplicate articles were found locally.",
+				});
+			}
+		} catch (err) {
+			console.error("Failed to remove duplicate articles:", err);
+			toast({
+				title: "Failed to Remove Duplicates",
+				description:
+					err instanceof Error
+						? err.message
+						: "An error occurred while removing duplicates.",
+				variant: "destructive",
+			});
+		}
+	}, [toast, userId, isSignedIn, refreshArticles]);
+
 	return {
 		addArticleByUrl,
 		addArticleByFile,
 		updateArticleStatus,
 		updateReadingProgress,
 		removeArticle,
+		removeDuplicateLocalArticles, // Ensure the function is returned
 	};
 }

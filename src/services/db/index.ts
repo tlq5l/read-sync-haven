@@ -26,6 +26,7 @@ export {
 	updateArticle,
 	deleteArticle,
 	getAllArticles,
+	removeDuplicateArticles,
 } from "./articles";
 
 // --- Highlight Operations ---
