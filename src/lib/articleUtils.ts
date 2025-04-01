@@ -59,10 +59,11 @@ export const runOneTimeFileSync = async (
 				(a) =>
 					a.type === "epub" &&
 					!a.fileData && // fileData is missing
-					a.content && a.content.length > 100 && // content exists and is long enough to be base64
+					a.content &&
+					a.content.length > 100 && // content exists and is long enough to be base64
 					!a.content.startsWith("<") && // Not likely HTML content
 					a._id &&
-					a._rev // Ensure we have ID and revision for update
+					a._rev, // Ensure we have ID and revision for update
 			);
 
 			if (localEpubsToMigrate.length > 0) {
@@ -70,7 +71,9 @@ export const runOneTimeFileSync = async (
 					`Utils: Found ${localEpubsToMigrate.length} local EPUBs potentially needing migration.`,
 				);
 				for (const epub of localEpubsToMigrate) {
-					console.log(`Utils: Attempting migration for local EPUB ${epub._id}...`);
+					console.log(
+						`Utils: Attempting migration for local EPUB ${epub._id}...`,
+					);
 					try {
 						// MIGRATE: Move content to fileData and set placeholder in content
 						const updates = {
@@ -80,9 +83,7 @@ export const runOneTimeFileSync = async (
 							content: "EPUB content migrated locally.", // Set placeholder
 						};
 						await updateArticle(updates);
-						console.log(
-							`Utils: Successfully migrated local EPUB ${epub._id}.`,
-						);
+						console.log(`Utils: Successfully migrated local EPUB ${epub._id}.`);
 					} catch (migrationErr) {
 						migrationErrors++;
 						console.error(

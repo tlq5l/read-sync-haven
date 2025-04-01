@@ -89,17 +89,7 @@ export async function saveItemToCloud(article: Article): Promise<boolean> {
 }
 
 // Removed importCloudItems function as it's no longer needed with automatic cloud sync
-
-/**
- * Helper function to extract a short excerpt from HTML content
- */
-function extractExcerpt(htmlContent: string, maxLength = 150): string {
-	// Simple excerpt extraction - remove HTML tags and limit length
-	const plainText = htmlContent.replace(/<\/?[^>]+(>|$)/g, " ").trim();
-	return plainText.length > maxLength
-		? `${plainText.substring(0, maxLength)}...`
-		: plainText;
-}
+// Removed unused extractExcerpt function (was causing TypeScript error TS6133)
 
 // Removed unused mapItemType function
 // Removed mapArticleType as we now send the original type directly

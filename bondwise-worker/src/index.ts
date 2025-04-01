@@ -314,11 +314,20 @@ export default {
 					// Validate required fields including userId
 					// Validate required fields based on the updated WorkerArticle interface
 					// Use _id instead of id
-					if (!item || !item._id || !item.url || !item.title || !item.userId || !item.type || item.savedAt === undefined) {
+					if (
+						!item ||
+						!item._id ||
+						!item.url ||
+						!item.title ||
+						!item.userId ||
+						!item.type ||
+						item.savedAt === undefined
+					) {
 						return new Response(
 							JSON.stringify({
 								status: "error",
-								message: "Invalid article data - missing required fields (_id, url, title, userId, type, savedAt)",
+								message:
+									"Invalid article data - missing required fields (_id, url, title, userId, type, savedAt)",
 							}),
 							{
 								status: 400,
@@ -330,7 +339,9 @@ export default {
 						);
 					}
 
-					console.log(`Processing article: ${item._id} (Type: ${item.type}) for user: ${item.userId}`);
+					console.log(
+						`Processing article: ${item._id} (Type: ${item.type}) for user: ${item.userId}`,
+					);
 
 					try {
 						// Create a user-specific key
@@ -345,7 +356,8 @@ export default {
 						ctx.waitUntil(
 							kvPromise.then(
 								() => console.log(`Successfully wrote article ${key} to KV.`),
-								(err) => console.error(`Error writing article ${key} to KV:`, err),
+								(err) =>
+									console.error(`Error writing article ${key} to KV:`, err),
 							),
 						);
 
