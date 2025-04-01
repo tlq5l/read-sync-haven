@@ -1,34 +1,36 @@
 // Simplified browser polyfills - focusing on essential functionality
 if (typeof window !== "undefined") {
 	// Ensure JSZip is available to EPUB.js
-	if (window.JSZip) {
-		console.log("JSZip loaded from global scope");
-	} else {
-		console.warn("JSZip not found. EPUB functionality may be limited.");
+	// Skip JSZip check in test environment
+	const isTestEnv = typeof process !== 'undefined' && process.env && (process.env.NODE_ENV === 'test' || process.env.VITEST);
+
+	if (!isTestEnv) {
+		if (window.JSZip) {
+			console.log("JSZip loaded from global scope");
+		} else {
+			console.warn("JSZip not found. EPUB functionality may be limited.");
+		}
 	}
+
 	// Ensure process is defined for React and other libs that expect it
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	const proc = (window as any).process;
 
 	if (typeof proc === "undefined") {
 		// If process is completely missing, define a minimal version
-		// (Avoid doing this during Vitest runs unless explicitly testing the polyfill)
-		if (!import.meta.env.VITEST) {
-			// Define minimal process object
-			const minimalProcess = {
-				env: {},
-				versions: { node: "0.0.0" /* ... other versions */ },
-				nextTick: (cb: () => void) => setTimeout(cb, 0),
-				// Add dummy listeners method
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
-				listeners: (_event: string) => [] as Array<() => void>,
-			};
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			(window as any).process = minimalProcess;
-		}
+		// Always define a minimal process object, even during Vitest runs
+		const minimalProcess = {
+			env: {},
+			versions: { node: "0.0.0" /* ... other versions */ },
+			nextTick: (cb: () => void) => setTimeout(cb, 0),
+			// Add dummy listeners method that always returns an empty array
+			listeners: (_event: string) => [] as Array<() => void>,
+		};
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		(window as any).process = minimalProcess;
 	} else if (typeof proc.listeners === "undefined") {
 		// If process exists but listeners is missing, add the dummy listeners method
-		// This might help stabilize Vitest's error handling in certain environments
+		// This helps stabilize Vitest's error handling in all environments
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		(window as any).process.listeners = (_event: string) => [] as Array<() => void>;
 	}
@@ -40,27 +42,35 @@ if (typeof window !== "undefined") {
 		typeof window.crypto.getRandomValues === "undefined"
 	) {
 		// Simple polyfill for crypto.getRandomValues
-		(
-			window as Window &
-				typeof globalThis & {
-					crypto?: Partial<Crypto>;
-				}
-		).crypto = {
-			...(
-				window as Window &
-					typeof globalThis & {
-						crypto?: Partial<Crypto>;
+		if (typeof window.crypto === "undefined") {
+			// If crypto is completely missing, create a minimal implementation
+			Object.defineProperty(window, 'crypto', {
+				value: {
+					getRandomValues: <T extends ArrayBufferView | null>(array: T): T => {
+						if (array instanceof Uint8Array) {
+							for (let i = 0; i < array.length; i++) {
+								array[i] = Math.floor(Math.random() * 256);
+							}
+						}
+						return array;
 					}
-			).crypto,
-			getRandomValues: <T extends ArrayBufferView | null>(array: T): T => {
-				if (array instanceof Uint8Array) {
-					for (let i = 0; i < array.length; i++) {
-						array[i] = Math.floor(Math.random() * 256);
+				},
+				configurable: true
+			});
+		} else if (typeof window.crypto.getRandomValues === "undefined") {
+			// If only getRandomValues is missing, add it
+			Object.defineProperty(window.crypto, 'getRandomValues', {
+				value: <T extends ArrayBufferView | null>(array: T): T => {
+					if (array instanceof Uint8Array) {
+						for (let i = 0; i < array.length; i++) {
+							array[i] = Math.floor(Math.random() * 256);
+						}
 					}
-				}
-				return array;
-			},
-		};
+					return array;
+				},
+				configurable: true
+			});
+		}
 	}
 
 	// Ensure global is defined (needed for PouchDB)
@@ -90,4 +100,5 @@ if (typeof window !== "undefined") {
 	}
 }
 
-export {};
+export { };
+

@@ -1,7 +1,12 @@
 /// <reference types="vitest" />
-import path from "node:path";
 import react from "@vitejs/plugin-react-swc";
+import path from "node:path";
 import { defineConfig } from "vitest/config";
+
+// Ensure process.listeners is defined for Vitest's error handling
+if (typeof process !== 'undefined' && typeof process.listeners !== 'function') {
+	process.listeners = () => [];
+}
 
 export default defineConfig({
 	plugins: [
@@ -16,6 +21,11 @@ export default defineConfig({
 		//   provider: 'v8',
 		//   reporter: ['text', 'json', 'html'],
 		// },
+		environmentOptions: {
+			jsdom: {
+				// Add any jsdom-specific options here
+			}
+		},
 	},
 	resolve: {
 		alias: {
@@ -28,5 +38,6 @@ export default defineConfig({
 		// If your tests need environment variables, load and define them here
 		// Example:
 		// 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(process.env.VITE_CLERK_PUBLISHABLE_KEY),
+		'import.meta.env.VITEST': 'true',
 	},
 });

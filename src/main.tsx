@@ -1,4 +1,5 @@
 /* eslint-disable */
+import JSZip from "jszip";
 import * as React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
@@ -16,20 +17,9 @@ declare global {
 if (window.JSZip) {
 	console.log("JSZip is available globally");
 } else {
-	console.warn(
-		"JSZip not found in window global. EPUB functionality may be limited.",
-	);
-	// Try to create a simple access point in case it was loaded but not accessible
-	try {
-		// @ts-ignore
-		if (typeof JSZip !== "undefined") {
-			// @ts-ignore
-			window.JSZip = JSZip;
-			console.log("JSZip assigned from global scope");
-		}
-	} catch (e) {
-		console.error("Error setting JSZip global:", e);
-	}
+	console.log("JSZip not found in window global, setting it from imported package");
+	// Set JSZip from the imported package
+	window.JSZip = JSZip;
 }
 
 // Explicitly make React available globally

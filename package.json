@@ -67,6 +67,7 @@
 		"http-proxy-agent": "^7.0.2",
 		"input-otp": "^1.4.2",
 		"jsdom": "^26.0.0",
+		"jszip": "^3.10.1",
 		"lucide-react": "^0.462.0",
 		"next-themes": "^0.3.0",
 		"pouchdb": "^9.0.0",
