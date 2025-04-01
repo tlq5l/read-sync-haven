@@ -349,8 +349,39 @@ export default {
 						const key = createUserItemKey(item.userId, item._id);
 
 						// Store the item in KV with the user-specific key
-						// Ensure we save the complete item, including fileData if present
-						const kvPromise = env.SAVED_ITEMS_KV.put(key, JSON.stringify(item));
+						// Explicitly construct the object to save, ensuring important fields are included
+						const itemToSave: WorkerArticle = {
+							// Base required fields
+							_id: item._id,
+							userId: item.userId,
+							url: item.url,
+							title: item.title,
+							type: item.type,
+							savedAt: item.savedAt,
+							isRead: item.isRead ?? false, // Default if missing
+							favorite: item.favorite ?? false, // Default if missing
+
+							// Include optional fields if they exist in the incoming item
+							...(item.content && { content: item.content }),
+							...(item.fileData && { fileData: item.fileData }),
+							...(item.htmlContent && { htmlContent: item.htmlContent }),
+							...(item.excerpt && { excerpt: item.excerpt }),
+							...(item.author && { author: item.author }),
+							...(item.siteName && { siteName: item.siteName }), // Explicitly include siteName
+							...(item.publishedDate && { publishedDate: item.publishedDate }),
+							...(item.tags && { tags: item.tags }),
+							...(item.readingProgress && { readingProgress: item.readingProgress }),
+							...(item.readAt && { readAt: item.readAt }),
+							...(item.scrollPosition && { scrollPosition: item.scrollPosition }),
+							...(item.coverImage && { coverImage: item.coverImage }),
+							...(item.language && { language: item.language }),
+							...(item.pageCount && { pageCount: item.pageCount }),
+							...(item.estimatedReadTime && { estimatedReadTime: item.estimatedReadTime }), // Explicitly include estimatedReadTime
+							// Include _rev only if it exists (for potential future update logic via POST)
+							...(item._rev && { _rev: item._rev }),
+						};
+
+						const kvPromise = env.SAVED_ITEMS_KV.put(key, JSON.stringify(itemToSave));
 
 						// Use waitUntil to ensure operation completes even if response is sent
 						ctx.waitUntil(
