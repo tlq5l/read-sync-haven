@@ -6,13 +6,25 @@ export default defineConfig({
 		environment: "miniflare",
 		// Optional: Configure the miniflare environment
 		environmentOptions: {
-			// Specify bindings, KV namespaces, etc., needed for your tests
+		          // Prevent loading wrangler.toml vars/secrets, use only those defined below
+		          wranglerConfigPath: false,
+		          // scriptPath removed - let Miniflare handle build or TS directly
+		 // Specify bindings, KV namespaces, etc., needed for your tests
 			// These should match your wrangler.toml configuration
 			kvNamespaces: ["SAVED_ITEMS_KV"],
-			// Example of adding environment variables:
-			// vars: { GCF_SUMMARIZE_URL: "http://localhost:8080/summarize" },
-			// Example of adding secrets:
-			// secrets: { CLERK_SECRET_KEY: "test_secret_key" },
+			// Define environment variables needed by the worker handlers
+			vars: {
+			             GCF_SUMMARIZE_URL: "http://fake-gcf.test/summarize", // Use .test TLD for mocks
+			             GCF_CHAT_URL: "http://fake-gcf.test/chat",
+			             // Add other VARS from wrangler.toml if they become necessary for tests
+			         },
+			// Define secrets needed by the worker handlers
+			secrets: {
+			             CLERK_SECRET_KEY: "TEST_CLERK_SECRET_KEY",
+			             CLERK_PUBLISHABLE_KEY: "TEST_CLERK_PUBLISHABLE_KEY",
+			             GCF_AUTH_SECRET: "TEST_GCF_SECRET",
+			             // Add other SECRETS from wrangler.toml if needed
+			         },
 		},
 		// Optional: Add setup files if needed
 		// setupFiles: ['./test/setup.ts'],
