@@ -22,12 +22,17 @@ vi.mock("@/services/db", async (importOriginal) => {
 });
 
 // Mock articlesDb specifically for bulkDocs
-vi.mock("@/services/db/config", () => ({
-	articlesDb: {
-		bulkDocs: vi.fn(),
-		// Add other methods if needed by tests
-	},
-}));
+vi.mock("@/services/db/config", async (importOriginal) => {
+	const originalConfig =
+		await importOriginal<typeof import("@/services/db/config")>();
+	return {
+		...originalConfig, // Keep original exports (like initializeDatabase)
+		articlesDb: {
+			...originalConfig.articlesDb, // Keep original articlesDb properties/methods
+			bulkDocs: vi.fn(), // Mock only bulkDocs
+		},
+	};
+});
 
 vi.mock("@/services/cloudSync", () => ({
 	fetchCloudItems: vi.fn(),
