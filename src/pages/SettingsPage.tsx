@@ -224,9 +224,7 @@ export default function SettingsPage() {
 										</div>
 										<Switch id="sync" disabled />
 									</div>
-
 									<Separator />
-
 									<div className="space-y-2">
 										<h3 className="text-sm font-medium">Export Data</h3>
 										<p className="text-sm text-muted-foreground">
@@ -234,6 +232,26 @@ export default function SettingsPage() {
 										</p>
 										<Button onClick={exportData} disabled={isExportingData}>
 											{isExportingData ? "Exporting..." : "Export Data"}
+										</Button>
+									</div>
+									<Separator /> {/* Add separator */}
+									{/* Duplicate Cleanup Section */}
+									<div className="space-y-2">
+										<h3 className="text-sm font-medium">
+											Clean Local Duplicates
+										</h3>
+										<p className="text-sm text-muted-foreground">
+											Remove duplicate articles stored locally based on their
+											original URL. Keeps the earliest saved version.
+										</p>
+										<Button
+											variant="destructive"
+											onClick={handleCleanDuplicates} // Connect handler
+											disabled={isCleaningDuplicates} // Connect disabled state
+										>
+											{isCleaningDuplicates
+												? "Cleaning..."
+												: "Remove Local Duplicates"}
 										</Button>
 									</div>
 								</CardContent>
