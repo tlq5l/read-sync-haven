@@ -42,30 +42,12 @@ vi.mock("@/lib/articleUtils", () => {
 				return articles.filter((a: Article) => a.favorite);
 			return articles;
 		}),
-		// Inline implementation of deduplicateArticles
-		deduplicateArticles: vi.fn((articles: Article[]): Article[] => {
-			// Create a map to store the most recent version of each article
-			const articleMap = new Map<string, Article>();
-
-			// Process each article
-			for (const article of articles) {
-				if (!article._id) continue;
-
-				// If we haven't seen this article before or this version is newer
-				const existingArticle = articleMap.get(article._id);
-				if (!existingArticle || article.savedAt > existingArticle.savedAt) {
-					articleMap.set(article._id, article);
-				}
-			}
-
-			// Return deduplicated array
-			return Array.from(articleMap.values());
-		}),
+		// deduplicateArticles is no longer in articleUtils, it's internal to the hook
 		runOneTimeFileSync: vi.fn(),
 	};
 });
 
-import * as articleUtils from "@/lib/articleUtils";
+// Removed unused import: import * as articleUtils from "@/lib/articleUtils";
 import * as cloudSync from "@/services/cloudSync";
 import * as db from "@/services/db";
 
@@ -135,10 +117,7 @@ describe("useArticleSync", () => {
 			expect(result.current.isLoading).toBe(false);
 		});
 
-		// Verify deduplicateArticles was called with the duplicated articles
-		expect(articleUtils.deduplicateArticles).toHaveBeenCalledWith(
-			duplicateArticles,
-		);
+		// Deduplication is now internal to the hook, we verify the result below
 
 		// Verify we only have 2 articles (not 3)
 		expect(result.current.articles.length).toBe(2);
@@ -212,10 +191,7 @@ describe("useArticleSync", () => {
 			expect(result.current.isLoading).toBe(false);
 		});
 
-		// Verify deduplicateArticles was called with the combined articles
-		expect(articleUtils.deduplicateArticles).toHaveBeenCalledWith(
-			combinedArticles,
-		);
+		// Deduplication is now internal to the hook, we verify the result below
 
 		// We should have 3 articles after deduplication (not 4)
 		expect(result.current.articles.length).toBe(3);

@@ -101,7 +101,7 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 				}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
 			}}
 		>
-			<Link to={`/read/${article._id}`}>
+			<Link to={`/read/${article._id}`} data-testid="article-card">
 				<CardContent className="p-0">
 					<div className="p-4">
 						{article.isRead ? (

@@ -1,14 +1,39 @@
 import { useToast } from "@/hooks/use-toast";
-import {
-	deduplicateArticles,
-	filterAndSortArticles,
-	runOneTimeFileSync,
-} from "@/lib/articleUtils";
+// Removed deduplicateArticles, filterAndSortArticles, runOneTimeFileSync imports
+// filterArticles and sortArticles might be needed if we implement view filtering here
+// import { filterArticles, sortArticles } from "@/lib/articleUtils";
 import { fetchCloudItems } from "@/services/cloudSync";
 import { type Article, getAllArticles, saveArticle } from "@/services/db";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ArticleView } from "./useArticleView"; // Import the type
+
+// Deduplicates articles based on _id, keeping the one with the latest savedAt timestamp.
+const deduplicateArticlesById = (articlesToDedup: Article[]): Article[] => {
+	const articleMap = new Map<string, Article>();
+
+	for (const article of articlesToDedup) {
+		if (!article._id) {
+			console.warn("Deduplicating article without an ID:", article);
+			// Decide how to handle articles without ID - maybe generate a temp one or skip?
+			// For now, let's skip them to avoid potential issues.
+			continue;
+		}
+
+		const existingArticle = articleMap.get(article._id);
+		// Keep the article if it's the first one with this ID,
+		// or if its savedAt timestamp is newer (or existing has no timestamp).
+		// Handle potential null/undefined savedAt values.
+		const currentSavedAt = article.savedAt ?? 0;
+		const existingSavedAt = existingArticle?.savedAt ?? 0;
+
+		if (!existingArticle || currentSavedAt > existingSavedAt) {
+			articleMap.set(article._id, article);
+		}
+	}
+
+	return Array.from(articleMap.values());
+};
 
 /**
  * Hook to manage article fetching, synchronization, and state.
@@ -46,18 +71,30 @@ export function useArticleSync(
 					console.log(
 						`Sync Hook: Loaded ${cachedArticles.length} articles from cache.`,
 					);
-					// Deduplicate articles before filtering and sorting
-					const dedupedArticles = deduplicateArticles(cachedArticles);
+					// Deduplicate articles
+					const dedupedArticles = deduplicateArticlesById(cachedArticles);
 					if (dedupedArticles.length < cachedArticles.length) {
 						console.log(
 							`Sync Hook: Removed ${cachedArticles.length - dedupedArticles.length} duplicate articles from cache.`,
 						);
 					}
-					const filteredCached = filterAndSortArticles(
-						dedupedArticles,
-						currentView,
-					);
-					setArticles(filteredCached);
+
+					// Apply view filtering
+					let viewFilteredArticles = dedupedArticles;
+					if (currentView === "unread") {
+						viewFilteredArticles = dedupedArticles.filter((a) => !a.isRead);
+					} else if (currentView === "favorites") {
+						viewFilteredArticles = dedupedArticles.filter((a) => a.favorite);
+					}
+					// Apply default sort (e.g., savedAt desc) - mimicking potential old behavior
+					// Note: The context provider will apply its own sorting later based on user selection
+					const sortedArticles = [...viewFilteredArticles].sort((a, b) => {
+						const timeA = a.savedAt ?? 0;
+						const timeB = b.savedAt ?? 0;
+						return timeB - timeA; // Descending
+					});
+
+					setArticles(sortedArticles);
 					setIsLoading(false);
 					setIsRefreshing(true); // Start background refresh after cache load
 					return true; // Loaded from cache
@@ -211,7 +248,7 @@ export function useArticleSync(
 				);
 
 				// Deduplicate articles after sync
-				const dedupedArticlesAfterSync = deduplicateArticles(
+				const dedupedArticlesAfterSync = deduplicateArticlesById(
 					localArticlesAfterSync,
 				);
 				if (dedupedArticlesAfterSync.length < localArticlesAfterSync.length) {
@@ -220,10 +257,27 @@ export function useArticleSync(
 					);
 				}
 
-				const filteredArticles = filterAndSortArticles(
-					dedupedArticlesAfterSync,
-					currentView,
+				// Apply view filtering
+				let viewFilteredArticlesAfterSync = dedupedArticlesAfterSync;
+				if (currentView === "unread") {
+					viewFilteredArticlesAfterSync = dedupedArticlesAfterSync.filter(
+						(a) => !a.isRead,
+					);
+				} else if (currentView === "favorites") {
+					viewFilteredArticlesAfterSync = dedupedArticlesAfterSync.filter(
+						(a) => a.favorite,
+					);
+				}
+				// Apply default sort (e.g., savedAt desc)
+				const sortedArticlesAfterSync = [...viewFilteredArticlesAfterSync].sort(
+					(a, b) => {
+						const timeA = a.savedAt ?? 0;
+						const timeB = b.savedAt ?? 0;
+						return timeB - timeA; // Descending
+					},
 				);
+
+				const filteredArticles = sortedArticlesAfterSync; // Use the sorted articles
 
 				if (isMounted) {
 					setArticles(filteredArticles);
@@ -231,7 +285,8 @@ export function useArticleSync(
 				}
 
 				// Run one-time sync for existing local files
-				await runOneTimeFileSync(userId, getToken, user);
+				// TODO: Investigate where runOneTimeFileSync functionality went or if it's still needed.
+				// await runOneTimeFileSync(userId, getToken, user);
 			} catch (syncErr) {
 				syncInProgress = false; // Mark sync as complete on error too
 				if (syncTimeoutId) clearTimeout(syncTimeoutId);
