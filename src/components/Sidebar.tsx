@@ -10,7 +10,6 @@ import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
 import { UserButton, useAuth, useUser } from "@clerk/clerk-react";
 import {
-	BookOpen,
 	Bookmark,
 	ChevronLeft,
 	Clock,
@@ -235,26 +234,6 @@ export default function Sidebar() {
 						staggerDelay={30}
 						autoAnimate={true}
 					>
-						<TransitionItem showFrom="left" className="w-full">
-							<Button
-								variant="ghost"
-								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
-								asChild
-							>
-								<Link
-									to="/"
-									style={isActive("/") ? styles.activeLink : styles.link}
-								>
-									<BookOpen size={20} />
-									{!collapsed && (
-										<span className="transition-opacity duration-200">
-											Home
-										</span>
-									)}
-								</Link>
-							</Button>
-						</TransitionItem>
-
 						{/* Show these navigation items regardless of authentication state */}
 						<TransitionItem showFrom="left" className="w-full">
 							<Button
