@@ -66,7 +66,7 @@ export async function fetchCloudItems(
 		return items;
 	} catch (error) {
 		console.error("Error fetching cloud items:", error);
-		return [];
+		throw error; // Re-throw the error so the caller knows about it
 	}
 }
 
