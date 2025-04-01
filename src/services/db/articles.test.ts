@@ -1,6 +1,6 @@
 // src/services/db/articles.test.ts
 
-import PouchDBAdapterMemory from "pouchdb-adapter-memory"; // Import the memory adapter plugin
+import PouchDBAdapterMemory from "pouchdb-adapter-memory";
 import PouchDB from "pouchdb-browser"; // Import the core PouchDB constructor
 import {
 	afterAll,
@@ -17,29 +17,19 @@ import {
 	removeDuplicateArticles,
 	saveArticle,
 } from "./articles"; // Import the function to test and helpers
-import { articlesDb, initializeDatabase } from "./config"; // Need to initialize
+import { articlesDb, initializeDatabase } from "./config"; // Import articlesDb as well
 import type { Article } from "./types";
 
 // Mock the config to use the memory adapter
-vi.mock("./config", async (importOriginal) => {
-	const originalConfig = await importOriginal<typeof import("./config")>();
-	// Ensure the memory adapter plugin is registered before creating the instance
-	if (typeof PouchDB.plugin === "function") {
-		PouchDB.plugin(PouchDBAdapterMemory);
-	} else {
-		console.error("PouchDB.plugin is not available in test setup!");
-	}
-	// Now create the instance using the registered adapter
-	const memoryDb = new PouchDB<Article>("test-articles-db", {
-		adapter: "memory",
-	});
-	return {
-		...originalConfig,
-		articlesDb: memoryDb,
-		initializeDatabase: vi.fn().mockResolvedValue({ articlesDb: memoryDb }), // Mock initializeDatabase
-	};
-});
-// [Removed leftover mock fragments]
+// Setup relies on config.ts test environment detection
+if (typeof PouchDB.plugin === "function") {
+	PouchDB.plugin(PouchDBAdapterMemory);
+}
+// No explicit mocking needed.
+
+// Mock the config to always return the persistent instance
+// No explicit mocking needed here.
+// config.ts should automatically use the memory adapter because import.meta.vitest is true.
 
 // Helper function to create article data
 const createArticleData = (
@@ -63,27 +53,40 @@ const createArticleData = (
 });
 
 describe("removeDuplicateArticles", () => {
-	let dbInstance: PouchDB.Database<Article>;
+	// We will import articlesDb directly from './config' which should be the memory instance.
+	// We will import articlesDb directly from './config' which should be the memory instance.
 
 	beforeAll(async () => {
-		// Initialization happens implicitly due to the top-level mock
-		// We just need to get a reference to the mocked instance
-		const { articlesDb: mockedDb } = await import("./config");
-		dbInstance = mockedDb;
+		// Ensure the database is initialized once before all tests
+		// This relies on the actual initializeDatabase function from config.ts
+		// which should use the memory adapter due to import.meta.vitest.
+		await initializeDatabase();
 	});
 
 	beforeEach(async () => {
-		// Destroy and recreate the database for a clean state
-		if (dbInstance) {
-			await dbInstance.destroy();
+		// Clear the database before each test using bulkDocs delete
+		// Import articlesDb directly - it should be the memory instance due to config.ts logic
+		const { articlesDb } = await import("./config");
+		const allDocs = await articlesDb.allDocs();
+		if (allDocs.rows.length > 0) {
+			await articlesDb.bulkDocs(
+				allDocs.rows.map((row) => ({
+					_id: row.id,
+					_rev: row.value.rev,
+					_deleted: true,
+				})) as any[], // Cast needed for deletion stubs
+			);
 		}
-		// Re-import the mocked instance after destroy/recreate cycle triggered by mock
-		const { articlesDb: newMockedDb } = await import("./config");
-		dbInstance = newMockedDb;
-		// Optional: Verify DB is empty if needed
-		const info = await dbInstance.info();
+		// Verify DB is empty
+		const info = await articlesDb.info();
 		expect(info.doc_count).toBe(0);
 	});
+
+	// Optional: afterAll could destroy the DB if needed, but might not be necessary with memory adapter
+	// afterAll(async () => {
+	//   const { articlesDb } = await import("./config");
+	//   await articlesDb.destroy();
+	// });
 
 	afterAll(async () => {
 		// Optional: Destroy the DB after all tests if needed, though memory adapter might not require it
@@ -165,7 +168,8 @@ describe("removeDuplicateArticles", () => {
 			createArticleData(1, "http://example.com", "Valid Article"),
 		);
 		// Save an article directly without a URL (simulate bad data)
-		await dbInstance.put({
+		await articlesDb.put({
+			// Use imported articlesDb
 			_id: "article_no_url",
 			userId: "test-user",
 			title: "No URL Article",
@@ -203,7 +207,8 @@ describe("removeDuplicateArticles", () => {
 		);
 
 		// Manually put a duplicate without fetching _rev first (simulates missing rev)
-		await dbInstance.put({
+		await articlesDb.put({
+			// Use imported articlesDb
 			_id: "article_2", // Different ID
 			userId: "test-user",
 			url: "http://rev-test.com", // Same URL
