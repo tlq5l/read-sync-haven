@@ -1,8 +1,9 @@
 // bondwise-worker/src/index.test.ts
 
+import type { ExecutionContext } from "@cloudflare/workers-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as auth from "./auth"; // Import the auth module to mock it
-import worker from "./index"; // Import the default export from index.ts
+import worker from "./index"; // Import the worker module directly
 import type { Env, WorkerArticle } from "./types";
 import { createUserItemKey } from "./utils";
 
@@ -20,14 +21,39 @@ const mockedAuth = vi.mocked(auth.authenticateRequestWithClerk);
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// Helper to get bindings provided by vitest-environment-miniflare
-// We need to declare this, but the environment provides the implementation
-declare const getMiniflareBindings: () => Env;
-// ExecutionContext is not provided globally, we'll mock it simply
+// Mock KV Namespace for tests
+class MockKVNamespace {
+	private store = new Map<string, string>();
 
+	async get(key: string) {
+		return this.store.get(key) || null;
+	}
+
+	async put(key: string, value: string) {
+		this.store.set(key, value);
+		return null;
+	}
+
+	async delete(key: string) {
+		this.store.delete(key);
+		return null;
+	}
+
+	async list(options?: { prefix?: string }) {
+		const keys = [];
+		const prefix = options?.prefix || "";
+		for (const key of this.store.keys()) {
+			if (key.startsWith(prefix)) {
+				keys.push({ name: key });
+			}
+		}
+		return { keys };
+	}
+}
+// ExecutionContext is not provided globally, we'll mock it simply (though likely unused now)
 describe("Worker Integration Tests", () => {
-	let env: Env; // Will be populated by getMiniflareBindings()
-	let ctx: ExecutionContext; // Will be mocked
+	let env: Env;
+	let ctx: ExecutionContext;
 	const testUserId = "user_integration_789";
 	const testArticleId = "article_integ_1";
 	const testArticle: WorkerArticle = {
@@ -48,23 +74,8 @@ describe("Worker Integration Tests", () => {
 		mockedAuth.mockReset();
 		mockFetch.mockReset();
 
-		// Get bindings from Miniflare
-		const bindings = getMiniflareBindings();
-		// Manually add the vars and secrets needed for tests
-		env = {
-			...bindings, // Spread the bindings (like SAVED_ITEMS_KV)
-			GCF_SUMMARIZE_URL: "http://fake-gcf.test/summarize",
-			GCF_CHAT_URL: "http://fake-gcf.test/chat",
-			CLERK_SECRET_KEY: "TEST_CLERK_SECRET_KEY",
-			CLERK_PUBLISHABLE_KEY: "TEST_CLERK_PUBLISHABLE_KEY",
-			GCF_AUTH_SECRET: "TEST_GCF_SECRET",
-			// Add other required Env properties with dummy values if needed
-			GEMINI_API_KEY: "",
-			GCLOUD_PROJECT_NUMBER: "",
-			GCLOUD_WORKLOAD_IDENTITY_POOL_ID: "",
-			GCLOUD_WORKLOAD_IDENTITY_PROVIDER_ID: "",
-			GCLOUD_SERVICE_ACCOUNT_EMAIL: "",
-		};
+		// Create a mock KV namespace
+		const mockKV = new MockKVNamespace();
 
 		// Create a simple mock ExecutionContext
 		ctx = {
@@ -72,14 +83,20 @@ describe("Worker Integration Tests", () => {
 			passThroughOnException: vi.fn(),
 		} as unknown as ExecutionContext;
 
-		// Clear KV before each test using the env provided by Miniflare
-		const kv = env.SAVED_ITEMS_KV;
-		const list = await kv.list();
-		const keys = list.keys.map((k) => k.name);
-		// Vitest-miniflare doesn't directly support deleteMany in older versions, do it manually
-		for (const key of keys) {
-			await kv.delete(key);
-		}
+		// Create the env object with our mocks
+		env = {
+			SAVED_ITEMS_KV: mockKV as any,
+			CLERK_SECRET_KEY: "test-clerk-key",
+			CLERK_PUBLISHABLE_KEY: "test-clerk-pub-key",
+			GEMINI_API_KEY: "test-gemini-key",
+			GCF_SUMMARIZE_URL: "http://fake-gcf.test/summarize",
+			GCF_CHAT_URL: "http://fake-gcf.test/chat",
+			GCF_AUTH_SECRET: "test-auth-secret",
+			GCLOUD_PROJECT_NUMBER: "123456",
+			GCLOUD_WORKLOAD_IDENTITY_POOL_ID: "test-pool",
+			GCLOUD_WORKLOAD_IDENTITY_PROVIDER_ID: "test-provider",
+			GCLOUD_SERVICE_ACCOUNT_EMAIL: "test@example.com",
+		};
 	});
 
 	afterEach(() => {
@@ -139,7 +156,7 @@ describe("Worker Integration Tests", () => {
 			expect(postBody.status).toBe("success");
 			expect(postBody.item).toEqual(testArticle); // Check returned item
 
-			// Verify in KV (using the environment binding)
+			// Verify in KV using our mock
 			const kvValue = await env.SAVED_ITEMS_KV.get(
 				createUserItemKey(testUserId, testArticleId),
 			);
@@ -170,7 +187,7 @@ describe("Worker Integration Tests", () => {
 
 		it("GET /items/:id should retrieve a specific item", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			// Pre-populate KV
+			// Pre-populate KV using our mock
 			await env.SAVED_ITEMS_KV.put(
 				createUserItemKey(testUserId, testArticleId),
 				JSON.stringify(testArticle),
@@ -193,7 +210,7 @@ describe("Worker Integration Tests", () => {
 		it("DELETE /items/:id should delete an item", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
 			const key = createUserItemKey(testUserId, testArticleId);
-			// Pre-populate KV
+			// Pre-populate KV using our mock
 			await env.SAVED_ITEMS_KV.put(key, JSON.stringify(testArticle));
 			expect(await env.SAVED_ITEMS_KV.get(key)).toBe(
 				JSON.stringify(testArticle),
@@ -209,7 +226,7 @@ describe("Worker Integration Tests", () => {
 			expect(body.status).toBe("success");
 
 			// Verify deletion
-			expect(await env.SAVED_ITEMS_KV.get(key)).toBeNull();
+			expect(await env.SAVED_ITEMS_KV.get(key)).toBeNull(); // Verify deletion
 		});
 	});
 
@@ -240,7 +257,7 @@ describe("Worker Integration Tests", () => {
 			expect(body).toEqual({ status: "success", summary: "Mock summary" });
 			expect(mockFetch).toHaveBeenCalledTimes(1);
 			expect(mockFetch).toHaveBeenCalledWith(
-				env.GCF_SUMMARIZE_URL,
+				"http://fake-gcf.test/summarize",
 				expect.anything(),
 			);
 		});
@@ -270,7 +287,7 @@ describe("Worker Integration Tests", () => {
 			});
 			expect(mockFetch).toHaveBeenCalledTimes(1);
 			expect(mockFetch).toHaveBeenCalledWith(
-				env.GCF_CHAT_URL,
+				"http://fake-gcf.test/chat",
 				expect.anything(),
 			);
 		});
