@@ -388,24 +388,13 @@ export function useArticleSync(
 			await performCloudSync(isMounted, true);
 			// Re-fetch happens inside performCloudSync, state is updated there
 			// Return the latest state after sync completes (or potentially cached on error)
-			// Need to get the latest state value after async operation
-			const finalArticles = await getAllArticles({ userIds: [userId] }); // Re-fetch to ensure latest
-
-			// Deduplicate articles before filtering and returning
-			const dedupedFinalArticles = deduplicateArticles(finalArticles);
-			if (dedupedFinalArticles.length < finalArticles.length) {
-				console.log(
-					`Sync Hook: Removed ${finalArticles.length - dedupedFinalArticles.length} duplicate articles during refresh.`,
-				);
-			}
-
-			const filteredFinal = filterAndSortArticles(
-				dedupedFinalArticles,
-				currentView,
-			);
-			if (isMounted) setArticles(filteredFinal); // Update state if still mounted
+			// State is updated within performCloudSync, just need to return the current state
 			cleanup();
-			return filteredFinal;
+			// Since 'articles' state is updated within performCloudSync, we can't directly return it here.
+			// The component consuming this hook will re-render with the updated 'articles' state.
+			// We return the 'articles' state *before* the async call started,
+			// acknowledging the UI will update shortly after.
+			return articles;
 		} catch (err) {
 			// performCloudSync handles its internal errors and toasts
 			console.error("Sync Hook: Error during refreshArticles wrapper:", err);
@@ -424,7 +413,7 @@ export function useArticleSync(
 		userId,
 		performCloudSync, // Depend on the core sync logic
 		articles, // Return existing articles on error/skip
-		currentView, // Needed for final filter/sort
+		// currentView, // No longer needed after removing redundant filter/sort
 		// filterAndSortArticles is a stable import, no need to list
 	]);
 
