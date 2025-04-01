@@ -112,6 +112,11 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					const metadata = await extractEpubMetadata(fileBuffer);
 					const base64Content = epubToBase64(fileBuffer);
 
+					// Calculate estimated reading time
+					const estimatedReadingTime = await import("@/services/epub").then(
+						(module) => module.getEstimatedReadingTime(fileBuffer.byteLength),
+					);
+
 					articleToSave = {
 						userId,
 						title: metadata.title || file.name.replace(/\.epub$/i, ""),
@@ -127,12 +132,25 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 						publishedDate: metadata.publishedDate,
 						excerpt: metadata.description || "EPUB file",
 						readingProgress: 0,
+						siteName: "EPUB Book", // Set a descriptive source name
+						estimatedReadTime: estimatedReadingTime, // Set the estimated reading time
+						fileName: file.name, // Store the original filename
+						fileSize: fileBuffer.byteLength, // Store the file size
 					};
 				} else if (isValidPdf(file)) {
 					fileType = "pdf";
 					const fileBuffer = await file.arrayBuffer();
 					const metadata = await extractPdfMetadata(file, fileBuffer);
 					const base64Content = pdfToBase64(fileBuffer);
+
+					// Calculate estimated reading time based on PDF size or page count
+					const estimatedReadingTime = await import("@/services/pdf").then(
+						(module) =>
+							module.getEstimatedReadingTime(
+								fileBuffer.byteLength,
+								metadata.pageCount,
+							),
+					);
 
 					articleToSave = {
 						userId,
@@ -149,6 +167,10 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 						excerpt: metadata.description || "PDF file",
 						pageCount: metadata.pageCount,
 						readingProgress: 0,
+						siteName: "PDF Document", // Set a descriptive source name
+						estimatedReadTime: estimatedReadingTime, // Set the estimated reading time
+						fileName: file.name, // Store the original filename
+						fileSize: fileBuffer.byteLength, // Store the file size
 					};
 				} else {
 					throw new Error(

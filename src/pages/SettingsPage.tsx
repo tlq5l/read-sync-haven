@@ -18,6 +18,7 @@ import {
 	articlesDb,
 	highlightsDb,
 	tagsDb,
+	updateMissingMetadata,
 } from "@/services/db"; // Import specific DBs and types
 import {
 	ArrowLeft,
@@ -34,7 +35,8 @@ export default function SettingsPage() {
 	const { toast } = useToast();
 	const { theme } = useTheme();
 	const [isExportingData, setIsExportingData] = useState(false);
-	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false); // Add state for cleanup button
+	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
+	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false); // Add state for metadata update button
 	const [activeTab, setActiveTab] = useState("profile");
 
 	// Get the action function - needs a refresh callback, maybe null for now or a dummy?
@@ -120,6 +122,30 @@ export default function SettingsPage() {
 			console.error("Error triggering duplicate cleanup from settings:", error);
 		} finally {
 			setIsCleaningDuplicates(false);
+		}
+	};
+
+	// Function to handle metadata updates for PDFs and EPUBs
+	const handleUpdateMetadata = async () => {
+		setIsUpdatingMetadata(true);
+		try {
+			const updatedCount = await updateMissingMetadata();
+			toast({
+				title: "Update Complete",
+				description:
+					updatedCount > 0
+						? `Updated metadata for ${updatedCount} documents.`
+						: "No documents needed metadata updates.",
+			});
+		} catch (error) {
+			console.error("Error updating metadata:", error);
+			toast({
+				title: "Update Failed",
+				description: "There was an error updating document metadata.",
+				variant: "destructive",
+			});
+		} finally {
+			setIsUpdatingMetadata(false);
 		}
 	};
 
@@ -252,6 +278,24 @@ export default function SettingsPage() {
 											{isCleaningDuplicates
 												? "Cleaning..."
 												: "Remove Local Duplicates"}
+										</Button>
+									</div>
+									<Separator /> {/* Add separator */}
+									{/* Metadata Update Section */}
+									<div className="space-y-2">
+										<h3 className="text-sm font-medium">
+											Fix PDF/EPUB Metadata
+										</h3>
+										<p className="text-sm text-muted-foreground">
+											Update source information and reading time estimates for
+											PDF and EPUB files that are showing as "Unknown source" or
+											"? min read".
+										</p>
+										<Button
+											onClick={handleUpdateMetadata}
+											disabled={isUpdatingMetadata}
+										>
+											{isUpdatingMetadata ? "Updating..." : "Update Metadata"}
 										</Button>
 									</div>
 								</CardContent>
