@@ -13,6 +13,7 @@ import {
 	// Bookmark, // Removed unused icon
 	ChevronLeft,
 	// Clock, // Removed unused icon
+	Home,
 	Library,
 	LogIn,
 	MenuIcon,
@@ -177,7 +178,7 @@ export default function Sidebar() {
 							}}
 							style={isActive("/") ? styles.activeLink : styles.link}
 						>
-							<Library size={20} />
+							<Home size={20} />
 							{!collapsed && (
 								<span className="transition-opacity duration-200">Home</span>
 							)}
