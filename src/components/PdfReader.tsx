@@ -1,4 +1,4 @@
-import { base64ToArrayBuffer } from "@/services/pdf";
+// Removed static import: import { base64ToArrayBuffer } from "@/services/pdf";
 import {
 	ChevronLeft,
 	ChevronRight,
@@ -31,35 +31,40 @@ export default function PdfReader({
 	const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
 	useEffect(() => {
-		if (!fileData) {
-			setError("No PDF data provided");
-			setIsLoading(false);
-			return undefined;
-		}
+		const loadPdf = async () => {
+			if (!fileData) {
+				setError("No PDF data provided");
+				setIsLoading(false);
+				return;
+			}
 
-		try {
-			// Convert base64 to ArrayBuffer
-			const arrayBuffer = base64ToArrayBuffer(fileData);
+			try {
+				// Dynamically import and convert base64 to ArrayBuffer
+				const { base64ToArrayBuffer } = await import("@/services/pdf");
+				const arrayBuffer = base64ToArrayBuffer(fileData);
 
-			// Create a Blob from the ArrayBuffer
-			const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+				// Create a Blob from the ArrayBuffer
+				const blob = new Blob([arrayBuffer], { type: "application/pdf" });
 
-			// Create an object URL for the Blob
-			const url = URL.createObjectURL(blob);
-			setObjectUrl(url);
-			setIsLoading(false);
+				// Create an object URL for the Blob
+				const url = URL.createObjectURL(blob);
+				setObjectUrl(url);
+				setIsLoading(false);
 
-			// Clean up the URL when the component unmounts
-			return () => {
-				if (url) URL.revokeObjectURL(url);
-			};
-		} catch (err) {
-			console.error("Error processing PDF:", err);
-			setError("Failed to load PDF file");
-			setIsLoading(false);
-			onTextExtracted(null); // Signal text extraction failure/unsupported
-			return undefined;
-		}
+				// Clean up the URL when the component unmounts
+				return () => {
+					if (url) URL.revokeObjectURL(url);
+				};
+			} catch (err) {
+				console.error("Error processing PDF:", err);
+				setError("Failed to load PDF file");
+				setIsLoading(false);
+				onTextExtracted(null); // Signal text extraction failure/unsupported
+				return undefined;
+			}
+		};
+
+		loadPdf();
 	}, [fileData, onTextExtracted]); // Add callback to dependencies
 
 	// Handle iframe load event - Signal that text extraction is not supported here

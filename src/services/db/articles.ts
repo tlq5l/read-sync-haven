@@ -43,6 +43,9 @@ export async function saveArticle(
 			throw new Error("Cannot save article: Missing title, url, or content.");
 		}
 
+		// Reverted: Rely on PouchDB's put() conflict handling via executeWithRetry
+		// The explicit check before put caused issues with tests.
+
 		try {
 			console.log(
 				`${isUpdate ? "Updating" : "Creating"} article ${docId} locally...`,

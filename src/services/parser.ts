@@ -1,7 +1,7 @@
 import { Readability } from "@mozilla/readability";
 import DOMPurify from "dompurify";
-// Import JSDOM for Node.js environments
-import { JSDOM } from "jsdom";
+// JSDOM is imported dynamically below for Node.js environments only
+// import { JSDOM } from "jsdom";
 import TurndownService from "turndown";
 
 // No need for Node.js polyfills as we're using browser-native DOMParser
@@ -199,11 +199,22 @@ export async function parseArticle(
 			// Use Readability to parse the article
 			const reader = new Readability(document);
 			article = reader.parse();
+		} else if (import.meta.env.SSR) {
+			// Node.js environment (SSR build) - dynamically import and use JSDOM
+			try {
+				const { JSDOM } = await import("jsdom");
+				const dom = new JSDOM(html, { url: normalizedUrl });
+				const reader = new Readability(dom.window.document);
+				article = reader.parse();
+			} catch (e) {
+				console.error("Failed to load or use JSDOM in SSR:", e);
+				throw new Error("Failed to parse article in SSR environment.");
+			}
 		} else {
-			// Node.js environment - use JSDOM
-			const dom = new JSDOM(html, { url: normalizedUrl });
-			const reader = new Readability(dom.window.document);
-			article = reader.parse();
+			// Should not happen in a pure client-side build if window was undefined
+			throw new Error(
+				"Parsing environment unclear: window is undefined but not in SSR build.",
+			);
 		}
 
 		if (!article) {

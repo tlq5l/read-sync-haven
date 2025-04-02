@@ -55,6 +55,7 @@
 		"@types/pouchdb": "^6.4.2",
 		"@types/turndown": "^5.0.5",
 		"@types/uuid": "^10.0.0",
+		"ajv": "^6.12.3",
 		"caniuse-lite": "^1.0.30001707",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
@@ -106,15 +107,18 @@
 		"google-auth-library": "^9.15.1",
 		"happy-dom": "^17.4.4",
 		"husky": "^9.1.7",
-		"lovable-tagger": "^1.1.8",
+		"msw": "^2.7.3",
 		"postcss": "^8.5.3",
 		"pouchdb-adapter-memory": "^9.0.0",
-		"pouchdb-memory": "^6.0.0",
 		"process": "^0.11.10",
 		"tailwindcss": "^3.4.17",
 		"typescript": "^5.8.2",
 		"vite": "^6.2.4",
 		"vite-plugin-node-polyfills": "^0.23.0",
 		"vitest": "^3.1.1"
+	},
+	"overrides": {
+		"pouchdb-ajax": "^6.4.3",
+		"pouchdb-adapter-http": "^6.4.3"
 	}
 }

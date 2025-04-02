@@ -6,6 +6,7 @@
 export interface Article {
 	_id: string; // PouchDB document ID (e.g., 'article_uuid', 'pdf_uuid')
 	_rev?: string; // PouchDB document revision
+	_deleted?: boolean; // PouchDB deletion marker
 	title: string; // Title of the item
 	url: string; // Original URL or local file identifier (e.g., 'local://filename.epub')
 	content: string; // Main content (HTML for articles, placeholder for binary files)

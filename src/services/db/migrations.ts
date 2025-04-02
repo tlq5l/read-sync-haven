@@ -1,8 +1,9 @@
 // src/services/db/migrations.ts
 // Helper functions to update the database schema or fix data issues
 
-import { getEstimatedReadingTime as getEpubReadingTime } from "@/services/epub";
-import { getEstimatedReadingTime as getPdfReadingTime } from "@/services/pdf";
+// Removed static imports for dynamic loading below
+// import { getEstimatedReadingTime as getEpubReadingTime } from "@/services/epub";
+// import { getEstimatedReadingTime as getPdfReadingTime } from "@/services/pdf";
 import { articlesDb } from "./config";
 import type { Article } from "./types";
 import { executeWithRetry } from "./utils";
@@ -51,100 +52,115 @@ export async function updateMissingMetadata(): Promise<number> {
 				`Found ${documentsToUpdate.length} documents potentially missing metadata (siteName, readTime, excerpt).`,
 			);
 
-			// 3. Update each document with appropriate values
-			const updatedDocs: Article[] = [];
-
-			for (const doc of documentsToUpdate) {
+			// 3. Process each document asynchronously to update values
+			const updatePromises = documentsToUpdate.map(async (doc) => {
 				// Skip if missing revision
 				if (!doc._rev) {
 					console.warn(`Document ${doc._id} is missing _rev, cannot update.`);
-					continue;
+					return null; // Return null for documents that cannot be updated
 				}
 
 				let updated = false;
+				const docToUpdate = { ...doc }; // Clone doc to avoid modifying original in case of partial failure
 
 				// Add siteName if missing
-				if (!doc.siteName) {
+				if (!docToUpdate.siteName) {
 					try {
 						// Attempt to derive from URL for web articles
-						if (doc.type === "article" && doc.url) {
-							const url = new URL(doc.url);
+						if (docToUpdate.type === "article" && docToUpdate.url) {
+							const url = new URL(docToUpdate.url);
 							// Remove 'www.' if present
-							doc.siteName = url.hostname.replace(/^www\./, "");
-						} else if (doc.type === "pdf") {
-							doc.siteName = "PDF Document";
-						} else if (doc.type === "epub") {
-							doc.siteName = "EPUB Book";
+							docToUpdate.siteName = url.hostname.replace(/^www\./, "");
+						} else if (docToUpdate.type === "pdf") {
+							docToUpdate.siteName = "PDF Document";
+						} else if (docToUpdate.type === "epub") {
+							docToUpdate.siteName = "EPUB Book";
 						} else {
-							doc.siteName = "Unknown Source"; // Fallback
+							docToUpdate.siteName = "Unknown Source"; // Fallback
 						}
 						updated = true;
 					} catch (e) {
 						console.warn(
-							`Failed to parse URL for siteName on ${doc._id}: ${doc.url}`,
+							`Failed to parse URL for siteName on ${docToUpdate._id}: ${docToUpdate.url}`,
 						);
-						doc.siteName = "Unknown Source"; // Fallback on URL parse error
+						docToUpdate.siteName = "Unknown Source"; // Fallback on URL parse error
 						updated = true;
 					}
 				}
 
 				// Add estimatedReadTime if missing
-				// Add estimatedReadTime if missing
-				if (!doc.estimatedReadTime) {
-					if (doc.type === "pdf" && doc.fileSize) {
-						doc.estimatedReadTime = getPdfReadingTime(
-							doc.fileSize,
-							doc.pageCount,
-						);
-						updated = true;
-					} else if (doc.type === "epub" && doc.fileSize) {
-						doc.estimatedReadTime = getEpubReadingTime(doc.fileSize);
-						updated = true;
-					}
-					// Add default for web articles or if calculation failed
-					if (!doc.estimatedReadTime) {
-						// Basic estimation for web articles based on content length (very rough)
-						if (doc.type === "article" && doc.content) {
-							const words = doc.content.split(/\s+/).length;
-							doc.estimatedReadTime = Math.max(1, Math.ceil(words / 200)); // Assume 200 WPM, min 1 min
-						} else if (doc.type === "pdf") {
-							// Default for PDF if size/page count missing
-							doc.estimatedReadTime = doc.pageCount ? doc.pageCount * 2 : 10;
-						} else if (doc.type === "epub") {
-							// Default for EPUB if size missing
-							doc.estimatedReadTime = 60;
-						} else {
-							// General fallback
-							doc.estimatedReadTime = 5;
+				if (!docToUpdate.estimatedReadTime && docToUpdate.fileSize) {
+					try {
+						if (docToUpdate.type === "pdf") {
+							const { getEstimatedReadingTime: getPdfReadingTime } =
+								await import("@/services/pdf");
+							docToUpdate.estimatedReadTime = getPdfReadingTime(
+								docToUpdate.fileSize,
+								docToUpdate.pageCount,
+							);
+							updated = true;
+						} else if (docToUpdate.type === "epub") {
+							const { getEstimatedReadingTime: getEpubReadingTime } =
+								await import("@/services/epub");
+							docToUpdate.estimatedReadTime = getEpubReadingTime(
+								docToUpdate.fileSize,
+							);
+							updated = true;
 						}
-						updated = true;
+					} catch (importError) {
+						console.error(
+							`Failed to dynamically import reading time function for ${docToUpdate._id}:`,
+							importError,
+						);
 					}
+				}
+
+				// Add default reading time if we couldn't calculate it
+				if (!docToUpdate.estimatedReadTime) {
+					if (docToUpdate.type === "article" && docToUpdate.content) {
+						// Basic estimation for web articles based on content length
+						const words = docToUpdate.content.split(/\s+/).length;
+						docToUpdate.estimatedReadTime = Math.max(1, Math.ceil(words / 200)); // Assume 200 WPM, min 1 min
+					} else if (docToUpdate.type === "pdf") {
+						docToUpdate.estimatedReadTime = docToUpdate.pageCount
+							? docToUpdate.pageCount * 2
+							: 10; // 2 minutes per page or 10 minutes default
+					} else if (docToUpdate.type === "epub") {
+						docToUpdate.estimatedReadTime = 60; // Default to 60 minutes for EPUBs
+					} else {
+						docToUpdate.estimatedReadTime = 5; // General fallback
+					}
+					updated = true;
 				}
 
 				// Add excerpt if missing and content exists
-				if ((!doc.excerpt || doc.excerpt.trim() === "") && doc.content) {
+				if ((!docToUpdate.excerpt || docToUpdate.excerpt.trim() === "") && docToUpdate.content) {
 					// Simple excerpt: first 200 chars, add ellipsis if longer
-					const plainTextContent = doc.content
+					const plainTextContent = docToUpdate.content
 						.replace(/<[^>]+>/g, " ")
 						.replace(/\s+/g, " ")
 						.trim(); // Basic HTML strip + whitespace normalize
 					if (plainTextContent.length > 0) {
-						doc.excerpt =
+						docToUpdate.excerpt =
 							plainTextContent.length > 200
 								? `${plainTextContent.substring(0, 200)}...`
 								: plainTextContent;
 						updated = true;
-					} else if (!doc.excerpt) {
+					} else if (!docToUpdate.excerpt) {
 						// If content was only HTML/empty, set a default placeholder
-						doc.excerpt = "No excerpt available";
+						docToUpdate.excerpt = "No excerpt available";
 						updated = true;
 					}
 				}
 
-				if (updated) {
-					updatedDocs.push(doc);
-				}
-			}
+				return updated ? docToUpdate : null; // Return updated doc or null if no changes
+			});
+
+			// Wait for all updates to process and filter out nulls
+			const results = await Promise.all(updatePromises);
+			const updatedDocs: Article[] = results.filter(
+				(doc): doc is Article => doc !== null,
+			);
 
 			if (updatedDocs.length > 0) {
 				console.log(
