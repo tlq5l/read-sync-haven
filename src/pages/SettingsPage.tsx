@@ -9,7 +9,6 @@ import { Slider } from "@/components/ui/slider";
 
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
 import type { TextSize } from "@/context/ThemeContext"; // Import TextSize type
 
 import { useTheme } from "@/context/ThemeContext";
@@ -30,7 +29,7 @@ import { Link } from "react-router-dom";
 
 export default function SettingsPage() {
 	const { toast } = useToast();
-	const { theme, textSize, setTextSize } = useTheme(); // Get textSize and setTextSize
+	const { textSize, setTextSize } = useTheme(); // Get textSize and setTextSize
 	const [isExportingData, setIsExportingData] = useState(false);
 	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
 	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false); // Add state for metadata update button
@@ -200,18 +199,6 @@ export default function SettingsPage() {
 								<CardContent className="space-y-6">
 									{" "}
 									{/* Increased spacing */}
-									<div className="flex items-center justify-between">
-										<div className="space-y-0.5">
-											<Label htmlFor="dark-mode">Dark Mode</Label>
-											<p className="text-sm text-muted-foreground">
-												{theme === "dark"
-													? "Dark mode enabled"
-													: "Light mode enabled"}
-											</p>
-										</div>
-										<ThemeToggle showLabel={false} />
-									</div>
-									<Separator />
 									{/* Text Size Slider */}
 									<div className="space-y-3">
 										<Label htmlFor="text-size-slider">Text Size</Label>
