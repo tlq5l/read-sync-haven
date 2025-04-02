@@ -16,6 +16,7 @@ import {
 import { useArticles } from "@/context/ArticleContext";
 import type { ArticleSortField } from "@/types/articles";
 import { ArrowDownUp, ChevronDown, Library } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 
 // Removed unused getSortLabel function
 
@@ -27,6 +28,9 @@ export default function TopBar() {
 		setSortField,
 		toggleSortDirection,
 	} = useArticles();
+	const location = useLocation();
+
+	const isActive = (path: string) => location.pathname === path;
 
 	return (
 		<div className="flex items-center justify-between p-2 px-4 border-b bg-background text-foreground sticky top-0 z-10">
@@ -62,15 +66,27 @@ export default function TopBar() {
 					</DropdownMenuContent>
 				</DropdownMenu>
 
-				{/* Placeholder buttons for other views */}
-				<Button variant="ghost" disabled className="px-2 text-muted-foreground">
-					Inbox
+				{/* Navigation Links */}
+				<Button
+					variant="ghost"
+					className={`px-2 ${isActive("/inbox") ? "text-foreground" : "text-muted-foreground"}`}
+					asChild
+				>
+					<Link to="/inbox">Inbox</Link>
 				</Button>
-				<Button variant="ghost" disabled className="px-2 text-muted-foreground">
-					Later
+				<Button
+					variant="ghost"
+					className={`px-2 ${isActive("/later") ? "text-foreground" : "text-muted-foreground"}`}
+					asChild
+				>
+					<Link to="/later">Later</Link>
 				</Button>
-				<Button variant="ghost" disabled className="px-2 text-muted-foreground">
-					Archive
+				<Button
+					variant="ghost"
+					className={`px-2 ${isActive("/archive") ? "text-foreground" : "text-muted-foreground"}`}
+					asChild
+				>
+					<Link to="/archive">Archive</Link>
 				</Button>
 			</div>
 

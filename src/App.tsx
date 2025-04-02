@@ -17,7 +17,10 @@ import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import AddPage from "./pages/AddPage";
+import ArchivePage from "./pages/ArchivePage";
 import HomePage from "./pages/HomePage";
+import InboxPage from "./pages/InboxPage";
+import LaterPage from "./pages/LaterPage";
 import NotFound from "./pages/NotFound";
 import ReadPage from "./pages/ReadPage";
 import SearchPage from "./pages/SearchPage";
@@ -91,6 +94,9 @@ const AppWithRouter = () => (
 						<Route path="/read/:id" element={<ReadPage />} />
 						<Route path="/search" element={<SearchPage />} />
 						<Route path="/settings" element={<SettingsPage />} />
+						<Route path="/inbox" element={<InboxPage />} />
+						<Route path="/later" element={<LaterPage />} />
+						<Route path="/archive" element={<ArchivePage />} />
 					</Route>
 				</Route>
 
