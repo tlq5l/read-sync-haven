@@ -6,7 +6,7 @@ import { fetchCloudItems } from "@/services/cloudSync";
 import { type Article, getAllArticles, saveArticle } from "@/services/db";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ArticleView } from "./useArticleView"; // Import the type
+// import type { ArticleView } from "./useArticleView"; // Removed unused import
 
 // Deduplicates articles based on _id, keeping the one with the latest savedAt timestamp.
 const deduplicateArticlesById = (articlesToDedup: Article[]): Article[] => {
@@ -44,7 +44,7 @@ const deduplicateArticlesById = (articlesToDedup: Article[]): Article[] => {
  */
 export function useArticleSync(
 	isInitialized: boolean,
-	currentView: ArticleView,
+	// currentView: ArticleView, // Removed as filtering is handled by context
 ) {
 	const [articles, setArticles] = useState<Article[]>([]);
 	const [isLoading, setIsLoading] = useState<boolean>(true); // True initially
@@ -79,13 +79,8 @@ export function useArticleSync(
 						);
 					}
 
-					// Apply view filtering
-					let viewFilteredArticles = dedupedArticles;
-					if (currentView === "unread") {
-						viewFilteredArticles = dedupedArticles.filter((a) => !a.isRead);
-					} else if (currentView === "favorites") {
-						viewFilteredArticles = dedupedArticles.filter((a) => a.favorite);
-					}
+					// View filtering is now handled by ArticleContext
+					const viewFilteredArticles = dedupedArticles;
 					// Apply default sort (e.g., savedAt desc) - mimicking potential old behavior
 					// Note: The context provider will apply its own sorting later based on user selection
 					const sortedArticles = [...viewFilteredArticles].sort((a, b) => {
@@ -121,7 +116,7 @@ export function useArticleSync(
 			return false; // Not loaded from cache
 		},
 		// Dependencies: These influence the cache query or filtering
-		[isSignedIn, userId, currentView],
+		[isSignedIn, userId], // Removed currentView dependency
 	);
 
 	const performCloudSync = useCallback(
@@ -138,14 +133,12 @@ export function useArticleSync(
 
 			syncTimeoutId = setTimeout(() => {
 				if (isMounted && syncInProgress) {
-					console.warn(
-						`Sync Hook: Cloud sync for ${currentView} view timed out`,
-					);
+					console.warn("Sync Hook: Cloud sync timed out");
 					if (isMounted) {
 						setIsRefreshing(false);
 						fetchLockRef.current = false; // Release lock on timeout
 						const timeoutError = new Error(
-							`Syncing ${currentView} articles timed out. Displaying cached data.`,
+							"Syncing articles timed out. Displaying cached data.",
 						);
 						setError(timeoutError); // Set error on timeout
 						toast({
@@ -257,17 +250,8 @@ export function useArticleSync(
 					);
 				}
 
-				// Apply view filtering
-				let viewFilteredArticlesAfterSync = dedupedArticlesAfterSync;
-				if (currentView === "unread") {
-					viewFilteredArticlesAfterSync = dedupedArticlesAfterSync.filter(
-						(a) => !a.isRead,
-					);
-				} else if (currentView === "favorites") {
-					viewFilteredArticlesAfterSync = dedupedArticlesAfterSync.filter(
-						(a) => a.favorite,
-					);
-				}
+				// View filtering is now handled by ArticleContext
+				const viewFilteredArticlesAfterSync = dedupedArticlesAfterSync;
 				// Apply default sort (e.g., savedAt desc)
 				const sortedArticlesAfterSync = [...viewFilteredArticlesAfterSync].sort(
 					(a, b) => {
@@ -290,10 +274,7 @@ export function useArticleSync(
 			} catch (syncErr) {
 				syncInProgress = false; // Mark sync as complete on error too
 				if (syncTimeoutId) clearTimeout(syncTimeoutId);
-				console.error(
-					`Sync Hook: Failed to sync articles for ${currentView} view:`,
-					syncErr,
-				);
+				console.error("Sync Hook: Failed to sync articles:", syncErr);
 
 				if (isMounted) {
 					const error =
@@ -321,7 +302,7 @@ export function useArticleSync(
 		},
 		// Dependencies: These influence the cloud sync operation
 		// filterAndSortArticles and runOneTimeFileSync are stable imports from "@/lib/articleUtils"
-		[isSignedIn, userId, getToken, user, currentView, toast],
+		[isSignedIn, userId, getToken, user, toast], // Removed currentView dependency
 	);
 
 	// --- Main Load and Sync Effect ---
@@ -396,7 +377,7 @@ export function useArticleSync(
 		isLoaded,
 		isSignedIn,
 		userId,
-		// currentView is implicitly handled via loadArticlesFromCache/performCloudSync deps
+		// currentView dependency removed from load/sync functions
 		loadArticlesFromCache,
 		performCloudSync,
 		isRefreshing, // Keep isRefreshing to reset error correctly
@@ -483,14 +464,14 @@ export function useArticleSync(
 		setError(null);
 		toast({
 			title: "Retrying",
-			description: `Retrying to load ${currentView} articles...`,
+			description: "Retrying to load articles...",
 		});
 		// The main useEffect will re-run due to state changes or dependencies
 		// Alternatively, directly call refreshArticles if preferred
 		// Directly trigger the main effect logic by changing a dependency or state
 		// Or, more directly, call refreshArticles which now encapsulates the sync
-		refreshArticles();
-	}, [refreshArticles, currentView, toast]); // Add missing dependencies
+		refreshArticles(); // refreshArticles itself doesn't depend on currentView anymore
+	}, [refreshArticles, toast]); // Removed currentView dependency
 
 	// Helper functions are now imported from @/lib/articleUtils
 

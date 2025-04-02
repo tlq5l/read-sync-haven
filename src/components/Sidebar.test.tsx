@@ -2,7 +2,7 @@ import { AnimationProvider } from "@/context/AnimationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import Sidebar from "./Sidebar";
 
 // --- Mocks ---
@@ -71,7 +71,9 @@ vi.mock("lucide-react", async (importOriginal) => {
 	];
 
 	for (const name of iconNames) {
-		mockedIcons[name] = (props) => <svg data-testid={`icon-${name}`} {...props} />;
+		mockedIcons[name] = (props) => (
+			<svg data-testid={`icon-${name}`} {...props} />
+		);
 	}
 
 	return {
@@ -162,7 +164,9 @@ describe("Sidebar Component", () => {
 				<Sidebar />
 			</MockProviders>,
 		);
-		expect(screen.getByRole("link", { name: /add content/i })).toBeInTheDocument();
+		expect(
+			screen.getByRole("link", { name: /add content/i }),
+		).toBeInTheDocument();
 		expect(screen.getByTestId("icon-Plus")).toBeInTheDocument();
 	});
 

@@ -85,7 +85,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		error: syncError,
 		refreshArticles: syncRefreshArticles, // Rename to avoid conflict
 		retryLoading: syncRetryLoading, // Rename to avoid conflict
-	} = useArticleSync(isDbInitialized, currentView); // This provides the raw 'articles' based on view
+	} = useArticleSync(isDbInitialized); // Removed currentView argument
 
 	// 4. Tags State
 	const [allTags, setAllTags] = useState<Tag[]>([]);

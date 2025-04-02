@@ -1,5 +1,10 @@
 import { useToast } from "@/hooks/use-toast";
-import { deleteItemFromCloud, saveItemToCloud } from "@/services/cloudSync"; // Import cloud save and delete
+import { debounce } from "@/lib/utils"; // Import debounce
+import {
+	type CloudSyncStatus, // Import the status type
+	deleteItemFromCloud,
+	saveItemToCloud,
+} from "@/services/cloudSync"; // Import cloud save and delete
 import {
 	type Article,
 	deleteArticle,
@@ -20,7 +25,7 @@ import {
 	arrayBufferToBase64 as pdfToBase64,
 } from "@/services/pdf";
 import { useAuth } from "@clerk/clerk-react"; // Removed useUser as unused
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react"; // Import useMemo
 
 /**
  * Hook providing functions to perform actions on articles (add, update, delete).
@@ -30,7 +35,29 @@ import { useCallback } from "react";
 export function useArticleActions(refreshArticles: () => Promise<void>) {
 	const { toast } = useToast();
 	const { userId, isSignedIn } = useAuth();
-	// const { user } = useUser(); // Removed as unused - permission checks use userId directly
+
+	// Debounced function for syncing progress updates to the cloud
+	const debouncedSyncProgress = useMemo(
+		() =>
+			debounce((articleToSync: Article) => {
+				saveItemToCloud(articleToSync)
+					.then((status: CloudSyncStatus) => {
+						if (status !== "success") {
+							console.warn(
+								`Debounced sync for progress update ${articleToSync._id} failed with status: ${status}`,
+							);
+						}
+						// No console log on success to reduce noise
+					})
+					.catch((err) => {
+						console.error(
+							`Error syncing progress update for ${articleToSync._id}:`,
+							err,
+						);
+					});
+			}, 1500), // Debounce for 1.5 seconds
+		[], // No dependencies, saveItemToCloud is a stable import
+	);
 
 	// Add article by URL
 	const addArticleByUrl = useCallback(
@@ -186,14 +213,14 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 
 				// Sync to Cloud (fire and forget)
 				saveItemToCloud(savedArticle)
-					.then((success) => {
-						if (success) {
+					.then((status: CloudSyncStatus) => {
+						if (status === "success") {
 							console.log(
 								`Successfully synced ${fileType} ${savedArticle._id} to cloud.`,
 							);
 						} else {
 							console.warn(
-								`Failed to sync ${fileType} ${savedArticle._id} to cloud (API returned false).`,
+								`Sync for ${fileType} ${savedArticle._id} failed with status: ${status}`,
 							);
 						}
 					})
@@ -298,14 +325,14 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 
 				// Sync update to cloud (fire and forget)
 				saveItemToCloud(updatedArticle)
-					.then((success) => {
-						if (success) {
+					.then((status: CloudSyncStatus) => {
+						if (status === "success") {
 							console.log(
 								`Successfully synced status update for ${id} to cloud.`,
 							);
 						} else {
 							console.warn(
-								`Failed to sync status update for ${id} (API returned false).`,
+								`Sync for status update ${id} failed with status: ${status}`,
 							);
 						}
 					})
@@ -377,21 +404,8 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 
 				const updatedArticle = await updateArticle(updates);
 
-				// Sync progress update to cloud (fire and forget, maybe less frequently?)
-				// Consider debouncing this or only syncing significant changes
-				saveItemToCloud(updatedArticle)
-					.then((success) => {
-						if (success) {
-							// console.log(`Synced progress update for ${id} to cloud.`); // Maybe too noisy
-						} else {
-							console.warn(
-								`Failed to sync progress update for ${id} (API returned false).`,
-							);
-						}
-					})
-					.catch((err) => {
-						console.error(`Error syncing progress update for ${id}:`, err);
-					});
+				// Sync progress update to cloud using the debounced function
+				debouncedSyncProgress(updatedArticle);
 
 				// No refresh needed here, UI should update optimistically or via direct state update if required elsewhere
 				// await refreshArticles(); // Avoid refreshing on every progress update
@@ -400,7 +414,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				// No toast for progress updates
 			}
 		},
-		[userId, isSignedIn], // No toast or refresh needed here
+		[userId, isSignedIn, debouncedSyncProgress], // Add stable debounced function
 	);
 
 	// Remove article - Returns true on successful DB delete, false otherwise.
@@ -447,15 +461,17 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 
 				// Trigger cloud deletion (fire and forget, but log errors)
 				deleteItemFromCloud(id)
-					.then((success) => {
-						if (success) {
+					.then((status: CloudSyncStatus) => {
+						if (status === "success") {
 							console.log(`Successfully triggered cloud deletion for ${id}.`);
+						} else if (status === "not_found") {
+							console.log(
+								`Item ${id} already deleted or not found in cloud during deletion trigger.`,
+							);
 						} else {
-							// This might happen if the item was already deleted from the cloud
-							// or if there was an API error. The local delete succeeded,
-							// so we still return true, but log the warning.
+							// Log other failures but don't block UI return, as local delete succeeded
 							console.warn(
-								`Cloud deletion request for ${id} failed or item not found.`,
+								`Cloud deletion trigger for ${id} failed with status: ${status}`,
 							);
 						}
 					})

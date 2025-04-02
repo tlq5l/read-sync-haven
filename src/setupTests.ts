@@ -45,7 +45,6 @@ Object.defineProperty(window, "matchMedia", {
 	}),
 });
 
-
 // Mock ResizeObserver more robustly
 global.ResizeObserver = class ResizeObserver {
 	callback: ResizeObserverCallback;

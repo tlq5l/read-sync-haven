@@ -1,10 +1,10 @@
-import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import HomePage from "./HomePage";
-import { MemoryRouter } from "react-router-dom";
+import { TooltipProvider } from "@/components/ui/tooltip"; // Import TooltipProvider
 import { ThemeProvider } from "@/context/ThemeContext"; // Import ThemeProvider
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"; // Import QueryClientProvider
-import { TooltipProvider } from "@/components/ui/tooltip"; // Import TooltipProvider
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import HomePage from "./HomePage";
 
 // Mock Clerk's useUser hook
 vi.mock("@clerk/clerk-react", () => ({
@@ -12,9 +12,7 @@ vi.mock("@clerk/clerk-react", () => ({
 	useAuth: vi.fn(() => ({ isSignedIn: true })), // Mock useAuth as well if needed by sub-components
 }));
 
-const mockUseUser = vi.mocked(
-	(await import("@clerk/clerk-react")).useUser,
-);
+const mockUseUser = vi.mocked((await import("@clerk/clerk-react")).useUser);
 
 // Mock Dropdown components if they cause issues in tests
 vi.mock("@/components/ui/dropdown-menu", async () => {
@@ -27,7 +25,9 @@ vi.mock("@/components/ui/dropdown-menu", async () => {
 			<div>{children}</div>
 		),
 		// Render children directly to avoid extra button wrapper
-		DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+		DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => (
+			<>{children}</>
+		),
 		DropdownMenuContent: ({ children }: { children: React.ReactNode }) => (
 			<div>{children}</div>
 		),

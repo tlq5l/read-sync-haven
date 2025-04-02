@@ -1,5 +1,14 @@
 import type { Article } from "./db"; // Use type-only import
 
+// Define possible outcomes for cloud operations
+export type CloudSyncStatus =
+	| "success"
+	| "not_found"
+	| "unauthorized"
+	| "error"
+	| "no_user_id"
+	| "no_article_id";
+
 // Interface for items from the Cloudflare Worker
 // Define the structure expected from the worker (should match WorkerArticle in worker)
 // We can reuse the Article type if it's identical or define a specific CloudArticle type
@@ -73,10 +82,12 @@ export async function fetchCloudItems(
 /**
  * Saves an article to the Cloudflare Worker
  */
-export async function saveItemToCloud(article: Article): Promise<boolean> {
+export async function saveItemToCloud(
+	article: Article,
+): Promise<CloudSyncStatus> {
 	if (!article.userId) {
-		console.error("Cannot save to cloud: article has no userId");
-		return false;
+		console.error("Cannot save to cloud: article has no userId", article._id);
+		return "no_user_id";
 	}
 
 	try {
@@ -93,20 +104,37 @@ export async function saveItemToCloud(article: Article): Promise<boolean> {
 			},
 		);
 
-		return response.ok;
+		if (response.ok) {
+			// Status 200 OK or 201 Created typically indicate success
+			return "success";
+		}
+		if (response.status === 401) {
+			console.error(
+				`Unauthorized: Failed to save item ${article._id} to cloud.`,
+			);
+			return "unauthorized";
+		}
+		// Handle other non-OK statuses as generic errors
+		const errorBody = await response.text();
+		console.error(
+			`Error saving item ${article._id} to cloud. Status: ${response.status}, Body: ${errorBody}`,
+		);
+		return "error";
 	} catch (error) {
-		console.error("Error saving item to cloud:", error);
-		return false;
+		console.error(`Error saving item ${article._id} to cloud:`, error);
+		return "error";
 	}
 }
 
 /**
  * Deletes an article from the Cloudflare Worker
  */
-export async function deleteItemFromCloud(articleId: string): Promise<boolean> {
+export async function deleteItemFromCloud(
+	articleId: string,
+): Promise<CloudSyncStatus> {
 	if (!articleId) {
-		console.error("Cannot delete from cloud: articleId is missing");
-		return false;
+		console.error("Cannot delete from cloud: articleId is missing.");
+		return "no_article_id";
 	}
 
 	try {
@@ -127,20 +155,31 @@ export async function deleteItemFromCloud(articleId: string): Promise<boolean> {
 			},
 		});
 
-		if (!response.ok) {
-			// Log specific error details if possible
-			const errorBody = await response.text();
+		if (response.ok) {
+			// Status 200 OK or 204 No Content typically indicate success
+			console.log(`Successfully deleted item ${articleId} from cloud.`);
+			return "success";
+		}
+		if (response.status === 404) {
+			console.warn(`Item ${articleId} not found in cloud for deletion.`);
+			return "not_found";
+		}
+		if (response.status === 401) {
 			console.error(
-				`Failed to delete item ${articleId} from cloud. Status: ${response.status}, Body: ${errorBody}`,
+				`Unauthorized: Failed to delete item ${articleId} from cloud.`,
 			);
-			return false;
+			return "unauthorized";
 		}
 
-		console.log(`Successfully deleted item ${articleId} from cloud.`);
-		return response.ok;
+		// Handle other non-OK statuses as generic errors
+		const errorBody = await response.text();
+		console.error(
+			`Error deleting item ${articleId} from cloud. Status: ${response.status}, Body: ${errorBody}`,
+		);
+		return "error";
 	} catch (error) {
-		console.error(`Error deleting item ${articleId} from cloud:`, error);
-		return false;
+		console.error(`Error during delete request for ${articleId}:`, error);
+		return "error";
 	}
 }
 

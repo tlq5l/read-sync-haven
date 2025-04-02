@@ -113,7 +113,7 @@ describe("useArticleSync", () => {
 		vi.mocked(db.getAllArticles).mockResolvedValue(duplicateArticles);
 
 		// Render the hook
-		const { result } = renderHook(() => useArticleSync(true, "all"));
+		const { result } = renderHook(() => useArticleSync(true)); // Removed "all" argument
 
 		// Wait for initial load to complete
 		await waitFor(() => {
@@ -189,7 +189,7 @@ describe("useArticleSync", () => {
 		getAllArticlesMock.mockResolvedValue(combinedArticles);
 
 		// Render the hook
-		const { result } = renderHook(() => useArticleSync(true, "all"));
+		const { result } = renderHook(() => useArticleSync(true)); // Removed "all" argument
 
 		// Wait for sync to complete
 		await waitFor(() => {
