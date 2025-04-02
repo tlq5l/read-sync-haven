@@ -1,5 +1,5 @@
-import React, { type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react"; // Use 'import type'
 
 // Create a QueryClient instance specifically for tests
 // We create it once here to be shared across tests using this wrapper
@@ -13,9 +13,13 @@ const testQueryClient = new QueryClient({
 });
 
 // Define and export the wrapper component
-export function QueryClientWrapper({ children }: { children: ReactNode }): JSX.Element {
+export function QueryClientWrapper({
+	children,
+}: { children: ReactNode }): JSX.Element {
 	return (
-		<QueryClientProvider client={testQueryClient}>{children}</QueryClientProvider>
+		<QueryClientProvider client={testQueryClient}>
+			{children}
+		</QueryClientProvider>
 	);
 }
 

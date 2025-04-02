@@ -58,13 +58,12 @@ global.ResizeObserver = class ResizeObserver {
 
 // Add any other global setup logic here if needed.
 
-
+import { afterAll, afterEach, beforeAll } from "vitest";
 // MSW Setup
-import { server } from './mocks/server'; // Import the server instance
-import { beforeAll, afterEach, afterAll } from 'vitest';
+import { server } from "./mocks/server"; // Import the server instance
 
 // Establish API mocking before all tests.
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' })); // Error on unhandled requests
+beforeAll(() => server.listen({ onUnhandledRequest: "error" })); // Error on unhandled requests
 
 // Reset any request handlers that we may add during the tests,
 // so they don't affect other tests.

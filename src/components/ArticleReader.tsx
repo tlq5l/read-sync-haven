@@ -254,7 +254,8 @@ export default function ArticleReader() {
 							</ScrollArea>
 							{chatError && (
 								<p className="text-sm text-destructive mb-2">
-									Chat Error: {chatError}
+									Chat Error: {chatError?.message}{" "}
+									{/* Display the error message */}
 								</p>
 							)}
 							<form

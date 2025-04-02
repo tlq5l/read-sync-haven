@@ -1,14 +1,13 @@
 // bondwise-worker/src/index.test.ts
 
 import type { ExecutionContext } from "@cloudflare/workers-types";
+import { http, HttpResponse } from "msw"; // Import MSW http
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as auth from "./auth"; // Import the auth module to mock it
 import worker from "./index"; // Import the worker module directly
 import type { Env, WorkerArticle } from "./types";
 import { createUserItemKey } from "./utils";
-import { http, HttpResponse } from 'msw'; // Import MSW http
 // import { server } from '../../src/mocks/server'; // Cannot import due to rootDir constraint
-
 
 // Mock the authenticateRequestWithClerk function from the auth module
 vi.mock("./auth", async (importOriginal) => {
@@ -253,7 +252,10 @@ describe("Worker Integration Tests", () => {
 			const res = await worker.fetch(req, env, ctx);
 			expect(res.status).toBe(200);
 			const body = await res.json();
-			expect(body).toEqual({ status: "success", summary: "Fake GCF Summary (.test)" }); // Match MSW handler response
+			expect(body).toEqual({
+				status: "success",
+				summary: "Fake GCF Summary (.test)",
+			}); // Match MSW handler response
 			// expect(mockFetch).toHaveBeenCalledTimes(1); // MSW handles this now
 			// expect(mockFetch).toHaveBeenCalledWith( // MSW handles this now
 			// 	"http://fake-gcf.test/summarize",
@@ -337,7 +339,9 @@ describe("Worker Integration Tests", () => {
 			// Relying on global MSW handler for fake URL, which returns success.
 			// This test case might need adjustment based on how GCF failures are handled.
 			// TODO: Revisit mocking strategy for worker tests if needed.
-			console.warn("[Test Warning] Cannot override MSW handler for 502 failure in index.test.ts due to TS rootDir constraint. Test may not accurately reflect 502 scenario.");
+			console.warn(
+				"[Test Warning] Cannot override MSW handler for 502 failure in index.test.ts due to TS rootDir constraint. Test may not accurately reflect 502 scenario.",
+			);
 			const req = new Request("http://worker/api/summarize", {
 				method: "POST",
 				headers: {
