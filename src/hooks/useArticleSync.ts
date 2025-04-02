@@ -3,7 +3,12 @@ import { useToast } from "@/hooks/use-toast";
 // filterArticles and sortArticles might be needed if we implement view filtering here
 // import { filterArticles, sortArticles } from "@/lib/articleUtils";
 import { fetchCloudItems } from "@/services/cloudSync";
-import { type Article, getAllArticles, saveArticle } from "@/services/db";
+import {
+	type Article,
+	articlesDb,
+	bulkSaveArticles,
+	getAllArticles,
+} from "@/services/db"; // Import bulkSaveArticles, articlesDb, remove saveArticle
 import { useAuth, useUser } from "@clerk/clerk-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 // import type { ArticleView } from "./useArticleView"; // Removed unused import
@@ -179,81 +184,119 @@ export function useArticleSync(
 					return hasEssentialFields;
 				});
 
-				// Save/Update fetched articles locally
-				if (completeArticles.length > 0) {
-					console.log(
-						`Sync Hook: Attempting to save/update ${completeArticles.length} complete synced articles locally...`,
-					);
-					for (const article of completeArticles) {
-						try {
-							// Preprocess article before saving, especially EPUBs
-							const articleToSave = { ...article, userId }; // Create a mutable copy with userId
+				// Prepare articles for bulk saving
+				const articlesToBulkSave = completeArticles.map((article) => {
+					const articleToSave = { ...article, userId }; // Add userId
 
-							if (articleToSave.type === "epub") {
-								// Check if fileData is missing but content looks like Base64 (migration needed)
-								if (
-									!articleToSave.fileData &&
-									articleToSave.content &&
-									articleToSave.content.length > 100
-								) {
-									// Basic check for Base64-like content
-									console.warn(
-										`Sync Hook: Migrating EPUB ${articleToSave._id} from content to fileData during cloud sync.`,
-									);
-									articleToSave.fileData = articleToSave.content; // Move content to fileData
-									articleToSave.content =
-										"EPUB content migrated from content field."; // Set placeholder
-								} else if (articleToSave.fileData) {
-									// Ensure content is just a placeholder if fileData exists
-									articleToSave.content = "EPUB content is stored in fileData.";
-								} else {
-									// EPUB type but no fileData and content doesn't look like Base64
-									console.warn(
-										`Sync Hook: EPUB ${articleToSave._id} from cloud is missing fileData.`,
-									);
-									// Keep original content for now, might be a placeholder already
-								}
-							}
-							// TODO: Similar check might be needed for PDF if fileData is used there too
-
-							await saveArticle(articleToSave); // Save the potentially modified article
-						} catch (saveErr) {
+					// Preprocess EPUBs (similar logic as before)
+					if (articleToSave.type === "epub") {
+						if (
+							!articleToSave.fileData &&
+							articleToSave.content &&
+							articleToSave.content.length > 100
+						) {
 							console.warn(
-								`Sync Hook: Failed to save/update synced article ${article._id} locally:`,
-								saveErr,
+								`Sync Hook: Migrating EPUB ${articleToSave._id} from content to fileData during bulk sync.`,
+							);
+							articleToSave.fileData = articleToSave.content;
+							articleToSave.content =
+								"EPUB content migrated from content field.";
+						} else if (articleToSave.fileData) {
+							articleToSave.content = "EPUB content is stored in fileData.";
+						} else {
+							console.warn(
+								`Sync Hook: EPUB ${articleToSave._id} from cloud is missing fileData.`,
 							);
 						}
 					}
-					console.log(
-						"Sync Hook: Finished saving/updating synced articles locally.",
-					);
-				}
-
-				// Re-fetch from local DB AFTER saving cloud data
-				console.log(
-					"Sync Hook: Re-fetching articles from local DB after sync...",
-				);
-				const localArticlesAfterSync = await getAllArticles({
-					userIds: [userId],
+					// TODO: Similar check for PDF if needed
+					return articleToSave;
 				});
-				console.log(
-					`Sync Hook: Fetched ${localArticlesAfterSync.length} articles locally after sync.`,
-				);
 
-				// Deduplicate articles after sync
-				const dedupedArticlesAfterSync = deduplicateArticlesById(
-					localArticlesAfterSync,
-				);
-				if (dedupedArticlesAfterSync.length < localArticlesAfterSync.length) {
+				// Save/Update fetched articles locally using bulkDocs
+				let savedOrUpdatedArticles: Article[] = [];
+				if (articlesToBulkSave.length > 0) {
 					console.log(
-						`Sync Hook: Removed ${localArticlesAfterSync.length - dedupedArticlesAfterSync.length} duplicate articles after sync.`,
+						`Sync Hook: Attempting to bulk save/update ${articlesToBulkSave.length} synced articles locally...`,
+					);
+					try {
+						const bulkResponse = await bulkSaveArticles(articlesToBulkSave);
+						console.log("Sync Hook: Bulk save operation completed.");
+
+						const successfulOps = bulkResponse.filter(
+							(res): res is PouchDB.Core.Response => "ok" in res && res.ok,
+						);
+						const failedOps = bulkResponse.filter(
+							(res): res is PouchDB.Core.Error => "error" in res && !!res.error,
+						);
+
+						if (failedOps.length > 0) {
+							console.warn(
+								`Sync Hook: Failed to bulk save/update ${failedOps.length} articles.`,
+								failedOps,
+							);
+						}
+
+						if (successfulOps.length > 0) {
+							console.log(
+								`Sync Hook: Successfully saved/updated ${successfulOps.length} articles via bulk operation. Fetching updated docs...`,
+							);
+							// Fetch only the successfully updated documents to merge into state
+							const successfulIds = successfulOps.map((res) => res.id);
+							// Use getAllArticles with specific IDs (assuming it supports fetching by keys)
+							// If getAllArticles doesn't support fetching by keys directly, we might need
+							// to use articlesDb.allDocs({ keys: successfulIds, include_docs: true })
+							// For now, let's assume getAllArticles can handle it or adapt it later.
+							// NOTE: Re-implementing the fetch logic here for clarity as getAllArticles does filtering/sorting we don't need yet.
+							const updatedDocsResponse = await articlesDb.allDocs<Article>({
+								keys: successfulIds,
+								include_docs: true,
+							});
+							savedOrUpdatedArticles = updatedDocsResponse.rows
+								// Filter first to ensure type narrowing
+								.filter(
+									(
+										row,
+									): row is PouchDB.Core.AllDocsResponse<Article>["rows"][number] & {
+										doc: Article;
+									} => !("error" in row) && !!row.doc,
+								)
+								// Now map over the correctly typed filtered array
+								.map((row) => row.doc);
+							console.log(
+								`Sync Hook: Fetched ${savedOrUpdatedArticles.length} updated articles after bulk save.`,
+							);
+						}
+					} catch (bulkErr) {
+						console.error(
+							"Sync Hook: Critical error during bulk save operation:",
+							bulkErr,
+						);
+						// Decide how to proceed - maybe rely on cache?
+					}
+				}
+
+				// Merge updated/new articles with existing state
+				const currentArticlesMap = new Map(
+					articles.map((article) => [article._id, article]),
+				);
+				// Use for...of loop as suggested by Biome
+				for (const updatedArticle of savedOrUpdatedArticles) {
+					currentArticlesMap.set(updatedArticle._id, updatedArticle);
+				}
+
+				// Get all articles from the map, deduplicate, and sort
+				const mergedArticles = Array.from(currentArticlesMap.values());
+				const dedupedArticlesAfterSync =
+					deduplicateArticlesById(mergedArticles);
+				if (dedupedArticlesAfterSync.length < mergedArticles.length) {
+					console.log(
+						`Sync Hook: Removed ${mergedArticles.length - dedupedArticlesAfterSync.length} duplicate articles after merge.`,
 					);
 				}
 
-				// View filtering is now handled by ArticleContext
-				const viewFilteredArticlesAfterSync = dedupedArticlesAfterSync;
-				// Apply default sort (e.g., savedAt desc)
-				const sortedArticlesAfterSync = [...viewFilteredArticlesAfterSync].sort(
+				// Apply default sort
+				const sortedArticlesAfterSync = [...dedupedArticlesAfterSync].sort(
 					(a, b) => {
 						const timeA = a.savedAt ?? 0;
 						const timeB = b.savedAt ?? 0;
@@ -261,7 +304,7 @@ export function useArticleSync(
 					},
 				);
 
-				const filteredArticles = sortedArticlesAfterSync; // Use the sorted articles
+				const filteredArticles = sortedArticlesAfterSync; // Final list for state update
 
 				if (isMounted) {
 					setArticles(filteredArticles);
@@ -302,7 +345,7 @@ export function useArticleSync(
 		},
 		// Dependencies: These influence the cloud sync operation
 		// filterAndSortArticles and runOneTimeFileSync are stable imports from "@/lib/articleUtils"
-		[isSignedIn, userId, getToken, user, toast], // Removed currentView dependency
+		[isSignedIn, userId, getToken, user, toast, articles], // Add 'articles' dependency
 	);
 
 	// --- Main Load and Sync Effect ---

@@ -150,6 +150,166 @@ export async function saveArticle(
 }
 
 /**
+ * Saves multiple articles in bulk. Handles both creating new articles and updating existing ones.
+ * Fetches existing documents first to handle conflicts and merge data.
+ *
+ * @param articlesToSave - An array of article objects to save.
+ * @returns A promise resolving to an array of results, one for each input article.
+ *          Success results contain { ok: true, id: string, rev: string }.
+ *          Error results contain { error: true, id: string, message: string, name?: string, status?: number }.
+ * @throws Error if the bulk operation itself fails unexpectedly.
+ */
+export async function bulkSaveArticles(
+	articlesToSave: (Omit<Article, "_id" | "_rev"> & {
+		_id?: string;
+		_rev?: string;
+	})[],
+): Promise<(PouchDB.Core.Response | PouchDB.Core.Error)[]> {
+	console.log(`Attempting to bulk save ${articlesToSave.length} articles...`);
+
+	return executeWithRetry(async () => {
+		// 1. Prepare documents and identify potential updates
+		const docsToProcess: (Article & { _id: string })[] = [];
+		const potentialUpdateIds: string[] = [];
+
+		for (const article of articlesToSave) {
+			const docId = article._id || `article_${uuidv4()}`;
+			// Basic validation
+			if (!article.title || !article.url || !article.content) {
+				console.warn(
+					`Skipping bulk save for article (ID: ${docId}) due to missing essential fields.`,
+				);
+				// Optionally, return an error object for this specific article later
+				continue;
+			}
+
+			const preparedDoc: Article & { _id: string } = {
+				...article,
+				_id: docId,
+				savedAt: article.savedAt || Date.now(),
+				isRead: article.isRead ?? false,
+				favorite: article.favorite ?? false,
+				tags: article.tags || [],
+				type: article.type || "article",
+				// _rev will be added later if it's an update
+			};
+			docsToProcess.push(preparedDoc);
+
+			if (article._id) {
+				potentialUpdateIds.push(article._id);
+			}
+		}
+
+		// 2. Fetch existing documents for potential updates
+		const existingDocsMap = new Map<string, Article>();
+		if (potentialUpdateIds.length > 0) {
+			try {
+				const fetchResponse = await articlesDb.allDocs<Article>({
+					keys: potentialUpdateIds,
+					include_docs: true,
+				});
+				for (const row of fetchResponse.rows) {
+					// Correctly check for errors before accessing doc/id
+					if ("error" in row) {
+						// Log or handle the error if needed, e.g., document not found
+						// console.warn(`Document with key ${row.key} not found or error: ${row.error}`);
+					} else if (row.doc) {
+						// Only access doc and id if there's no error and doc exists
+						existingDocsMap.set(row.id, row.doc);
+					}
+				}
+				console.log(
+					`Fetched ${existingDocsMap.size} existing documents for merging.`,
+				);
+			} catch (fetchError) {
+				console.error(
+					"Error fetching existing documents for bulk update:",
+					fetchError,
+				);
+				// Decide how to proceed: maybe fail the whole batch or try saving without merging?
+				// For now, let's proceed but updates might overwrite without merging.
+			}
+		}
+
+		// 3. Merge and prepare final documents for bulkDocs
+		const finalDocsToSave: Article[] = docsToProcess.map((doc) => {
+			const existingDoc = existingDocsMap.get(doc._id);
+			if (existingDoc) {
+				// Merge logic (similar to saveArticle conflict resolution)
+				const mergedDoc: Article = {
+					_id: existingDoc._id,
+					_rev: existingDoc._rev, // Use existing revision for update
+					userId: doc.userId ?? existingDoc.userId, // Prioritize incoming userId if available
+					title: doc.title ?? existingDoc.title,
+					url: doc.url ?? existingDoc.url,
+					content: doc.content ?? existingDoc.content,
+					excerpt: doc.excerpt ?? existingDoc.excerpt,
+					htmlContent: doc.htmlContent ?? existingDoc.htmlContent,
+					type: doc.type ?? existingDoc.type,
+					savedAt: doc.savedAt ?? existingDoc.savedAt,
+					status: doc.status ?? existingDoc.status ?? "inbox",
+					isRead: doc.isRead ?? existingDoc.isRead,
+					favorite: doc.favorite ?? existingDoc.favorite,
+					tags: doc.tags ?? existingDoc.tags,
+					readAt: doc.readAt ?? existingDoc.readAt,
+					scrollPosition: doc.scrollPosition ?? existingDoc.scrollPosition,
+					siteName: doc.siteName ?? existingDoc.siteName,
+					author: doc.author ?? existingDoc.author,
+					publishedDate: doc.publishedDate ?? existingDoc.publishedDate,
+					estimatedReadTime:
+						doc.estimatedReadTime ?? existingDoc.estimatedReadTime,
+					coverImage: doc.coverImage ?? existingDoc.coverImage,
+					language: doc.language ?? existingDoc.language,
+					fileData: doc.fileData ?? existingDoc.fileData,
+					fileName: doc.fileName ?? existingDoc.fileName,
+					fileSize: doc.fileSize ?? existingDoc.fileSize,
+					pageCount: doc.pageCount ?? existingDoc.pageCount,
+				};
+				return mergedDoc;
+			}
+			// It's a new document (no 'else' needed as 'if' returns)
+			// Remove potential _rev if it somehow exists
+			const { _rev, ...newDoc } = doc;
+			return newDoc as Article; // Cast needed as _rev is removed
+		});
+
+		// 4. Execute bulkDocs
+		if (finalDocsToSave.length === 0) {
+			console.log("No valid articles to bulk save.");
+			return [];
+		}
+
+		try {
+			console.log(
+				`Executing bulkDocs for ${finalDocsToSave.length} articles...`,
+			);
+			const response = await articlesDb.bulkDocs(finalDocsToSave);
+			console.log("bulkDocs operation completed.");
+
+			// Log errors from the response
+			const errors = response.filter(
+				(res): res is PouchDB.Core.Error => "error" in res && !!res.error,
+			);
+			if (errors.length > 0) {
+				console.error(
+					`Errors occurred during bulk save for ${errors.length} articles:`,
+				);
+				for (const err of errors) {
+					console.error(
+						` - ID: ${err.id}, Status: ${err.status}, Name: ${err.name}, Message: ${err.message}`,
+					);
+				}
+			}
+
+			return response;
+		} catch (bulkError) {
+			console.error("Fatal error during bulkDocs execution:", bulkError);
+			throw bulkError; // Rethrow fatal errors
+		}
+	});
+}
+
+/**
  * Retrieves a single article by its ID.
  * @param id - The _id of the article to retrieve.
  * @returns The article document or null if not found or an error occurs.

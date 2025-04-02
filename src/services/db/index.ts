@@ -27,6 +27,7 @@ export {
 	deleteArticle,
 	getAllArticles,
 	removeDuplicateArticles,
+	bulkSaveArticles, // Added bulk save function
 } from "./articles";
 
 // --- Highlight Operations ---
