@@ -43,6 +43,37 @@ export async function saveArticle(
 			throw new Error("Cannot save article: Missing title, url, or content.");
 		}
 
+		// --- Check for local deletion before saving ---
+		let localDoc: Article | null = null; // Use updated Article type
+		try {
+			// Fetch the document. PouchDB's get typically returns deleted docs too.
+			localDoc = await articlesDb.get<Article>(docId);
+		} catch (err: any) {
+			if (err.name === "not_found") {
+				// If not found, localDoc remains null, which is fine. Proceed to save.
+				console.log(
+					`Local doc ${docId} not found, proceeding with save/update.`,
+				);
+			} else {
+				// Re-throw unexpected errors during the check
+				console.error(`Error checking existing local doc ${docId}:`, err);
+				throw err;
+			}
+		}
+
+		// If local doc exists and is marked deleted, skip the save to preserve deletion.
+		// We assume incoming 'article' data from cloud sync is not deleted.
+		if (localDoc?._deleted) {
+			console.log(
+				`Skipping save for ${docId}: Local version is deleted. Preserving local deletion.`,
+			);
+			// Return the fetched local document (which includes _deleted: true)
+			return localDoc;
+		}
+		// --- End of local deletion check ---
+
+		// If we reach here, the local doc either doesn't exist or isn't deleted. Proceed.
+
 		try {
 			console.log(
 				`${isUpdate ? "Updating" : "Creating"} article ${docId} locally...`,
