@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 // Removed duplicate React import
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react"; // Add useEffect and useRef
 import { Link } from "react-router-dom";
 
 interface ArticleCardProps {
@@ -33,6 +33,7 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 	const { updateArticleStatus, optimisticRemoveArticle } = useArticles(); // Use optimistic remove
 	const { toast } = useToast();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
+	const cardElementRef = useRef<HTMLDivElement | null>(null); // Local ref for the card element
 
 	// Use synchronized animation with staggered delay based on index
 	const cardAnimation = useSynchronizedAnimation({
@@ -101,18 +102,41 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 			});
 		}
 	};
+
+	// Effect to trigger the transition animation after mount
+	useEffect(() => {
+		// Use the local ref here
+		const node = cardElementRef.current;
+		if (node) {
+			// Use requestAnimationFrame to ensure the initial styles are applied before transitioning
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => {
+					// Double RAF for good measure
+					node.style.opacity = "1";
+					node.style.transform = "translateY(0) translateZ(0)";
+				});
+			});
+		}
+		// Run only once on mount
+	}, []);
+
+	// Combine the callback ref from the hook with setting our local ref
+	const combinedRef = (element: HTMLDivElement | null) => {
+		cardAnimation.ref(element); // Call the hook's ref function
+		cardElementRef.current = element; // Set our local ref
+	};
+
 	return (
 		<Card
-			ref={cardAnimation.ref}
+			ref={combinedRef} // Use the combined ref callback
 			tabIndex={0} // Make card focusable
 			onKeyDown={handleKeyDown} // Add keydown handler
 			className="overflow-hidden transition-all gpu-accelerated duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" // Add focus styles
+			// Initial state for transition - opacity 0 and translated down
 			style={{
 				opacity: 0,
 				transform: "translateY(20px) translateZ(0)",
-				animation: `fadeIn 200ms ${
-					index * 30
-				}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
+				// Removed keyframe animation property
 			}}
 		>
 			<Link to={`/read/${article._id}`} data-testid="article-card">
@@ -298,30 +322,4 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 		</Card>
 	);
 }
-
-// Add keyframe animation for consistent card fade-in
-const cardAnimation = `
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px) translateZ(0);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) translateZ(0);
-  }
-}
-`;
-
-// Inject the animation styles
-const injectStyles = () => {
-	if (!document.getElementById("card-animation-styles")) {
-		const styleEl = document.createElement("style");
-		styleEl.id = "card-animation-styles";
-		styleEl.innerHTML = cardAnimation;
-		document.head.appendChild(styleEl);
-	}
-};
-
-// Execute once when the component is loaded
-injectStyles();
+// Removed useEffect from here, moved inside component

@@ -1,6 +1,6 @@
-import ArticleCard from "@/components/ArticleCard";
+import VirtualizedArticleList from "@/components/VirtualizedArticleList"; // Import the virtual list
+// Removed direct ArticleCard import
 import { Button } from "@/components/ui/button";
-
 import { Input } from "@/components/ui/input";
 import { useArticles } from "@/context/ArticleContext";
 import { useToast } from "@/hooks/use-toast";
@@ -154,11 +154,9 @@ export default function SearchPage() {
 							{filteredArticles.length === 1 ? "result" : "results"} for "
 							{searchTerm}"
 						</p>
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-							{filteredArticles.map((article) => (
-								<ArticleCard key={article._id} article={article} />
-							))}
-						</div>
+						{/* Use the VirtualizedArticleList component */}
+						{/* The parent div (line 130) already has overflow-y-auto and flex-1 for height */}
+						<VirtualizedArticleList articles={filteredArticles} />
 					</div>
 				)}
 			</div>

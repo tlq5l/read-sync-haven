@@ -1,5 +1,6 @@
-import ArticleCard from "@/components/ArticleCard";
+// Removed direct ArticleCard import
 import TopBar from "@/components/TopBar";
+import VirtualizedArticleList from "@/components/VirtualizedArticleList"; // Import the virtual list
 import { Button } from "@/components/ui/button";
 import {
 	TransitionGroup,
@@ -167,12 +168,9 @@ export default function ArchivePage() {
 						</TransitionItem>
 					</TransitionGroup>
 				) : (
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-						{/* Render only 'archived' articles */}
-						{archivedArticles.map((article, index) => (
-							<ArticleCard key={article._id} article={article} index={index} />
-						))}
-					</div>
+					// Use the VirtualizedArticleList component
+					// The parent div (line 107) already has overflow-y-auto and flex-1 for height
+					<VirtualizedArticleList articles={archivedArticles} />
 				)}
 			</div>
 		</div>
