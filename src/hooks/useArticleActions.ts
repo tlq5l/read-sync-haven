@@ -1,5 +1,5 @@
 import { useToast } from "@/hooks/use-toast";
-import { saveItemToCloud } from "@/services/cloudSync"; // Import cloud save
+import { deleteItemFromCloud, saveItemToCloud } from "@/services/cloudSync"; // Import cloud save and delete
 import {
 	type Article,
 	deleteArticle,
@@ -445,8 +445,27 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					description: "The article has been removed.",
 				});
 
+				// Trigger cloud deletion (fire and forget, but log errors)
+				deleteItemFromCloud(id)
+					.then((success) => {
+						if (success) {
+							console.log(`Successfully triggered cloud deletion for ${id}.`);
+						} else {
+							// This might happen if the item was already deleted from the cloud
+							// or if there was an API error. The local delete succeeded,
+							// so we still return true, but log the warning.
+							console.warn(
+								`Cloud deletion request for ${id} failed or item not found.`,
+							);
+						}
+					})
+					.catch((err) => {
+						// Log error but don't block UI return, as local delete succeeded
+						console.error(`Error triggering cloud deletion for ${id}:`, err);
+					});
+
 				// No refresh here - handled optimistically by caller.
-				return true; // Indicate success
+				return true; // Indicate success of local deletion
 			} catch (err) {
 				console.error("Failed to remove article:", err);
 				toast({

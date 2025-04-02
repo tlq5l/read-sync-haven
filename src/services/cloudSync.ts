@@ -100,6 +100,50 @@ export async function saveItemToCloud(article: Article): Promise<boolean> {
 	}
 }
 
+/**
+ * Deletes an article from the Cloudflare Worker
+ */
+export async function deleteItemFromCloud(articleId: string): Promise<boolean> {
+	if (!articleId) {
+		console.error("Cannot delete from cloud: articleId is missing");
+		return false;
+	}
+
+	try {
+		// Construct the URL with the item ID
+		const deleteUrl = `https://bondwise-sync-api.vikione.workers.dev/items/${encodeURIComponent(
+			articleId,
+		)}`;
+		console.log(
+			`Attempting to delete item ${articleId} from cloud at ${deleteUrl}`,
+		);
+
+		const response = await fetch(deleteUrl, {
+			method: "DELETE",
+			headers: {
+				// Add authentication headers if required by the worker
+				// Assuming the worker uses the same auth as fetch/save
+				// If not, this needs adjustment based on worker requirements
+			},
+		});
+
+		if (!response.ok) {
+			// Log specific error details if possible
+			const errorBody = await response.text();
+			console.error(
+				`Failed to delete item ${articleId} from cloud. Status: ${response.status}, Body: ${errorBody}`,
+			);
+			return false;
+		}
+
+		console.log(`Successfully deleted item ${articleId} from cloud.`);
+		return response.ok;
+	} catch (error) {
+		console.error(`Error deleting item ${articleId} from cloud:`, error);
+		return false;
+	}
+}
+
 // Removed importCloudItems function as it's no longer needed with automatic cloud sync
 // Removed unused extractExcerpt function (was causing TypeScript error TS6133)
 
