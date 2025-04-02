@@ -251,10 +251,12 @@ export default function SettingsPage() {
 											onValueChange={(value) =>
 												setTextSize(value[0] as TextSize)
 											}
-											className="w-[60%]" // Adjust width as needed
+											// Removed fixed width className="w-[60%]"
 										/>
 										{/* Optional: Add labels for slider steps */}
-										<div className="flex justify-between text-xs text-muted-foreground w-[60%] pt-1">
+										<div className="flex justify-between text-xs text-muted-foreground pt-1">
+											{" "}
+											{/* Removed fixed width w-[60%] */}
 											<span>Smallest</span>
 											<span>Default</span>
 											<span>Largest</span>
