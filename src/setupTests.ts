@@ -21,10 +21,10 @@ if (typeof global.EventTarget === "undefined") {
 				};
 }
 
-// Ensure process.listeners exists for Vitest's error handlers
-if (typeof process !== "undefined" && typeof process.listeners !== "function") {
-	process.listeners = () => [];
-}
+// // Ensure process.listeners exists for Vitest's error handlers - Removed as it might cause issues
+// if (typeof process !== "undefined" && typeof process.listeners !== "function") {
+// 	process.listeners = () => [];
+// }
 
 // Extend Vitest's expect with jest-dom matchers
 expect.extend(matchers);
@@ -57,3 +57,18 @@ global.ResizeObserver = class ResizeObserver {
 };
 
 // Add any other global setup logic here if needed.
+
+
+// MSW Setup
+import { server } from './mocks/server'; // Import the server instance
+import { beforeAll, afterEach, afterAll } from 'vitest';
+
+// Establish API mocking before all tests.
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' })); // Error on unhandled requests
+
+// Reset any request handlers that we may add during the tests,
+// so they don't affect other tests.
+afterEach(() => server.resetHandlers());
+
+// Clean up after the tests are finished.
+afterAll(() => server.close());
