@@ -20,6 +20,7 @@ import {
 	Trash2,
 } from "lucide-react";
 import type React from "react";
+// Removed duplicate React import
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -94,10 +95,27 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 		}
 	};
 
+	const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+		if (e.key === "Delete") {
+			e.preventDefault();
+			e.stopPropagation();
+			// Call optimistic remove directly, similar to handleDelete but for keyboard event
+			optimisticRemoveArticle(article._id).catch((error) => {
+				console.error("Error deleting article via keyboard:", error);
+				toast({
+					title: "Error",
+					description: "Could not delete article",
+					variant: "destructive",
+				});
+			});
+		}
+	};
 	return (
 		<Card
 			ref={cardAnimation.ref}
-			className="overflow-hidden transition-all gpu-accelerated duration-200 hover:shadow-md"
+			tabIndex={0} // Make card focusable
+			onKeyDown={handleKeyDown} // Add keydown handler
+			className="overflow-hidden transition-all gpu-accelerated duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" // Add focus styles
 			style={{
 				opacity: 0,
 				transform: "translateY(20px) translateZ(0)",

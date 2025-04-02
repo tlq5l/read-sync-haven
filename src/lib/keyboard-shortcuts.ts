@@ -75,6 +75,16 @@ export const shortcutGroups: ShortcutGroup[] = [
 					modifiers: { alt: true },
 				},
 			},
+			{
+				id: "focus-search",
+				name: "Focus Search",
+				description: "Focus the search input or navigate to search page",
+				category: "navigation",
+				keys: {
+					key: "/",
+					modifiers: {},
+				},
+			},
 		],
 	},
 	{
@@ -110,6 +120,16 @@ export const shortcutGroups: ShortcutGroup[] = [
 				keys: {
 					key: "f",
 					modifiers: { ctrl: true },
+				},
+			},
+			{
+				id: "delete-article",
+				name: "Delete Article",
+				description: "Delete the currently selected/viewed article",
+				category: "content",
+				keys: {
+					key: "Delete",
+					modifiers: {},
 				},
 			},
 		],

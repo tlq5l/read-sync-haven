@@ -77,6 +77,33 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 					case "show-shortcuts":
 						action = () => setIsShortcutsDialogOpen(true);
 						break;
+					case "focus-search":
+						action = () => {
+							const searchInput = document.getElementById(
+								"global-search-input",
+							) as HTMLInputElement | null;
+							if (searchInput) {
+								searchInput.focus();
+							} else {
+								navigate("/search");
+							}
+						};
+						break;
+					case "delete-article":
+						action = () => {
+							// This action needs context (which article is selected).
+							// It should be handled by the component displaying the article.
+							console.log(
+								"Delete shortcut pressed - requires context-specific handling.",
+							);
+							toast({
+								title: "Delete Shortcut",
+								description:
+									"Press Delete when an article card or reader is active.",
+								variant: "default",
+							});
+						};
+						break;
 					default:
 						action = () =>
 							console.log(`Action for ${shortcut.id} not implemented`);
