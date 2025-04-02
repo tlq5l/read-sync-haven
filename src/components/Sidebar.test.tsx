@@ -69,7 +69,7 @@ describe("Sidebar Component", () => {
 			</MockProviders>,
 		);
 
-		expect(screen.getByRole("link", { name: /search/i })).toBeInTheDocument();
+		// Removed expectation for "Search" link as it's no longer rendered
 		expect(screen.getByRole("link", { name: /settings/i })).toBeInTheDocument();
 	});
 
@@ -79,8 +79,9 @@ describe("Sidebar Component", () => {
 				<Sidebar />
 			</MockProviders>,
 		);
+		// The button that sets the view to 'all' has the text "Home"
 		expect(
-			screen.getByRole("button", { name: /all articles/i }),
+			screen.getByRole("button", { name: /home/i }),
 		).toBeInTheDocument();
 	});
 });

@@ -30,6 +30,8 @@ vi.mock("@/hooks/use-synchronized-animation", () => ({
 	useTransitionGroup: () => ({ animateGroup: vi.fn() }),
 }));
 
+// Removed Button mock - relying on actual implementation and DropdownMenuTrigger mock
+
 // Mock Radix UI components causing issues in JSDOM
 vi.mock("@/components/ui/select", async () => ({
 	Select: ({
@@ -107,12 +109,20 @@ vi.mock("@/components/ui/dropdown-menu", async () => ({
 	DropdownMenuTrigger: ({
 		children,
 		asChild,
-	}: { children: React.ReactNode; asChild?: boolean }) =>
-		asChild ? (
-			children
+		...props // Accept rest props
+	}: { children: React.ReactNode; asChild?: boolean; [key: string]: any }) => {
+		// Add index signature for props
+		const React = require("react"); // Import React inside the mock function scope
+		return asChild && React.isValidElement(children) ? (
+			// Clone the child element and add props if asChild is true
+			React.cloneElement(children, props)
 		) : (
-			<div className="mock-dropdown-trigger">{children}</div>
-		),
+			// Apply props to the wrapper div if asChild is false
+			<div className="mock-dropdown-trigger" {...props}>
+				{children}
+			</div>
+		);
+	},
 	DropdownMenuContent: ({ children }: { children: React.ReactNode }) => (
 		<div className="mock-dropdown-content">{children}</div>
 	),
@@ -496,32 +506,7 @@ describe("HomePage Integration Tests", () => {
 		expect(within(articleCards[3]).getByText("React Fun")).toBeInTheDocument(); // Oldest
 	});
 
-	it("should filter articles by search query (debounced)", async () => {
-		renderHomePage();
-		const searchInput = screen.getByPlaceholderText(
-			/Search title, excerpt.../i,
-		);
-
-		// Use act to wrap the state updates
-		await act(async () => {
-			await userEvent.type(searchInput, "React");
-
-			// Advance timers within act
-			vi.useFakeTimers();
-			vi.advanceTimersByTime(350); // Advance time past debounce delay
-			vi.useRealTimers();
-		});
-
-		// Wait for the changes to take effect
-		await waitFor(() => {
-			const articles = screen.getAllByRole("link", { name: /read/i });
-			expect(articles.length).toBe(1);
-
-			// Check for specific article content
-			expect(screen.getByText("React Fun")).toBeInTheDocument();
-		});
-	});
-
+	// Removed obsolete test for search input
 	it("should sort articles by title ascending", async () => {
 		renderHomePage();
 
@@ -663,4 +648,6 @@ describe("HomePage Integration Tests", () => {
 			expect(articleCards).toHaveLength(mockRawArticles.length);
 		});
 	});
+
+	// Removed tests related to the top bar elements as they are not part of HomePage
 }); // Correct closing for the describe block
