@@ -10,9 +10,9 @@ import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
 import { UserButton, useAuth } from "@clerk/clerk-react"; // Removed unused useUser
 import {
-	Bookmark,
+	// Bookmark, // Removed unused icon
 	ChevronLeft,
-	Clock,
+	// Clock, // Removed unused icon
 	Library,
 	LogIn,
 	MenuIcon,
@@ -28,7 +28,7 @@ export default function Sidebar() {
 	const [collapsed, setCollapsed] = useState(false);
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { currentView, setCurrentView } = useArticles();
+	const { setCurrentView } = useArticles(); // Removed unused currentView
 	const { theme, setTheme } = useTheme();
 	const { synchronizeAnimations } = useAnimation();
 	const { isSignedIn } = useAuth();
@@ -63,8 +63,8 @@ export default function Sidebar() {
 	}, [theme]);
 
 	const isActive = (path: string) => location.pathname === path;
-	const isViewActive = (view: "all" | "unread" | "favorites") =>
-		currentView === view;
+	// const isViewActive = (view: "all" | "unread" | "favorites") =>
+	// 	currentView === view; // Removed unused function
 
 	const toggleTheme = () => {
 		setTheme(theme === "dark" ? "light" : "dark");
@@ -184,37 +184,7 @@ export default function Sidebar() {
 						</Button>
 					</TransitionItem>
 
-					<TransitionItem showFrom="left" className="w-full">
-						<Button
-							variant="ghost"
-							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
-							onClick={() => setCurrentView("unread")}
-							style={isViewActive("unread") ? styles.activeLink : styles.link}
-						>
-							<Clock size={20} />
-							{!collapsed && (
-								<span className="transition-opacity duration-200">Unread</span>
-							)}
-						</Button>
-					</TransitionItem>
-
-					<TransitionItem showFrom="left" className="w-full">
-						<Button
-							variant="ghost"
-							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
-							onClick={() => setCurrentView("favorites")}
-							style={
-								isViewActive("favorites") ? styles.activeLink : styles.link
-							}
-						>
-							<Bookmark size={20} />
-							{!collapsed && (
-								<span className="transition-opacity duration-200">
-									Favorites
-								</span>
-							)}
-						</Button>
-					</TransitionItem>
+					{/* Removed Unread and Favorites buttons - handled by TopBar */}
 				</TransitionGroup>
 
 				<div className="mt-8 px-3">
