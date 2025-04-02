@@ -11,6 +11,7 @@ import {
 import { ClerkProvider } from "@clerk/clerk-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { ArticleProvider } from "./context/ArticleContext"; // Import ArticleProvider
 
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import GlobalSearchOverlay from "./components/GlobalSearchOverlay"; // Import the new overlay
@@ -136,11 +137,14 @@ const App = () => (
 							<Sonner />
 							{/* Wrap AppWithRouter with KeyboardProvider */}
 							{/* Wrap KeyboardProvider with BrowserRouter */}
-							<BrowserRouter>
-								<KeyboardProvider>
-									<AppWithRouter />
-								</KeyboardProvider>
-							</BrowserRouter>
+							{/* Wrap BrowserRouter with ArticleProvider */}
+							<ArticleProvider>
+								<BrowserRouter>
+									<KeyboardProvider>
+										<AppWithRouter />
+									</KeyboardProvider>
+								</BrowserRouter>
+							</ArticleProvider>
 						</TooltipProvider>
 					</QueryClientProvider>
 				</MotionPreferenceHandler>

@@ -1,6 +1,6 @@
 import { TransitionGroup } from "@/components/ui/transition-group";
 import { useAnimation } from "@/context/AnimationContext";
-import { ArticleProvider } from "@/context/ArticleContext";
+// ArticleProvider import removed, will be moved to App.tsx
 import { useOffline } from "@/hooks/use-offline";
 
 import { useEffect } from "react";
@@ -24,7 +24,8 @@ export default function Layout() {
 	}, [animateAll]);
 
 	return (
-		<ArticleProvider>
+		// Return content within a single fragment, ArticleProvider removed
+		<>
 			<div className="flex h-screen bg-background">
 				<Sidebar />
 				<TransitionGroup
@@ -39,6 +40,6 @@ export default function Layout() {
 				</TransitionGroup>
 			</div>
 			<OfflineIndicator />
-		</ArticleProvider>
+		</>
 	);
 }
