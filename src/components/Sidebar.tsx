@@ -8,7 +8,7 @@ import { useArticles } from "@/context/ArticleContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
-import { UserButton, useAuth, useUser } from "@clerk/clerk-react";
+import { UserButton, useAuth } from "@clerk/clerk-react"; // Removed unused useUser
 import {
 	Bookmark,
 	ChevronLeft,
@@ -32,7 +32,7 @@ export default function Sidebar() {
 	const { theme, setTheme } = useTheme();
 	const { synchronizeAnimations } = useAnimation();
 	const { isSignedIn } = useAuth();
-	const { user } = useUser();
+	// const { user } = useUser(); // Removed as unused
 	const [isDarkMode, setIsDarkMode] = useState(false);
 
 	// Create synchronized animations for the sidebar
@@ -151,15 +151,7 @@ export default function Sidebar() {
 				</div>
 			</div>
 
-			{/* User greeting */}
-			{isSignedIn && !collapsed && (
-				<div
-					className="px-4 py-2 text-sm border-b"
-					style={{ borderColor: styles.container.borderColor }}
-				>
-					<p style={styles.userGreeting}>Hello, {user?.firstName || "User"}</p>
-				</div>
-			)}
+			{/* User greeting section removed */}
 
 			<div className="flex-grow overflow-y-auto py-4">
 				<TransitionGroup
