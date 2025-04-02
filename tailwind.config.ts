@@ -194,20 +194,26 @@ export default {
 				},
 			},
 			animation: {
-				"accordion-down": "accordion-down 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-				"accordion-up": "accordion-up 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-				"fade-in": "fade-in 0.2s ease-out",
-				"fade-out": "fade-out 0.2s ease-in",
+				"accordion-down":
+					"accordion-down var(--animation-duration-normal) var(--animation-easing-standard)",
+				"accordion-up":
+					"accordion-up var(--animation-duration-normal) var(--animation-easing-standard)",
+				"fade-in":
+					"fade-in var(--animation-duration-normal) var(--animation-easing-standard)",
+				"fade-out":
+					"fade-out var(--animation-duration-normal) var(--animation-easing-standard)",
 				"slide-in-from-top":
-					"slide-in-from-top 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+					"slide-in-from-top var(--animation-duration-slow) var(--animation-easing-standard)", // Keep slightly slower for slides
 				"slide-in-from-bottom":
-					"slide-in-from-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+					"slide-in-from-bottom var(--animation-duration-slow) var(--animation-easing-standard)", // Keep slightly slower for slides
 				"slide-in-from-left":
-					"slide-in-from-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+					"slide-in-from-left var(--animation-duration-slow) var(--animation-easing-standard)", // Keep slightly slower for slides
 				"slide-in-from-right":
-					"slide-in-from-right 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-				"scale-in": "scale-in 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-				"scale-out": "scale-out 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
+					"slide-in-from-right var(--animation-duration-slow) var(--animation-easing-standard)", // Keep slightly slower for slides
+				"scale-in":
+					"scale-in var(--animation-duration-normal) var(--animation-easing-standard)",
+				"scale-out":
+					"scale-out var(--animation-duration-normal) var(--animation-easing-standard)",
 			},
 		},
 	},

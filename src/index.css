@@ -48,11 +48,11 @@
 
 		/* Standardized animation variables (updated) */
 		--animation-duration-fast: 150ms;
-		--animation-duration-normal: 200ms; /* Reduced from 250ms for snappier transitions */
+		--animation-duration-normal: 250ms; /* Adjusted for smoother feel */
 		--animation-duration-slow: 300ms; /* Reduced from 400ms for better synchronization */
 
 		/* Standardized easing functions */
-		--animation-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+		--animation-easing-standard: cubic-bezier(0.65, 0, 0.35, 1); /* Smoother ease-in-out */
 		--animation-easing-accelerate: cubic-bezier(0.4, 0, 1, 1);
 		--animation-easing-decelerate: cubic-bezier(0, 0, 0.2, 1);
 		--animation-easing-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
