@@ -112,7 +112,7 @@ export default function HomePage() {
 			case "favorites":
 				return "Favorite Articles";
 			default:
-				return "All Articles";
+				return "Home";
 		}
 	};
 

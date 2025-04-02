@@ -73,7 +73,7 @@ describe("Sidebar Component", () => {
 		expect(screen.getByRole("link", { name: /settings/i })).toBeInTheDocument();
 	});
 
-	it("should render article view buttons like 'All Articles'", () => {
+	it("should render article view buttons like 'Home'", () => {
 		render(
 			<MockProviders>
 				<Sidebar />

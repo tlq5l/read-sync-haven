@@ -23,11 +23,12 @@ import {
 	Sun,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
 	const [collapsed, setCollapsed] = useState(false);
 	const location = useLocation();
+	const navigate = useNavigate();
 	const { currentView, setCurrentView } = useArticles();
 	const { theme, setTheme } = useTheme();
 	const { synchronizeAnimations } = useAnimation();
@@ -170,17 +171,19 @@ export default function Sidebar() {
 					autoAnimate={true}
 				>
 					<TransitionItem showFrom="left" className="w-full">
+						{/* Home Button */}
 						<Button
 							variant="ghost"
 							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
-							onClick={() => setCurrentView("all")}
-							style={isViewActive("all") ? styles.activeLink : styles.link}
+							onClick={() => {
+								setCurrentView("all"); // Reset view when going home
+								navigate("/");
+							}}
+							style={isActive("/") ? styles.activeLink : styles.link}
 						>
 							<Library size={20} />
 							{!collapsed && (
-								<span className="transition-opacity duration-200">
-									All Articles
-								</span>
+								<span className="transition-opacity duration-200">Home</span>
 							)}
 						</Button>
 					</TransitionItem>
