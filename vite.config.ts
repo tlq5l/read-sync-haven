@@ -93,6 +93,8 @@ export default defineConfig(({ mode }) => ({
 			// jsxRuntime: "classic", // Removed invalid option
 		}),
 		nodePolyfills({
+			// Exclude polyfills that might bring in 'asn1.js' and aren't typically needed/fully functional in browsers
+			exclude: ["vm", "crypto", "https", "tls"],
 			globals: {
 				process: true,
 				Buffer: true,
@@ -120,22 +122,12 @@ export default defineConfig(({ mode }) => ({
 			output: {
 				// Implement intelligent code-splitting
 				manualChunks: (id) => {
-					// Split Clerk authentication into separate chunk
+					// Split Clerk authentication
 					if (id.includes("@clerk")) {
 						return "vendor-clerk";
 					}
 
-					// Removed explicit splitting for react/react-dom/react-router
-					// Let Vite handle them or group them in vendor-deps
-					// if (
-					// 	id.includes("react") ||
-					// 	id.includes("react-dom") ||
-					// 	id.includes("react-router")
-					// ) {
-					// 	return "vendor-react";
-					// }
-
-					// Split UI components
+					// Split UI components (Radix, Lucide)
 					if (
 						id.includes("@/components/ui") ||
 						id.includes("@radix-ui") ||
@@ -149,9 +141,26 @@ export default defineConfig(({ mode }) => ({
 						return "vendor-pouchdb";
 					}
 
-					// Split utilities and other third-party libraries
+					// Split potentially large dependencies
+					if (id.includes("epubjs")) {
+						return "vendor-epubjs";
+					}
+					if (id.includes("recharts")) {
+						return "vendor-recharts";
+					}
+					if (id.includes("@mozilla/readability")) {
+						return "vendor-readability";
+					}
+					if (id.includes("dompurify")) {
+						return "vendor-dompurify";
+					}
+					if (id.includes("turndown")) {
+						return "vendor-turndown";
+					}
+
+					// Catch-all for other node_modules
 					if (id.includes("node_modules")) {
-						return "vendor-deps";
+						return "vendor-deps"; // Remaining smaller deps
 					}
 				},
 			},

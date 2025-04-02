@@ -1,8 +1,9 @@
 // src/services/db/migrations.ts
 // Helper functions to update the database schema or fix data issues
 
-import { getEstimatedReadingTime as getEpubReadingTime } from "@/services/epub";
-import { getEstimatedReadingTime as getPdfReadingTime } from "@/services/pdf";
+// Removed static imports for dynamic loading below
+// import { getEstimatedReadingTime as getEpubReadingTime } from "@/services/epub";
+// import { getEstimatedReadingTime as getPdfReadingTime } from "@/services/pdf";
 import { articlesDb } from "./config";
 import type { Article } from "./types";
 import { executeWithRetry } from "./utils";
@@ -41,59 +42,79 @@ export async function updateMissingMetadata(): Promise<number> {
 				`Found ${documentsToUpdate.length} PDF/EPUB documents with missing metadata.`,
 			);
 
-			// 3. Update each document with appropriate values
-			const updatedDocs: Article[] = [];
-
-			for (const doc of documentsToUpdate) {
+			// 3. Process each document asynchronously to update values
+			const updatePromises = documentsToUpdate.map(async (doc) => {
 				// Skip if missing revision
 				if (!doc._rev) {
 					console.warn(`Document ${doc._id} is missing _rev, cannot update.`);
-					continue;
+					return null; // Return null for documents that cannot be updated
 				}
 
 				let updated = false;
+				const docToUpdate = { ...doc }; // Clone doc to avoid modifying original in case of partial failure
 
 				// Add siteName if missing
-				if (!doc.siteName) {
-					if (doc.type === "pdf") {
-						doc.siteName = "PDF Document";
+				if (!docToUpdate.siteName) {
+					if (docToUpdate.type === "pdf") {
+						docToUpdate.siteName = "PDF Document";
 						updated = true;
-					} else if (doc.type === "epub") {
-						doc.siteName = "EPUB Book";
+					} else if (docToUpdate.type === "epub") {
+						docToUpdate.siteName = "EPUB Book";
 						updated = true;
 					}
 				}
 
 				// Add estimatedReadTime if missing
-				if (!doc.estimatedReadTime && doc.fileSize) {
-					if (doc.type === "pdf") {
-						doc.estimatedReadTime = getPdfReadingTime(
-							doc.fileSize,
-							doc.pageCount,
+				if (!docToUpdate.estimatedReadTime && docToUpdate.fileSize) {
+					try {
+						if (docToUpdate.type === "pdf") {
+							const { getEstimatedReadingTime: getPdfReadingTime } =
+								await import("@/services/pdf");
+							docToUpdate.estimatedReadTime = getPdfReadingTime(
+								docToUpdate.fileSize,
+								docToUpdate.pageCount,
+							);
+							updated = true;
+						} else if (docToUpdate.type === "epub") {
+							const { getEstimatedReadingTime: getEpubReadingTime } =
+								await import("@/services/epub");
+							docToUpdate.estimatedReadTime = getEpubReadingTime(
+								docToUpdate.fileSize,
+							);
+							updated = true;
+						}
+					} catch (importError) {
+						console.error(
+							`Failed to dynamically import reading time function for ${docToUpdate._id}:`,
+							importError,
 						);
-						updated = true;
-					} else if (doc.type === "epub") {
-						doc.estimatedReadTime = getEpubReadingTime(doc.fileSize);
-						updated = true;
+						// Decide how to handle: skip update, use default, etc.
+						// Here, we'll proceed to default calculation if needed.
 					}
 				}
 
-				// Add default reading time if we couldn't calculate it
-				if (!doc.estimatedReadTime) {
-					if (doc.type === "pdf") {
-						doc.estimatedReadTime = doc.pageCount ? doc.pageCount * 2 : 10; // 2 minutes per page or 10 minutes default
+				// Add default reading time if we couldn't calculate it (either missing size or import failed)
+				if (!docToUpdate.estimatedReadTime) {
+					if (docToUpdate.type === "pdf") {
+						docToUpdate.estimatedReadTime = docToUpdate.pageCount
+							? docToUpdate.pageCount * 2
+							: 10; // 2 minutes per page or 10 minutes default
 						updated = true;
-					} else if (doc.type === "epub") {
+					} else if (docToUpdate.type === "epub") {
 						// Default to 60 minutes for EPUBs without size info
-						doc.estimatedReadTime = 60;
+						docToUpdate.estimatedReadTime = 60;
 						updated = true;
 					}
 				}
 
-				if (updated) {
-					updatedDocs.push(doc);
-				}
-			}
+				return updated ? docToUpdate : null; // Return updated doc or null if no changes
+			});
+
+			// Wait for all updates to process and filter out nulls
+			const results = await Promise.all(updatePromises);
+			const updatedDocs: Article[] = results.filter(
+				(doc): doc is Article => doc !== null,
+			);
 
 			if (updatedDocs.length > 0) {
 				console.log(

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { base64ToArrayBuffer } from "@/services/epub";
+// Removed static import: import { base64ToArrayBuffer } from "@/services/epub";
 import type { Book, Rendition } from "epubjs";
 import ePub from "epubjs";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
@@ -61,12 +61,14 @@ export default function EpubReader({
 
 		let epubBook: ExtendedBook | null = null; // Use ExtendedBook
 
-		try {
-			setLoading(true);
-			setContentRendered(false);
+		const initializeBook = async () => {
+			try {
+				setLoading(true);
+				setContentRendered(false);
 
-			// Convert base64 to ArrayBuffer
-			const arrayBuffer = base64ToArrayBuffer(fileData);
+				// Dynamically import and convert base64 to ArrayBuffer
+				const { base64ToArrayBuffer } = await import("@/services/epub");
+				const arrayBuffer = base64ToArrayBuffer(fileData);
 
 			// Create EPUB book instance
 			epubBook = ePub(arrayBuffer) as ExtendedBook; // Cast to ExtendedBook
@@ -207,13 +209,16 @@ export default function EpubReader({
 					setLoading(false);
 					onTextExtracted(null); // Indicate failure on render error too
 				});
-		} catch (err) {
-			console.error("Error initializing EPUB:", err);
-			setError(
-				"Failed to initialize EPUB reader. The file might be corrupted.",
-			);
-			setLoading(false);
-		}
+			} catch (err) {
+				console.error("Error initializing EPUB:", err);
+				setError(
+					"Failed to initialize EPUB reader. The file might be corrupted.",
+				);
+				setLoading(false);
+				onTextExtracted(null); // Ensure callback on init error
+			}
+		};
+		initializeBook();
 
 		// Cleanup function
 		return () => {

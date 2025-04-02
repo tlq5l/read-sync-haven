@@ -13,17 +13,19 @@ import {
 	saveArticle,
 	updateArticle,
 } from "@/services/db";
-import {
-	arrayBufferToBase64 as epubToBase64,
-	extractEpubMetadata,
-	isValidEpub,
-} from "@/services/epub";
+// Removed static imports for dynamic loading below
+// import {
+// 	arrayBufferToBase64 as epubToBase64,
+// 	extractEpubMetadata,
+// 	isValidEpub,
+// } from "@/services/epub";
 import { parseArticle } from "@/services/parser";
-import {
-	extractPdfMetadata,
-	isValidPdf,
-	arrayBufferToBase64 as pdfToBase64,
-} from "@/services/pdf";
+// Removed static imports for dynamic loading below
+// import {
+// 	extractPdfMetadata,
+// 	isValidPdf,
+// 	arrayBufferToBase64 as pdfToBase64,
+// } from "@/services/pdf";
 import { useAuth } from "@clerk/clerk-react"; // Removed useUser as unused
 import { useCallback, useMemo } from "react"; // Import useMemo
 
@@ -135,26 +137,25 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				};
 				let fileType: "epub" | "pdf" | null = null;
 
-				if (isValidEpub(file)) {
+				// Dynamically import epub functions first
+				const epubModule = await import("@/services/epub");
+				if (epubModule.isValidEpub(file)) {
 					fileType = "epub";
 					const fileBuffer = await file.arrayBuffer();
-					const metadata = await extractEpubMetadata(fileBuffer);
-					const base64Content = epubToBase64(fileBuffer);
-
-					// Calculate estimated reading time
-					const estimatedReadingTime = await import("@/services/epub").then(
-						(module) => module.getEstimatedReadingTime(fileBuffer.byteLength),
-					);
+					const metadata = await epubModule.extractEpubMetadata(fileBuffer);
+					const base64Content = epubModule.arrayBufferToBase64(fileBuffer);
+					const estimatedReadingTime =
+						await epubModule.getEstimatedReadingTime(fileBuffer.byteLength);
 
 					articleToSave = {
 						userId,
 						title: metadata.title || file.name.replace(/\.epub$/i, ""),
 						type: "epub",
-						fileData: base64Content, // Store base64 in fileData for EPUB
-						content: "EPUB content is stored in fileData.", // Placeholder for content field
+						fileData: base64Content,
+						content: "EPUB content is stored in fileData.",
 						url: `local-epub://${file.name}`,
 						savedAt: Date.now(),
-						status: "inbox", // Default status
+						status: "inbox",
 						isRead: false,
 						favorite: false,
 						tags: [],
@@ -162,53 +163,57 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 						publishedDate: metadata.publishedDate,
 						excerpt: metadata.description || "EPUB file",
 						readingProgress: 0,
-						siteName: "EPUB Book", // Set a descriptive source name
-						estimatedReadTime: estimatedReadingTime, // Set the estimated reading time
-						fileName: file.name, // Store the original filename
-						fileSize: fileBuffer.byteLength, // Store the file size
-					};
-				} else if (isValidPdf(file)) {
-					fileType = "pdf";
-					const fileBuffer = await file.arrayBuffer();
-					const metadata = await extractPdfMetadata(file, fileBuffer);
-					const base64Content = pdfToBase64(fileBuffer);
-
-					// Calculate estimated reading time based on PDF size or page count
-					const estimatedReadingTime = await import("@/services/pdf").then(
-						(module) =>
-							module.getEstimatedReadingTime(
-								fileBuffer.byteLength,
-								metadata.pageCount,
-							),
-					);
-
-					articleToSave = {
-						userId,
-						title: metadata.title || file.name.replace(/\.pdf$/i, ""),
-						type: "pdf",
-						content: base64Content,
-						url: `local-pdf://${file.name}`,
-						savedAt: Date.now(),
-						status: "inbox", // Default status
-						isRead: false,
-						favorite: false,
-						tags: [],
-						author: metadata.author,
-						publishedDate: metadata.publishedDate,
-						excerpt: metadata.description || "PDF file",
-						pageCount: metadata.pageCount,
-						readingProgress: 0,
-						siteName: "PDF Document", // Set a descriptive source name
-						estimatedReadTime: estimatedReadingTime, // Set the estimated reading time
-						fileName: file.name, // Store the original filename
-						fileSize: fileBuffer.byteLength, // Store the file size
+						siteName: "EPUB Book",
+						estimatedReadTime: estimatedReadingTime,
+						fileName: file.name,
+						fileSize: fileBuffer.byteLength,
 					};
 				} else {
-					throw new Error(
-						"Invalid file type. Only EPUB and PDF formats are supported.",
-					);
+					// Dynamically import pdf functions only if not epub
+					const pdfModule = await import("@/services/pdf");
+					if (pdfModule.isValidPdf(file)) {
+						fileType = "pdf";
+						const fileBuffer = await file.arrayBuffer();
+						const metadata = await pdfModule.extractPdfMetadata(
+							file,
+							fileBuffer,
+						);
+						const base64Content = pdfModule.arrayBufferToBase64(fileBuffer);
+						const estimatedReadingTime = await pdfModule.getEstimatedReadingTime(
+							fileBuffer.byteLength,
+							metadata.pageCount,
+						);
+
+						articleToSave = {
+							userId,
+							title: metadata.title || file.name.replace(/\.pdf$/i, ""),
+							type: "pdf",
+							content: base64Content,
+							url: `local-pdf://${file.name}`,
+							savedAt: Date.now(),
+							status: "inbox",
+							isRead: false,
+							favorite: false,
+							tags: [],
+							author: metadata.author,
+							publishedDate: metadata.publishedDate,
+							excerpt: metadata.description || "PDF file",
+							pageCount: metadata.pageCount,
+							readingProgress: 0,
+							siteName: "PDF Document",
+							estimatedReadTime: estimatedReadingTime,
+							fileName: file.name,
+							fileSize: fileBuffer.byteLength,
+						};
+					} else {
+						// If neither EPUB nor PDF is valid
+						throw new Error(
+							"Invalid file type. Only EPUB and PDF formats are supported.",
+						);
+					}
 				}
 
+				// Save the article locally
 				const savedArticle = await saveArticle(articleToSave);
 
 				// Sync to Cloud (fire and forget)
@@ -231,6 +236,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 						);
 					});
 
+				// Show success toast
 				toast({
 					title: `${fileType?.toUpperCase()} saved`,
 					description: `"${savedArticle.title}" has been saved.`,
@@ -239,8 +245,9 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				// Trigger refresh after successful save
 				await refreshArticles();
 
-				return savedArticle;
+				return savedArticle; // Return the saved article on success
 			} catch (err) {
+				// Catch any error during the process (import, validation, save)
 				console.error("Failed to add file:", err);
 				toast({
 					title: "Failed to save file",
@@ -250,11 +257,11 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 							: "An error occurred while saving the file.",
 					variant: "destructive",
 				});
-				return null;
+				return null; // Return null on failure
 			}
-		},
-		[toast, userId, isSignedIn, refreshArticles],
-	);
+		}, // End of async function passed to useCallback
+		[toast, userId, isSignedIn, refreshArticles], // Dependencies for useCallback
+	); // End of useCallback
 
 	// Update article status (isRead, favorite, status)
 	const updateArticleStatus = useCallback(

@@ -3,11 +3,6 @@ import path from "node:path";
 import react from "@vitejs/plugin-react-swc";
 import { defineConfig } from "vitest/config";
 
-// Ensure process.listeners is defined for Vitest's error handling
-if (typeof process !== "undefined" && typeof process.listeners !== "function") {
-	process.listeners = () => [];
-}
-
 export default defineConfig({
 	plugins: [
 		react(), // Include React plugin

@@ -34,7 +34,7 @@ describe("Worker API Handlers", () => {
 		// Mock environment variables
 		mockEnv = {
 			GCF_SUMMARIZE_URL: "http://fake-gcf/summarize", // Use the fake URL MSW will intercept
-			GCF_CHAT_URL: "http://fake-gcf/chat",       // Use the fake URL MSW will intercept
+			GCF_CHAT_URL: "http://fake-gcf/chat", // Use the fake URL MSW will intercept
 			GCF_AUTH_SECRET: "test-secret",
 			// Add other required Env properties
 			SAVED_ITEMS_KV: {} as KVNamespace, // Simple mock for KV
@@ -184,7 +184,6 @@ describe("Worker API Handlers", () => {
 			const body = (await response.json()) as { summary?: string };
 			expect(body.summary).toBe("Fake GCF Summary");
 		});
-
 	});
 
 	// --- handleChat ---
@@ -317,6 +316,5 @@ describe("Worker API Handlers", () => {
 			const body = (await response.json()) as { response?: string };
 			expect(body.response).toBe("Fake GCF Chat Response");
 		});
-
 	});
 });

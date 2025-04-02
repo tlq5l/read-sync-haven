@@ -16,7 +16,7 @@ export function useChat(fullTextContent: string | null) {
 	const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 	const [chatInput, setChatInput] = useState("");
 	const [isChatting, setIsChatting] = useState(false);
-	const [chatError, setChatError] = useState<string | null>(null);
+	const [chatError, setChatError] = useState<Error | null>(null); // Use Error type
 	const chatScrollAreaRef = useRef<HTMLDivElement>(null); // Ref for scrolling
 
 	const chatMutation = useMutation({
@@ -41,7 +41,8 @@ export function useChat(fullTextContent: string | null) {
 			}
 
 			// Always use the production worker URL
-			const chatApiUrl = "https://bondwise-sync-api.vikione.workers.dev/api/chat";
+			const chatApiUrl =
+				"https://bondwise-sync-api.vikione.workers.dev/api/chat";
 
 			const response = await fetch(chatApiUrl, {
 				method: "POST",
@@ -85,11 +86,12 @@ export function useChat(fullTextContent: string | null) {
 			setChatHistory((prev) => [...prev, { sender: "ai", text: aiResponse }]);
 		},
 		onError: (error: Error) => {
-			setChatError(error.message);
+			// error is already type Error
+			setChatError(error); // Set the whole Error object
 			// Add error message to chat history
 			setChatHistory((prev) => [
 				...prev,
-				{ sender: "ai", text: `Error: ${error.message}` },
+				{ sender: "ai", text: `Error: ${error.message}` }, // Display message in history
 			]);
 		},
 		onSettled: () => {
@@ -121,7 +123,10 @@ export function useChat(fullTextContent: string | null) {
 			if (chatInput.trim() && !isChatting && fullTextContent) {
 				chatMutation.mutate(chatInput.trim());
 			} else if (!fullTextContent) {
-				setChatError("Article content not yet extracted or available.");
+				// Keep setting string here for consistency, or create new Error()
+				setChatError(
+					new Error("Article content not yet extracted or available."),
+				);
 			}
 		},
 		[chatInput, isChatting, fullTextContent, chatMutation],
@@ -135,5 +140,7 @@ export function useChat(fullTextContent: string | null) {
 		chatError,
 		handleChatSubmit,
 		chatScrollAreaRef, // Expose ref for the component to use
+		// Expose mutation object for more control in tests if needed
+		chatMutation,
 	};
 }
