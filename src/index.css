@@ -58,11 +58,11 @@
 		--animation-easing-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
 		/* Text Size Variables (relative to base 16px) */
-		--text-size-1: 0.7rem; /* ~11px */
-		--text-size-2: 0.85rem; /* ~14px */
+		--text-size-1: 0.6rem; /* ~10px */
+		--text-size-2: 0.8rem; /* ~13px */
 		--text-size-3: 1rem; /* 16px (default) */
-		--text-size-4: 1.2rem; /* ~19px */
-		--text-size-5: 1.4rem; /* ~22px */
+		--text-size-4: 1.3rem; /* ~21px */
+		--text-size-5: 1.6rem; /* ~26px */
 	}
 
 	.dark {
