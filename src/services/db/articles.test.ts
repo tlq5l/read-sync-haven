@@ -253,7 +253,6 @@ describe("removeDuplicateArticles", () => {
 	});
 });
 
-
 describe("saveArticle", () => {
 	// Setup and teardown are handled by the outer describe block
 
@@ -263,7 +262,11 @@ describe("saveArticle", () => {
 
 	it("should save normally if the local version exists but is not deleted", async () => {
 		// 1. Save an initial article
-		const initialData = createArticleData(2, "http://update-test.com", "Update Test");
+		const initialData = createArticleData(
+			2,
+			"http://update-test.com",
+			"Update Test",
+		);
 		const savedDoc = await articlesDb.put(initialData);
 
 		// 2. Prepare an "incoming" updated version
@@ -291,7 +294,11 @@ describe("saveArticle", () => {
 
 	it("should save normally if the local version does not exist", async () => {
 		// 1. Prepare an "incoming" new article
-		const incomingData = createArticleData(3, "http://new-test.com", "New Test");
+		const incomingData = createArticleData(
+			3,
+			"http://new-test.com",
+			"New Test",
+		);
 
 		// 2. Attempt to save the incoming new version
 		const result = await saveArticle(incomingData);
@@ -308,4 +315,3 @@ describe("saveArticle", () => {
 		expect(finalLocalDoc._deleted).toBeUndefined();
 	});
 });
-
