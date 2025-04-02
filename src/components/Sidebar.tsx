@@ -126,7 +126,12 @@ export default function Sidebar() {
 						Read Sync Haven
 					</h1>
 				)}
-				<div className="ml-auto flex items-center">
+				<div
+					className={cn(
+						"flex items-center",
+						collapsed ? "w-full justify-center" : "ml-auto", // Center content when collapsed
+					)}
+				>
 					{isSignedIn && (
 						<UserButton
 							afterSignOutUrl="/sign-in"
@@ -143,7 +148,7 @@ export default function Sidebar() {
 						onClick={toggleCollapsed}
 						className={cn(
 							"transition-transform duration-200",
-							isSignedIn ? "ml-2" : "ml-auto",
+							// Removed conditional margin, parent div handles centering/alignment
 						)}
 					>
 						{collapsed ? <MenuIcon size={20} /> : <ChevronLeft size={20} />}
