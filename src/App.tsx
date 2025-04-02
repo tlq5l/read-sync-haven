@@ -101,8 +101,8 @@ const AppWithRouter = () => {
 						<Route path="/add" element={<AddPage />} />
 						<Route path="/read/:id" element={<ReadPage />} />
 						<Route path="/search" element={<SearchPage />} />
-						<Route path="/settings/*" element={<SettingsPage />} />{" "}
-						{/* Added wildcard for Clerk routing */}
+						<Route path="/settings" element={<SettingsPage />} />{" "}
+						{/* Reverted wildcard for hash routing */}
 						<Route path="/inbox" element={<InboxPage />} />
 						<Route path="/later" element={<LaterPage />} />
 						<Route path="/archive" element={<ArchivePage />} />

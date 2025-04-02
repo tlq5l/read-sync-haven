@@ -218,8 +218,8 @@ export default function SettingsPage() {
 
 								return (
 									<UserProfile
-										routing="path"
-										path="/settings"
+										routing="hash" // Changed from "path" to "hash"
+										// Removed path prop as it's not needed for hash routing
 										appearance={{ baseTheme: clerkThemeObject }}
 									/>
 								);
