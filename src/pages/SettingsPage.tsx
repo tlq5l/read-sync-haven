@@ -158,7 +158,9 @@ export default function SettingsPage() {
 	// Removed useEffect for theme syncing
 
 	return (
-		<div className="container py-8 max-w-3xl mx-auto">
+		<div className="container py-8 max-w-5xl mx-auto">
+			{" "}
+			{/* Increased max-width */}
 			<div className="flex items-center mb-8">
 				<Button variant="ghost" size="icon" asChild>
 					<Link to="/">
@@ -167,7 +169,6 @@ export default function SettingsPage() {
 				</Button>
 				<h1 className="text-2xl font-bold ml-2">Settings</h1>
 			</div>
-
 			<Tabs
 				defaultValue="account"
 				value={activeTab}
