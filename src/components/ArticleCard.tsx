@@ -22,7 +22,7 @@ interface ArticleCardProps {
 }
 
 export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
-	const { updateArticleStatus, removeArticle } = useArticles();
+	const { updateArticleStatus, optimisticRemoveArticle } = useArticles(); // Use optimistic remove
 	const { toast } = useToast();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -48,10 +48,8 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 		e.preventDefault();
 		e.stopPropagation();
 		try {
-			if (!article._rev) {
-				throw new Error("Article revision not found");
-			}
-			await removeArticle(article._id, article._rev);
+			// No need to check _rev for optimistic remove
+			await optimisticRemoveArticle(article._id);
 		} catch (error) {
 			console.error("Error deleting article:", error);
 			toast({

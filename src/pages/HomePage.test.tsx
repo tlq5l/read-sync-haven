@@ -253,6 +253,7 @@ type MockArticleContextType = Omit<
 	| "updateArticleStatus"
 	| "removeArticle"
 	| "updateReadingProgress"
+	| "optimisticRemoveArticle" // Add the new function here
 > & {
 	// Keep simplified setters for testing state changes
 	setFilters: React.Dispatch<React.SetStateAction<ArticleFilters>>;
@@ -426,6 +427,7 @@ const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Mock potentially needed action functions simply
 			refreshArticles: vi.fn().mockResolvedValue(mockRawArticles),
 			retryLoading: vi.fn(),
+			optimisticRemoveArticle: vi.fn().mockResolvedValue(undefined), // Add mock function
 		}),
 		[
 			// Only include values that actually change and affect the output

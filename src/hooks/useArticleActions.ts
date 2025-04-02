@@ -367,18 +367,17 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 		[userId, isSignedIn], // No toast or refresh needed here
 	);
 
-	// Remove article
+	// Remove article - Returns true on successful DB delete, false otherwise.
+	// Refresh is handled by the caller/context optimistically.
 	const removeArticle = useCallback(
-		async (
-			id: string /* rev: string - Removed as unused, fetched internally */,
-		) => {
+		async (id: string): Promise<boolean> => {
 			if (!isSignedIn || !userId) {
 				toast({
 					title: "Authentication Required",
 					description: "Please sign in to remove articles.",
 					variant: "destructive",
 				});
-				return;
+				return false; // Indicate failure
 			}
 
 			try {
@@ -388,8 +387,10 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					// Already deleted or doesn't exist locally.
 					// Refresh will reconcile with the cloud state.
 					console.log(`Article ${id} not found locally during remove attempt.`);
-					await refreshArticles(); // Refresh to ensure list consistency
-					return;
+					// Don't refresh here, let the caller handle UI state.
+					// Consider if returning true is appropriate if already deleted locally.
+					// For now, let's return true as the desired state (gone) is achieved locally.
+					return true;
 				}
 
 				if (articleToDelete.userId !== userId) {
@@ -408,8 +409,8 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					description: "The article has been removed.",
 				});
 
-				// Trigger refresh after successful delete
-				await refreshArticles();
+				// No refresh here - handled optimistically by caller.
+				return true; // Indicate success
 			} catch (err) {
 				console.error("Failed to remove article:", err);
 				toast({
@@ -420,9 +421,10 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 							: "An error occurred while removing the article.",
 					variant: "destructive",
 				});
+				return false; // Indicate failure
 			}
 		},
-		[toast, userId, isSignedIn, refreshArticles],
+		[toast, userId, isSignedIn], // Removed refreshArticles dependency
 	);
 
 	// Remove duplicate articles locally

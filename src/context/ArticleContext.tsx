@@ -1,3 +1,4 @@
+import { useToast } from "@/hooks/use-toast"; // Ensure useToast is imported only once
 import { useArticleActions } from "@/hooks/useArticleActions";
 import { useArticleSync } from "@/hooks/useArticleSync";
 import { type ArticleView, useArticleView } from "@/hooks/useArticleView";
@@ -54,7 +55,7 @@ interface ArticleContextType {
 		isRead: boolean,
 		favorite?: boolean,
 	) => Promise<void>;
-	removeArticle: (id: string, rev: string) => Promise<void>;
+	optimisticRemoveArticle: (id: string) => Promise<void>; // Renamed for clarity
 	updateReadingProgress: (id: string, progress: number) => Promise<void>;
 }
 
@@ -65,7 +66,7 @@ const ArticleContext = createContext<ArticleContextType | undefined>(undefined);
 export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	children,
 }) => {
-	// const { toast } = useToast(); // Keep toast hook in case provider needs direct access - Removed as unused
+	const { toast } = useToast(); // Add toast hook back
 
 	// 1. Initialize Database
 	const { isInitialized: isDbInitialized, dbError } = useDatabaseInit();
@@ -99,6 +100,10 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		field: "savedAt",
 		direction: "desc",
 	});
+	// State to track articles being optimistically removed
+	const [hidingArticleIds, setHidingArticleIds] = useState<Set<string>>(
+		new Set(),
+	);
 
 	// 7. Article Actions (depends on refresh function from sync)
 
@@ -136,13 +141,17 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	const isLoading = !isDbInitialized || (isDbInitialized && isSyncLoading);
 	const error = dbError || syncError;
 
-	// Memoize processed articles (filtering + sorting)
+	// Memoize processed articles (filtering + sorting + optimistic hiding)
 	const processedArticles = useMemo(() => {
-		// Apply filtering first
-		const filtered = filterArticles(articles, filters);
+		// Filter out optimistically hidden articles first
+		const visibleArticles = articles.filter(
+			(a) => !hidingArticleIds.has(a._id),
+		);
+		// Apply user filters
+		const filtered = filterArticles(visibleArticles, filters);
 		// Then apply sorting
 		return sortArticles(filtered, sortCriteria);
-	}, [articles, filters, sortCriteria]);
+	}, [articles, filters, sortCriteria, hidingArticleIds]); // Add hidingArticleIds dependency
 
 	// --- Context Value & Helper Functions ---
 
@@ -154,6 +163,52 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	const setSortField = useCallback((field: ArticleSortField) => {
 		setSortCriteria((prev) => ({ ...prev, field }));
 	}, []); // setSortCriteria is stable
+
+	// Optimistic remove function
+	const optimisticRemoveArticle = useCallback(
+		async (id: string) => {
+			// Find the article first in case we need to revert - Removed as unused for now
+			// const articleToRemove = articles.find((a) => a._id === id);
+
+			// Optimistically hide the article
+			setHidingArticleIds((prev) => new Set(prev).add(id));
+
+			try {
+				const success = await removeArticle(id); // Call the actual remove function
+
+				if (!success) {
+					// Revert optimistic update on failure
+					toast({
+						title: "Failed to Remove Article",
+						description: "The article could not be removed. Please try again.",
+						variant: "destructive",
+					});
+					setHidingArticleIds((prev) => {
+						const next = new Set(prev);
+						next.delete(id);
+						return next;
+					});
+				}
+				// On success, the article remains hidden.
+				// The next sync/refresh will permanently remove it from the main 'articles' state.
+			} catch (error) {
+				// Catch any unexpected errors from removeArticle itself
+				console.error("Error during optimistic remove:", error);
+				toast({
+					title: "Error Removing Article",
+					description: "An unexpected error occurred.",
+					variant: "destructive",
+				});
+				// Revert optimistic update
+				setHidingArticleIds((prev) => {
+					const next = new Set(prev);
+					next.delete(id);
+					return next;
+				});
+			}
+		},
+		[removeArticle, toast], // Removed 'articles' dependency
+	);
 
 	const toggleSortDirection = useCallback(() => {
 		setSortCriteria((prev) => ({
@@ -186,7 +241,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			addArticleByUrl,
 			addArticleByFile,
 			updateArticleStatus,
-			removeArticle,
+			optimisticRemoveArticle, // Provide the optimistic remove function
 			updateReadingProgress,
 		}),
 		[
@@ -212,7 +267,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			addArticleByUrl, // Stable function reference
 			addArticleByFile, // Stable function reference
 			updateArticleStatus, // Stable function reference
-			removeArticle, // Stable function reference
+			optimisticRemoveArticle, // Add optimistic function to dependencies
 			updateReadingProgress, // Stable function reference
 		],
 	);
