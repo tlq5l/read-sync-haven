@@ -3,6 +3,7 @@
 import PouchDBAdapterMemory from "pouchdb-adapter-memory"; // Import memory adapter
 import PouchDB from "pouchdb-browser";
 import PouchDBFind from "pouchdb-find";
+import { updateMissingMetadata } from "./migrations"; // Import the migration function
 import type { Article, Highlight, Tag } from "./types";
 import { executeWithRetry } from "./utils";
 
@@ -264,6 +265,22 @@ export async function initializeDatabase(): Promise<boolean> {
 			// Don't mark initialization as failed just because indexes failed,
 			// but log it as a significant issue.
 			success = success && false; // Reflect that indexes might be missing
+		}
+
+		// 4. Run data migrations after indexes are set up
+		if (success) {
+			// Only run migrations if DB connection is okay
+			try {
+				console.log("Running data migrations (updateMissingMetadata)...");
+				const updatedCount = await updateMissingMetadata();
+				console.log(
+					`Data migration completed. Updated ${updatedCount} articles.`,
+				);
+			} catch (migrationError) {
+				console.error("Data migration failed:", migrationError);
+				// Decide if this should affect the overall success status
+				// For now, let's log it but not fail the entire initialization
+			}
 		}
 
 		console.log(
