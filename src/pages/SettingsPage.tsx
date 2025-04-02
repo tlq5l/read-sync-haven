@@ -1,4 +1,4 @@
-import UserProfileSection from "@/components/UserProfileSection";
+// Removed UserProfileSection import, using Clerk's UserProfile directly
 import { KeyboardShortcutsTab } from "@/components/keyboard-shortcuts-tab";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +23,15 @@ import {
 	tagsDb,
 	updateMissingMetadata,
 } from "@/services/db"; // Import specific DBs and types
-import { ArrowLeft, Database, Keyboard, Palette, User } from "lucide-react";
+import { UserProfile } from "@clerk/clerk-react"; // Import Clerk's UserProfile
+import {
+	ArrowLeft,
+	Database,
+	Keyboard,
+	Palette,
+	ShieldCheck,
+	User,
+} from "lucide-react"; // Added ShieldCheck for Account
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -33,7 +41,7 @@ export default function SettingsPage() {
 	const [isExportingData, setIsExportingData] = useState(false);
 	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
 	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false); // Add state for metadata update button
-	const [activeTab, setActiveTab] = useState("profile");
+	const [activeTab, setActiveTab] = useState("account"); // Default to account tab
 
 	// Get the action function - needs a refresh callback, maybe null for now or a dummy?
 	// Let's assume a refresh isn't strictly needed immediately after cleanup,
@@ -162,8 +170,18 @@ export default function SettingsPage() {
 				onValueChange={setActiveTab}
 				className="space-y-6"
 			>
-				<TabsList className="grid grid-cols-4 mb-4">
+				<TabsList className="grid grid-cols-5 mb-4">
+					{" "}
+					{/* Changed to 5 columns */}
+					<TabsTrigger value="account" className="flex items-center gap-1">
+						{" "}
+						{/* New Account Tab */}
+						<ShieldCheck className="h-4 w-4" />
+						<span>Account</span>
+					</TabsTrigger>
 					<TabsTrigger value="profile" className="flex items-center gap-1">
+						{" "}
+						{/* Existing Profile Tab */}
 						<User className="h-4 w-4" />
 						<span>Profile</span>
 					</TabsTrigger>
@@ -181,10 +199,33 @@ export default function SettingsPage() {
 					</TabsTrigger>
 				</TabsList>
 
-				<TabsContent value="profile" className="space-y-6">
+				<TabsContent value="account" className="space-y-6">
+					{" "}
+					{/* New Account Content */}
 					<ScrollArea className="h-[70vh]">
 						<div className="pr-4">
-							<UserProfileSection />
+							<UserProfile routing="path" path="/settings" />{" "}
+							{/* Use Clerk UserProfile */}
+						</div>
+					</ScrollArea>
+				</TabsContent>
+
+				<TabsContent value="profile" className="space-y-6">
+					{" "}
+					{/* Existing Profile Content */}
+					<ScrollArea className="h-[70vh]">
+						<div className="pr-4">
+							{/* Content for the user profile settings (if any separate from Clerk) can go here */}
+							<Card>
+								<CardHeader>
+									<CardTitle>User Profile Settings</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<p className="text-muted-foreground">
+										Additional profile settings can be added here later.
+									</p>
+								</CardContent>
+							</Card>
 						</div>
 					</ScrollArea>
 				</TabsContent>

@@ -8,7 +8,7 @@ import { useArticles } from "@/context/ArticleContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
-import { UserButton, useAuth } from "@clerk/clerk-react"; // Removed unused useUser
+import { useAuth } from "@clerk/clerk-react"; // Removed unused useUser and UserButton
 import {
 	// Bookmark, // Removed unused icon
 	ChevronLeft,
@@ -133,16 +133,7 @@ export default function Sidebar() {
 						collapsed ? "w-full justify-center" : "ml-auto", // Center content when collapsed
 					)}
 				>
-					{isSignedIn && (
-						<UserButton
-							afterSignOutUrl="/sign-in"
-							appearance={{
-								elements: {
-									userButtonAvatarBox: "w-8 h-8",
-								},
-							}}
-						/>
-					)}
+					{/* UserButton removed, moved to Settings page */}
 					<Button
 						variant="ghost"
 						size="icon"
