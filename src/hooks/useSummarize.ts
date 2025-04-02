@@ -17,59 +17,31 @@ export function useSummarize() {
 			if (!fullTextContent) {
 				throw new Error("Article content not available for summarization.");
 			}
-			let response: Response;
 			const requestBody = JSON.stringify({ content: fullTextContent });
 
 			// Check if running in development environment
 			// Note: This relies on Vite's import.meta.env feature.
 			// Ensure your vite-env.d.ts includes `/// <reference types="vite/client" />`
-			if (import.meta.env.DEV) {
-				// --- DEVELOPMENT: Call GCF directly via Vite Proxy ---
-				console.log("DEV: Calling GCF via Vite proxy...");
-				const gcfUrl = import.meta.env.VITE_GCF_SUMMARIZE_URL;
-				if (!gcfUrl) throw new Error("VITE_GCF_SUMMARIZE_URL not set.");
+			// --- Always call Cloudflare Worker Proxy (for both Dev and Prod) ---
+			console.log("Calling Cloudflare Worker proxy for summarize...");
+			// 1. Get Clerk token
+			const clerkToken = await getToken();
+			if (!clerkToken) {
+				throw new Error("User not authenticated (Clerk token missing).");
+			}
 
-				// 1. Get Google OIDC token from Vite dev server
-				const tokenResponse = await fetch("/api/get-gcf-token"); // Relative path for proxy
-				const tokenData = await tokenResponse.json();
-				if (!tokenResponse.ok || !tokenData.token) {
-					throw new Error(
-						tokenData?.error || "Failed to get dev token from Vite server.",
-					);
-				}
-				const googleOidcToken = tokenData.token;
-
-				// 2. Call GCF directly with the token
-				response = await fetch(gcfUrl, {
+			// 2. Call the worker endpoint
+			const response = await fetch(
+				"https://bondwise-sync-api.vikione.workers.dev/api/summarize", // Use production worker URL always
+				{
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
-						Authorization: `Bearer ${googleOidcToken}`,
+						Authorization: `Bearer ${clerkToken}`, // Use Clerk token
 					},
 					body: requestBody,
-				});
-			} else {
-				// --- PRODUCTION: Call Cloudflare Worker Proxy ---
-				console.log("PROD: Calling Cloudflare Worker proxy...");
-				// 1. Get Clerk token
-				const clerkToken = await getToken();
-				if (!clerkToken) {
-					throw new Error("User not authenticated (Clerk token missing).");
-				}
-
-				// 2. Call the worker endpoint
-				response = await fetch(
-					"https://bondwise-sync-api.vikione.workers.dev/api/summarize",
-					{
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							Authorization: `Bearer ${clerkToken}`,
-						},
-						body: requestBody,
-					},
-				);
-			}
+				},
+			);
 
 			// --- Handle Response (Common for Dev/Prod) ---
 			const data = await response.json();

@@ -28,7 +28,6 @@ export function useChat(fullTextContent: string | null) {
 				throw new Error("Cannot send an empty message.");
 			}
 
-			let response: Response;
 			const requestBody = JSON.stringify({
 				content: fullTextContent,
 				message: userMessage,
@@ -41,13 +40,10 @@ export function useChat(fullTextContent: string | null) {
 				throw new Error("User not authenticated (Clerk token missing).");
 			}
 
-			// Use VITE_GCF_CHAT_URL in dev if available, otherwise worker URL
-			const chatApiUrl =
-				import.meta.env.DEV && import.meta.env.VITE_GCF_CHAT_URL
-					? import.meta.env.VITE_GCF_CHAT_URL // TODO: Add proxy logic if needed for dev GCF
-					: "https://bondwise-sync-api.vikione.workers.dev/api/chat";
+			// Always use the production worker URL
+			const chatApiUrl = "https://bondwise-sync-api.vikione.workers.dev/api/chat";
 
-			response = await fetch(chatApiUrl, {
+			const response = await fetch(chatApiUrl, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
