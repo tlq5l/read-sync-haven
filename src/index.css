@@ -56,6 +56,13 @@
 		--animation-easing-accelerate: cubic-bezier(0.4, 0, 1, 1);
 		--animation-easing-decelerate: cubic-bezier(0, 0, 0.2, 1);
 		--animation-easing-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+		/* Text Size Variables (relative to base 16px) */
+		--text-size-1: 0.8rem; /* 12.8px */
+		--text-size-2: 0.9rem; /* 14.4px */
+		--text-size-3: 1rem; /* 16px (default) */
+		--text-size-4: 1.1rem; /* 17.6px */
+		--text-size-5: 1.2rem; /* 19.2px */
 	}
 
 	.dark {
@@ -105,6 +112,9 @@
 
 	body {
 		@apply bg-background text-foreground;
+		/* Default font size (level 3) */
+		font-size: var(--text-size-3);
+		line-height: 1.6; /* Adjust line-height for readability */
 	}
 
 	/* Modern standard for forced colors mode */
@@ -141,6 +151,23 @@
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
+
+		/* Apply text size based on data attribute */
+		html[data-text-size="1"] body {
+			font-size: var(--text-size-1);
+		}
+		html[data-text-size="2"] body {
+			font-size: var(--text-size-2);
+		}
+		html[data-text-size="3"] body {
+			font-size: var(--text-size-3);
+		}
+		html[data-text-size="4"] body {
+			font-size: var(--text-size-4);
+		}
+		html[data-text-size="5"] body {
+			font-size: var(--text-size-5);
+		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

@@ -5,9 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
+
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import type { TextSize } from "@/context/ThemeContext"; // Import TextSize type
+
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { useArticleActions } from "@/hooks/useArticleActions";
@@ -26,7 +30,7 @@ import { Link } from "react-router-dom";
 
 export default function SettingsPage() {
 	const { toast } = useToast();
-	const { theme } = useTheme();
+	const { theme, textSize, setTextSize } = useTheme(); // Get textSize and setTextSize
 	const [isExportingData, setIsExportingData] = useState(false);
 	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
 	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false); // Add state for metadata update button
@@ -208,14 +212,29 @@ export default function SettingsPage() {
 										<ThemeToggle showLabel={false} />
 									</div>
 									<Separator />
-									<div className="flex items-center justify-between">
-										<div className="space-y-0.5">
-											<Label htmlFor="font-size">Larger Text</Label>
-											<p className="text-sm text-muted-foreground">
-												Coming soon
-											</p>
+									{/* Text Size Slider */}
+									<div className="space-y-3">
+										<Label htmlFor="text-size-slider">Text Size</Label>
+										<p className="text-sm text-muted-foreground">
+											Adjust the application's base text size.
+										</p>
+										<Slider
+											id="text-size-slider"
+											min={1}
+											max={5}
+											step={1}
+											value={[textSize]}
+											onValueChange={(value) =>
+												setTextSize(value[0] as TextSize)
+											}
+											className="w-[60%]" // Adjust width as needed
+										/>
+										{/* Optional: Add labels for slider steps */}
+										<div className="flex justify-between text-xs text-muted-foreground w-[60%] pt-1">
+											<span>Smallest</span>
+											<span>Default</span>
+											<span>Largest</span>
 										</div>
-										<Switch id="font-size" disabled />
 									</div>
 								</CardContent>
 							</Card>

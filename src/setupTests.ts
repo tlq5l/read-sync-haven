@@ -45,4 +45,16 @@ Object.defineProperty(window, "matchMedia", {
 	}),
 });
 
+
+// Mock ResizeObserver more robustly
+global.ResizeObserver = class ResizeObserver {
+	callback: ResizeObserverCallback;
+	constructor(callback: ResizeObserverCallback) {
+		this.callback = callback;
+	}
+	observe = vi.fn();
+	unobserve = vi.fn();
+	disconnect = vi.fn();
+};
+
 // Add any other global setup logic here if needed.
