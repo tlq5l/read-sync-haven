@@ -1,5 +1,5 @@
 import { useAnimation } from "@/context/AnimationContext";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react"; // Add useCallback
 
 interface SynchronizedAnimationOptions {
 	groupId?: string;
@@ -24,8 +24,9 @@ export function useSynchronizedAnimation({
 	const {
 		registerTransitionElement,
 		unregisterTransitionElement,
-		isElementAnimating,
+		// isElementAnimating, // Removed as it's no longer used in this hook
 		timings,
+		// isElementAnimating is no longer needed directly in this hook
 		easings,
 	} = useAnimation();
 
@@ -51,57 +52,71 @@ export function useSynchronizedAnimation({
 		disabled,
 	]);
 
-	// Update animation state when group animates
-	useEffect(() => {
-		if (disabled) return;
+	// Removed polling useEffect. State will be managed via transitionend.
 
-		const checkAnimation = () => {
-			const newIsAnimating = isElementAnimating(
-				groupId,
-				uniqueElementId.current,
-			);
-			if (newIsAnimating !== isAnimating) {
-				setIsAnimating(newIsAnimating);
+	// Apply styles to the element when it's referenced
+	// Effect to handle transition end
+	useEffect(() => {
+		const node = elementRef.current;
+		if (!node || disabled) return;
+
+		const handleTransitionEnd = (event: TransitionEvent) => {
+			// Ensure the event is for the element itself and not a child
+			// And check if the transition property is one we care about (optional but good practice)
+			if (
+				event.target ===
+				node /* && (event.propertyName === 'opacity' || event.propertyName === 'transform') */
+			) {
+				// console.log(`Transition ended for ${uniqueElementId.current}`);
+				setIsAnimating(false);
+				node.style.willChange = "auto"; // Reset will-change when animation ends
 			}
 		};
 
-		// Check regularly to catch animation state changes
-		const intervalId = setInterval(checkAnimation, 100);
+		// Set initial animating state (assuming it starts animating immediately upon mount/trigger)
+		// This might need adjustment based on how triggerTransition works
+		// For now, let's assume it starts animating if not disabled.
+		// A better approach would be to have triggerTransition directly set this state.
+		setIsAnimating(true);
+		node.style.willChange = "transform, opacity"; // Set will-change when animation starts
+
+		node.addEventListener("transitionend", handleTransitionEnd);
 
 		return () => {
-			clearInterval(intervalId);
+			node.removeEventListener("transitionend", handleTransitionEnd);
+			// Reset will-change on cleanup if it was animating
+			if (isAnimating) {
+				node.style.willChange = "auto";
+			}
 		};
-	}, [groupId, isElementAnimating, isAnimating, disabled]);
+	}, [disabled, isAnimating]); // Rerun if disabled changes or isAnimating changes (to reset will-change)
 
-	// Apply styles to the element when it's referenced
-	const animationRef = (element: HTMLElement | null) => {
-		if (!element || disabled) {
-			elementRef.current = null;
-			return;
-		}
+	const animationRef = useCallback(
+		(element: HTMLElement | null) => {
+			if (!element || disabled) {
+				elementRef.current = null;
+				return;
+			}
 
-		elementRef.current = element;
+			elementRef.current = element;
 
-		// Apply animation-related styles
-		element.style.transitionProperty = "transform, opacity, visibility";
-		element.style.transitionDuration = `${duration || timings.normal}ms`;
-		element.style.transitionTimingFunction = easing || easings.standard;
+			// Apply animation-related styles - These define the transition itself
+			element.style.transitionProperty = "transform, opacity, visibility";
+			element.style.transitionDuration = `${duration || timings.normal}ms`;
+			element.style.transitionTimingFunction = easing || easings.standard;
+			if (delay > 0) {
+				element.style.transitionDelay = `${delay}ms`;
+			}
 
-		if (delay > 0) {
-			element.style.transitionDelay = `${delay}ms`;
-		}
+			// Apply hardware acceleration hints
+			element.style.transform = "translateZ(0)"; // Ensure this doesn't conflict with animation transforms
+			element.style.backfaceVisibility = "hidden";
 
-		// Apply hardware acceleration
-		element.style.transform = "translateZ(0)";
-		element.style.backfaceVisibility = "hidden";
-
-		// Set will-change only during animation to avoid performance issues
-		if (isAnimating) {
-			element.style.willChange = "transform, opacity";
-		} else {
-			element.style.willChange = "auto";
-		}
-	};
+			// Initial will-change state is handled in the useEffect now
+			// element.style.willChange = 'auto'; // Set initial state
+		},
+		[disabled, duration, delay, easing, timings, easings],
+	);
 
 	return {
 		ref: animationRef,
