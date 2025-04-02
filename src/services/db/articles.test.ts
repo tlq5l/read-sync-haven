@@ -46,6 +46,7 @@ const createArticleData = (
 	content: `Content for ${title}`,
 	excerpt: `Excerpt for ${title}`, // Add missing required field
 	savedAt: Date.now() - idNum * 1000, // Ensure different save times
+	status: "inbox",
 	isRead: false,
 	favorite: false,
 	tags: [],
@@ -175,6 +176,7 @@ describe("removeDuplicateArticles", () => {
 			title: "No URL Article",
 			content: "Content",
 			savedAt: Date.now(),
+			status: "inbox",
 			isRead: false,
 			favorite: false,
 			tags: [],
@@ -215,6 +217,7 @@ describe("removeDuplicateArticles", () => {
 			title: "Rev Test 2 - No Rev",
 			content: "Content",
 			savedAt: Date.now(),
+			status: "inbox",
 			isRead: false,
 			favorite: false,
 			tags: [],

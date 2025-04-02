@@ -89,7 +89,8 @@ const AppWithRouter = () => (
 				{/* Protected routes */}
 				<Route element={<ProtectedRoute />}>
 					<Route element={<Layout />}>
-						<Route path="/" element={<HomePage />} />
+						<Route path="/" element={<HomePage />} />{" "}
+						{/* Keep this pointing to the new HomePage */}
 						<Route path="/add" element={<AddPage />} />
 						<Route path="/read/:id" element={<ReadPage />} />
 						<Route path="/search" element={<SearchPage />} />

@@ -17,6 +17,7 @@ const mockArticles: Article[] = [
 		content: "Learn React",
 		excerpt: "Fundamental concepts",
 		savedAt: 1700000000000, // Older
+		status: "inbox",
 		isRead: false,
 		favorite: true,
 		siteName: "react.dev",
@@ -31,6 +32,7 @@ const mockArticles: Article[] = [
 		content: "Deep dive into TS",
 		excerpt: "Generics and types",
 		savedAt: 1710000000000, // Newer
+		status: "inbox",
 		isRead: true,
 		favorite: false,
 		siteName: "typescriptlang.org",
@@ -45,6 +47,7 @@ const mockArticles: Article[] = [
 		content: "Mastering CSS Grid",
 		excerpt: "Layout techniques",
 		savedAt: 1705000000000, // Middle
+		status: "inbox",
 		isRead: false,
 		favorite: false,
 		siteName: "css-tricks.com",
@@ -59,6 +62,7 @@ const mockArticles: Article[] = [
 		content: "Some important notes",
 		excerpt: "Quick thoughts",
 		savedAt: 1708000000000,
+		status: "inbox",
 		isRead: true,
 		favorite: true,
 		siteName: undefined, // No site name
@@ -73,6 +77,7 @@ const mockArticles: Article[] = [
 		content: "PDF Content Placeholder",
 		excerpt: "A sample document",
 		savedAt: 1709000000000,
+		status: "inbox",
 		isRead: false,
 		favorite: false,
 		siteName: "Local PDF",

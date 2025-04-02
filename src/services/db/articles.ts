@@ -94,6 +94,7 @@ export async function saveArticle(
 						savedAt: article.savedAt ?? latestArticle.savedAt, // Usually from cloud
 
 						// Fields primarily from 'latestDoc' (local state) unless overridden by incoming 'article'
+						status: article.status ?? latestArticle.status ?? "inbox", // Add status merge logic
 						isRead: article.isRead ?? latestArticle.isRead,
 						favorite: article.favorite ?? latestArticle.favorite,
 						tags: article.tags ?? latestArticle.tags,
@@ -109,6 +110,11 @@ export async function saveArticle(
 							article.estimatedReadTime ?? latestArticle.estimatedReadTime,
 						coverImage: article.coverImage ?? latestArticle.coverImage,
 						language: article.language ?? latestArticle.language,
+						// Ensure file-related fields are preserved if they exist on latestArticle
+						fileData: article.fileData ?? latestArticle.fileData,
+						fileName: article.fileName ?? latestArticle.fileName,
+						fileSize: article.fileSize ?? latestArticle.fileSize,
+						pageCount: article.pageCount ?? latestArticle.pageCount,
 					};
 					const retryResponse = await articlesDb.put(docToRetry);
 					if (retryResponse.ok) {

@@ -59,6 +59,7 @@ describe("useArticleSync", () => {
 			title: "Article 1",
 			content: "Content 1",
 			savedAt: 1000,
+			status: "inbox",
 			isRead: false,
 			favorite: false,
 			type: "article" as const, // Use const assertion to specify literal type
@@ -72,6 +73,7 @@ describe("useArticleSync", () => {
 			title: "Article 2",
 			content: "Content 2",
 			savedAt: 2000,
+			status: "inbox",
 			isRead: false,
 			favorite: false,
 			type: "article" as const,
@@ -97,6 +99,7 @@ describe("useArticleSync", () => {
 				title: "Article 1 Updated", // Different title
 				content: "Updated content", // Different content
 				savedAt: 3000, // Newer timestamp
+				status: "inbox",
 				isRead: false,
 				favorite: true, // Different favorite status
 				type: "article" as const,
@@ -143,6 +146,7 @@ describe("useArticleSync", () => {
 				title: "Cloud Article 1",
 				content: "Cloud Content 1",
 				savedAt: 5000, // Newer
+				status: "inbox",
 				isRead: true,
 				favorite: true,
 				type: "article" as const,
@@ -156,6 +160,7 @@ describe("useArticleSync", () => {
 				title: "Cloud Article 3",
 				content: "Cloud Content 3",
 				savedAt: 4000,
+				status: "inbox",
 				isRead: false,
 				favorite: false,
 				type: "article" as const,

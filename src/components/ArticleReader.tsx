@@ -61,7 +61,7 @@ export default function ArticleReader() {
 	const toggleFavorite = useCallback(() => {
 		if (article && id) {
 			const newFavoriteStatus = !article.favorite;
-			updateArticleStatus(id, true, newFavoriteStatus); // Update in DB via context
+			updateArticleStatus(id, { favorite: newFavoriteStatus }); // Update in DB via context
 			setArticle(
 				(
 					prev, // Update local state immediately

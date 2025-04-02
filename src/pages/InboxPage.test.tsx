@@ -17,7 +17,7 @@ import userEvent from "@testing-library/user-event";
 import React, { useCallback, useMemo, useState } from "react"; // Add hooks
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest"; // Removed beforeEach
-import HomePage from "./HomePage"; // The component to test
+import InboxPage from "./InboxPage"; // The component to test
 
 // --- Mocks ---
 
@@ -185,6 +185,7 @@ const mockRawArticles: Article[] = [
 		content: "",
 		excerpt: "Learn React",
 		savedAt: 1700000000000,
+		status: "inbox",
 		isRead: false,
 		favorite: true,
 		siteName: "React.dev", // Capitalized to match test lookups
@@ -199,6 +200,7 @@ const mockRawArticles: Article[] = [
 		content: "",
 		excerpt: "Learn TS",
 		savedAt: 1710000000000,
+		status: "inbox",
 		isRead: true,
 		favorite: false,
 		siteName: "typescriptlang.org",
@@ -213,6 +215,7 @@ const mockRawArticles: Article[] = [
 		content: "",
 		excerpt: "Learn CSS",
 		savedAt: 1705000000000,
+		status: "inbox",
 		isRead: false,
 		favorite: false,
 		siteName: "css-tricks.com",
@@ -227,6 +230,7 @@ const mockRawArticles: Article[] = [
 		content: "",
 		excerpt: "A PDF file",
 		savedAt: 1708000000000,
+		status: "inbox",
 		isRead: false,
 		favorite: false,
 		siteName: "Local",
@@ -454,11 +458,11 @@ const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 };
 
 // Helper to render the component with the mock provider
-const renderHomePage = () => {
+const renderInboxPage = () => {
 	return render(
 		<MemoryRouter>
 			<MockArticleProvider>
-				<HomePage />
+				<InboxPage />
 			</MockArticleProvider>
 		</MemoryRouter>,
 	);
@@ -487,7 +491,7 @@ function testToggleSortDirection() {
 
 // --- Tests ---
 
-describe("HomePage Integration Tests", () => {
+describe("InboxPage Integration Tests", () => {
 	// No beforeEach needed for mock context state setup anymore
 
 	afterEach(() => {
@@ -496,7 +500,7 @@ describe("HomePage Integration Tests", () => {
 	});
 
 	it("should render the initial list of articles sorted by date descending", () => {
-		renderHomePage();
+		renderInboxPage();
 		const articleCards = screen.getAllByRole("link", { name: /read/i }); // Links within cards
 		expect(articleCards).toHaveLength(mockRawArticles.length);
 		// Check order based on titles (assuming default sort is date desc)
@@ -510,7 +514,7 @@ describe("HomePage Integration Tests", () => {
 
 	// Removed obsolete test for search input
 	it("should sort articles by title ascending", async () => {
-		renderHomePage();
+		renderInboxPage();
 
 		// Set both the field AND direction to ensure ascending order
 		await act(async () => {
@@ -540,7 +544,7 @@ describe("HomePage Integration Tests", () => {
 	});
 
 	it("should toggle sort direction", async () => {
-		renderHomePage(); // Default: Date Desc
+		renderInboxPage(); // Default: Date Desc
 
 		// Toggle sort direction using our exported function
 		await act(async () => {
@@ -564,7 +568,7 @@ describe("HomePage Integration Tests", () => {
 	});
 
 	it("should filter by site name", async () => {
-		renderHomePage();
+		renderInboxPage();
 
 		// Set filter using our test helper function
 		await act(async () => {
@@ -585,7 +589,7 @@ describe("HomePage Integration Tests", () => {
 	});
 
 	it("should filter by type", async () => {
-		renderHomePage();
+		renderInboxPage();
 
 		// Set filter using our test helper function
 		await act(async () => {
@@ -606,7 +610,7 @@ describe("HomePage Integration Tests", () => {
 	});
 
 	it("should filter by tag", async () => {
-		renderHomePage();
+		renderInboxPage();
 
 		// Set filter using our test helper function
 		await act(async () => {
@@ -628,7 +632,7 @@ describe("HomePage Integration Tests", () => {
 	});
 
 	it("should show filtered empty state and allow clearing filters", async () => {
-		renderHomePage();
+		renderInboxPage();
 
 		// Set a filter that will yield no results
 		await act(async () => {

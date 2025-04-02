@@ -26,6 +26,7 @@ export interface Article {
 	fileName?: string; // Original filename for local files
 	pageCount?: number; // Number of pages (primarily for PDF)
 	userId?: string; // User ID associated with this article (e.g., from Clerk)
+	status: "inbox" | "later" | "archived"; // Article status
 
 	// Optional fields added based on usage elsewhere
 	htmlContent?: string; // Raw HTML content, if available

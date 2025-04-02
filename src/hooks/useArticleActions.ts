@@ -47,6 +47,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 			try {
 				const parsedArticle = await parseArticle(url);
 
+				// Add default status when creating article from URL
 				const articleWithUser: Omit<Article, "_id" | "_rev"> & {
 					_id?: string;
 					_rev?: string;
@@ -54,6 +55,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					...parsedArticle,
 					userId, // Assign the current Clerk user ID
 					savedAt: Date.now(),
+					status: "inbox", // Default status
 					isRead: false,
 					favorite: false,
 					tags: [],
@@ -125,6 +127,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 						content: "EPUB content is stored in fileData.", // Placeholder for content field
 						url: `local-epub://${file.name}`,
 						savedAt: Date.now(),
+						status: "inbox", // Default status
 						isRead: false,
 						favorite: false,
 						tags: [],
@@ -159,6 +162,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 						content: base64Content,
 						url: `local-pdf://${file.name}`,
 						savedAt: Date.now(),
+						status: "inbox", // Default status
 						isRead: false,
 						favorite: false,
 						tags: [],
@@ -225,9 +229,16 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 		[toast, userId, isSignedIn, refreshArticles],
 	);
 
-	// Update article read status and favorite status
+	// Update article status (isRead, favorite, status)
 	const updateArticleStatus = useCallback(
-		async (id: string, isRead: boolean, favorite?: boolean) => {
+		async (
+			id: string,
+			updates: {
+				isRead?: boolean;
+				favorite?: boolean;
+				status?: "inbox" | "later" | "archived";
+			},
+		) => {
 			if (!isSignedIn || !userId) {
 				toast({
 					title: "Authentication Required",
@@ -250,20 +261,40 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					throw new Error("Permission denied to update this article.");
 				}
 
-				const updates: Partial<Article> & { _id: string; _rev: string } = {
-					_id: id,
-					_rev: fetchedArticle._rev,
-					isRead,
-				};
+				const updatePayload: Partial<Article> & { _id: string; _rev: string } =
+					{
+						_id: id,
+						_rev: fetchedArticle._rev,
+					};
 
-				if (favorite !== undefined) {
-					updates.favorite = favorite;
+				let statusUpdateMessage = "";
+				if (updates.isRead !== undefined) {
+					updatePayload.isRead = updates.isRead;
+					if (updates.isRead && !fetchedArticle.readAt) {
+						updatePayload.readAt = Date.now();
+					}
+					statusUpdateMessage = updates.isRead
+						? "marked as read"
+						: "marked as unread";
 				}
-				if (isRead && !fetchedArticle.readAt) {
-					updates.readAt = Date.now();
+				if (updates.favorite !== undefined) {
+					updatePayload.favorite = updates.favorite;
+					statusUpdateMessage = updates.favorite
+						? "added to favorites"
+						: "removed from favorites";
+				}
+				if (updates.status !== undefined) {
+					updatePayload.status = updates.status;
+					statusUpdateMessage = `moved to ${updates.status}`;
 				}
 
-				const updatedArticle = await updateArticle(updates);
+				if (Object.keys(updatePayload).length <= 2) {
+					// Only _id and _rev
+					console.log("No actual updates provided to updateArticleStatus");
+					return; // No actual updates to perform
+				}
+
+				const updatedArticle = await updateArticle(updatePayload);
 
 				// Sync update to cloud (fire and forget)
 				saveItemToCloud(updatedArticle)
@@ -281,6 +312,11 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					.catch((err) => {
 						console.error(`Error syncing status update for ${id}:`, err);
 					});
+
+				toast({
+					title: "Article updated",
+					description: `Article ${statusUpdateMessage}.`,
+				});
 
 				// Trigger refresh to reflect changes everywhere
 				await refreshArticles();

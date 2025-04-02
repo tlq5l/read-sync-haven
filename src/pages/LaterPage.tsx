@@ -1,13 +1,182 @@
-import type React from "react";
+import ArticleCard from "@/components/ArticleCard";
+import TopBar from "@/components/TopBar";
+import { Button } from "@/components/ui/button";
+import {
+	TransitionGroup,
+	TransitionItem,
+} from "@/components/ui/transition-group";
+import { useAnimation } from "@/context/AnimationContext";
+import { useArticles } from "@/context/ArticleContext";
+import { useDebounce } from "@/hooks/useDebounce";
+import { createAnimationFrame } from "@/lib/animation";
+import { RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
-const LaterPage: React.FC = () => {
+// Renamed component to LaterPage
+export default function LaterPage() {
+	const {
+		articles, // Raw articles for deriving filter options
+		processedArticles, // Use this for display
+		isLoading,
+		refreshArticles,
+		error,
+		retryLoading,
+		filters,
+		setFilters,
+		setSearchQuery,
+	} = useArticles();
+	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+	const { synchronizeAnimations } = useAnimation();
+	const animationFrameRef = useRef(createAnimationFrame());
+
+	// Local state for search input
+	const [localSearchQuery, setLocalSearchQuery] = useState("");
+	const debouncedSearchQuery = useDebounce(localSearchQuery, 300); // 300ms debounce
+
+	// Effect to update context search query when debounced value changes
+	useEffect(() => {
+		setSearchQuery(debouncedSearchQuery);
+	}, [debouncedSearchQuery, setSearchQuery]);
+
+	// Reference to track if cards should animate
+	const shouldAnimateCards = useRef(true);
+
+	// On initial mount, refresh articles once
+	useEffect(() => {
+		let isMounted = true;
+
+		if (!hasLoadedOnce) {
+			refreshArticles()
+				.then(() => {
+					if (isMounted) {
+						setHasLoadedOnce(true);
+						setTimeout(() => {
+							if (isMounted) {
+								synchronizeAnimations(() => {
+									shouldAnimateCards.current = true;
+								});
+							}
+						}, 100);
+					}
+				})
+				.catch((err) => {
+					console.error("Error refreshing articles:", err);
+					if (isMounted) {
+						setHasLoadedOnce(true); // Still mark as loaded even on error
+					}
+				});
+		}
+
+		return () => {
+			isMounted = false;
+			animationFrameRef.current.cancel();
+		};
+	}, [hasLoadedOnce, refreshArticles, synchronizeAnimations]);
+
+	// Whenever the view changes, we should animate the cards again
+	useEffect(() => {
+		shouldAnimateCards.current = true;
+	}, []);
+
+	// Determine if we should show the empty state
+	const hasActiveFilters =
+		filters.searchQuery ||
+		filters.siteNames.length > 0 ||
+		filters.tags.length > 0 ||
+		filters.types.length > 0;
+
+	// Filter for 'later' status specifically for this page
+	const laterArticles = processedArticles.filter(
+		(article) => article.status === "later",
+	);
+
+	const showInitialEmptyState =
+		!isLoading &&
+		hasLoadedOnce &&
+		laterArticles.length === 0 &&
+		!hasActiveFilters;
+	const showFilterEmptyState =
+		!isLoading &&
+		hasLoadedOnce &&
+		laterArticles.length === 0 &&
+		(articles.length > 0 || hasActiveFilters); // Show if filters resulted in no matches for 'later'
+
 	return (
-		<div className="p-4">
-			<h1 className="text-2xl font-bold mb-4">Later</h1>
-			<p>Articles marked for later reading will be displayed here.</p>
-			{/* TODO: Implement article list filtering for Later */}
+		<div className="h-full flex flex-col bg-background">
+			<TopBar />
+			<div className="flex-1 overflow-y-auto p-4">
+				{isLoading && !hasLoadedOnce ? (
+					<div className="flex items-center justify-center h-64">
+						<p className="text-muted-foreground">Loading articles...</p>
+					</div>
+				) : error ? (
+					<TransitionGroup
+						groupId="error-state"
+						className="flex flex-col items-center justify-center h-64 space-y-4"
+						autoAnimate={true}
+					>
+						<TransitionItem showFrom="top">
+							<p className="text-muted-foreground">
+								{error.message || "Error loading articles"}
+							</p>
+						</TransitionItem>
+						<TransitionItem showFrom="bottom">
+							<Button onClick={retryLoading}>
+								<RefreshCw className="mr-2 h-4 w-4" />
+								Retry Loading
+							</Button>
+						</TransitionItem>
+					</TransitionGroup>
+				) : showInitialEmptyState ? (
+					<TransitionGroup
+						groupId="empty-state-initial-later" // Unique groupId
+						className="flex flex-col items-center justify-center h-64 space-y-4"
+						autoAnimate={true}
+					>
+						<TransitionItem showFrom="top">
+							<p className="text-muted-foreground">
+								No articles marked for later.
+							</p>
+						</TransitionItem>
+						{/* Optional: Add a button to go back or add articles */}
+					</TransitionGroup>
+				) : showFilterEmptyState ? (
+					<TransitionGroup
+						groupId="empty-state-filtered-later" // Unique groupId
+						className="flex flex-col items-center justify-center h-64 space-y-4"
+						autoAnimate={true}
+					>
+						<TransitionItem showFrom="top">
+							<p className="text-muted-foreground">
+								No 'Later' articles match your current filters.
+							</p>
+						</TransitionItem>
+						<TransitionItem showFrom="bottom">
+							<Button
+								variant="outline"
+								onClick={() => {
+									setLocalSearchQuery(""); // Clears debounced via effect
+									setFilters({
+										siteNames: [],
+										types: [],
+										tags: [],
+										searchQuery: "",
+									});
+								}}
+							>
+								Clear Filters
+							</Button>
+						</TransitionItem>
+					</TransitionGroup>
+				) : (
+					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+						{/* Render only 'later' articles */}
+						{laterArticles.map((article, index) => (
+							<ArticleCard key={article._id} article={article} index={index} />
+						))}
+					</div>
+				)}
+			</div>
 		</div>
 	);
-};
-
-export default LaterPage;
+}

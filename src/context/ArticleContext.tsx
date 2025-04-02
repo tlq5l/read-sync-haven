@@ -52,8 +52,11 @@ interface ArticleContextType {
 	addArticleByFile: (file: File) => Promise<Article | null>;
 	updateArticleStatus: (
 		id: string,
-		isRead: boolean,
-		favorite?: boolean,
+		updates: {
+			isRead?: boolean;
+			favorite?: boolean;
+			status?: "inbox" | "later" | "archived";
+		},
 	) => Promise<void>;
 	optimisticRemoveArticle: (id: string) => Promise<void>; // Renamed for clarity
 	updateReadingProgress: (id: string, progress: number) => Promise<void>;

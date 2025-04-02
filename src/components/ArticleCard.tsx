@@ -11,7 +11,14 @@ import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { useToast } from "@/hooks/use-toast";
 import type { Article } from "@/services/db";
 import { formatDistanceToNow } from "date-fns";
-import { Bookmark, BookmarkCheck, MoreHorizontal, Trash2 } from "lucide-react";
+import {
+	Archive,
+	Bookmark,
+	BookmarkCheck,
+	Clock,
+	MoreHorizontal,
+	Trash2,
+} from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -38,7 +45,7 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 		e.preventDefault();
 		e.stopPropagation();
 		try {
-			await updateArticleStatus(article._id, article.isRead, !article.favorite);
+			await updateArticleStatus(article._id, { favorite: !article.favorite });
 		} catch (error) {
 			console.error("Error toggling favorite:", error);
 		}
@@ -137,6 +144,28 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 											className="gpu-accelerated"
 										>
 											<DropdownMenuItem
+												onClick={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													updateArticleStatus(article._id, { status: "later" });
+												}}
+											>
+												<Clock className="mr-2 h-4 w-4" />
+												<span>Move to Later</span>
+											</DropdownMenuItem>
+											<DropdownMenuItem
+												onClick={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													updateArticleStatus(article._id, {
+														status: "archived",
+													});
+												}}
+											>
+												<Archive className="mr-2 h-4 w-4" />
+												<span>Archive</span>
+											</DropdownMenuItem>
+											<DropdownMenuItem
 												className="text-destructive focus:text-destructive"
 												onClick={handleDelete}
 											>
@@ -183,6 +212,28 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 											align="end"
 											className="gpu-accelerated"
 										>
+											<DropdownMenuItem
+												onClick={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													updateArticleStatus(article._id, { status: "later" });
+												}}
+											>
+												<Clock className="mr-2 h-4 w-4" />
+												<span>Move to Later</span>
+											</DropdownMenuItem>
+											<DropdownMenuItem
+												onClick={(e) => {
+													e.preventDefault();
+													e.stopPropagation();
+													updateArticleStatus(article._id, {
+														status: "archived",
+													});
+												}}
+											>
+												<Archive className="mr-2 h-4 w-4" />
+												<span>Archive</span>
+											</DropdownMenuItem>
 											<DropdownMenuItem
 												className="text-destructive focus:text-destructive"
 												onClick={handleDelete}
