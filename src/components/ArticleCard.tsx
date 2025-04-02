@@ -131,11 +131,43 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 							<div className="flex justify-between items-start mb-2">
 								<span className="text-xs text-muted-foreground">Read</span>
 								<div className="flex items-center gap-1">
+									{/* Move to Later Button */}
+									<Button
+										variant="ghost"
+										size="icon"
+										className="h-8 w-8"
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											updateArticleStatus(article._id, { status: "later" });
+										}}
+										aria-label="Move to Later"
+									>
+										<Clock size={16} />
+									</Button>
+									{/* Archive Button */}
+									<Button
+										variant="ghost"
+										size="icon"
+										className="h-8 w-8"
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											updateArticleStatus(article._id, { status: "archived" });
+										}}
+										aria-label="Archive"
+									>
+										<Archive size={16} />
+									</Button>
+									{/* Favorite Button */}
 									<Button
 										variant="ghost"
 										size="icon"
 										className="h-8 w-8 transition-transform duration-200"
 										onClick={handleToggleFavorite}
+										aria-label={
+											article.favorite ? "Remove favorite" : "Add favorite"
+										}
 									>
 										{article.favorite ? (
 											<BookmarkCheck size={16} className="text-bondwise-500" />
@@ -161,28 +193,7 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 											align="end"
 											className="gpu-accelerated"
 										>
-											<DropdownMenuItem
-												onClick={(e) => {
-													e.preventDefault();
-													e.stopPropagation();
-													updateArticleStatus(article._id, { status: "later" });
-												}}
-											>
-												<Clock className="mr-2 h-4 w-4" />
-												<span>Move to Later</span>
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												onClick={(e) => {
-													e.preventDefault();
-													e.stopPropagation();
-													updateArticleStatus(article._id, {
-														status: "archived",
-													});
-												}}
-											>
-												<Archive className="mr-2 h-4 w-4" />
-												<span>Archive</span>
-											</DropdownMenuItem>
+											{/* Items removed, now direct buttons */}
 											<DropdownMenuItem
 												className="text-destructive focus:text-destructive"
 												onClick={handleDelete}
@@ -200,11 +211,43 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 									Unread
 								</span>
 								<div className="flex items-center gap-1">
+									{/* Move to Later Button */}
+									<Button
+										variant="ghost"
+										size="icon"
+										className="h-8 w-8"
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											updateArticleStatus(article._id, { status: "later" });
+										}}
+										aria-label="Move to Later"
+									>
+										<Clock size={16} />
+									</Button>
+									{/* Archive Button */}
+									<Button
+										variant="ghost"
+										size="icon"
+										className="h-8 w-8"
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											updateArticleStatus(article._id, { status: "archived" });
+										}}
+										aria-label="Archive"
+									>
+										<Archive size={16} />
+									</Button>
+									{/* Favorite Button */}
 									<Button
 										variant="ghost"
 										size="icon"
 										className="h-8 w-8 transition-transform duration-200"
 										onClick={handleToggleFavorite}
+										aria-label={
+											article.favorite ? "Remove favorite" : "Add favorite"
+										}
 									>
 										{article.favorite ? (
 											<BookmarkCheck size={16} className="text-bondwise-500" />
@@ -230,28 +273,7 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 											align="end"
 											className="gpu-accelerated"
 										>
-											<DropdownMenuItem
-												onClick={(e) => {
-													e.preventDefault();
-													e.stopPropagation();
-													updateArticleStatus(article._id, { status: "later" });
-												}}
-											>
-												<Clock className="mr-2 h-4 w-4" />
-												<span>Move to Later</span>
-											</DropdownMenuItem>
-											<DropdownMenuItem
-												onClick={(e) => {
-													e.preventDefault();
-													e.stopPropagation();
-													updateArticleStatus(article._id, {
-														status: "archived",
-													});
-												}}
-											>
-												<Archive className="mr-2 h-4 w-4" />
-												<span>Archive</span>
-											</DropdownMenuItem>
+											{/* Items removed, now direct buttons */}
 											<DropdownMenuItem
 												className="text-destructive focus:text-destructive"
 												onClick={handleDelete}
