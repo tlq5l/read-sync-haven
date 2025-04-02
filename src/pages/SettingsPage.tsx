@@ -33,7 +33,7 @@ import {
 	ShieldCheck,
 	User,
 } from "lucide-react"; // Added ShieldCheck for Account
-import { useEffect, useState } from "react"; // Import useEffect
+import { useState } from "react"; // Remove useEffect import
 import { Link } from "react-router-dom";
 
 export default function SettingsPage() {
@@ -43,9 +43,7 @@ export default function SettingsPage() {
 	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
 	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false); // Add state for metadata update button
 	const [activeTab, setActiveTab] = useState("account"); // Default to account tab
-	const [clerkBaseTheme, setClerkBaseTheme] = useState<typeof dark | undefined>(
-		undefined,
-	); // State for Clerk theme
+	// Removed clerkBaseTheme state
 
 	// Get the action function - needs a refresh callback, maybe null for now or a dummy?
 	// Let's assume a refresh isn't strictly needed immediately after cleanup,
@@ -157,39 +155,7 @@ export default function SettingsPage() {
 		}
 	};
 
-	// Effect to sync Clerk theme with app theme
-	useEffect(() => {
-		const getResolvedTheme = () => {
-			if (theme === "dark") {
-				return dark;
-			}
-			if (theme === "light") {
-				return undefined;
-			}
-			// Handle 'system' theme
-			const systemPrefersDark = window.matchMedia(
-				"(prefers-color-scheme: dark)",
-			).matches;
-			return systemPrefersDark ? dark : undefined;
-		};
-
-		setClerkBaseTheme(getResolvedTheme());
-
-		// Listener for system theme changes
-		const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-		const handleChange = () => {
-			if (theme === "system") {
-				setClerkBaseTheme(mediaQuery.matches ? dark : undefined);
-			}
-		};
-
-		mediaQuery.addEventListener("change", handleChange);
-
-		// Cleanup listener on component unmount or theme change
-		return () => {
-			mediaQuery.removeEventListener("change", handleChange);
-		};
-	}, [theme]); // Rerun effect if app theme setting changes
+	// Removed useEffect for theme syncing
 
 	return (
 		<div className="container py-8 max-w-3xl mx-auto">
@@ -242,12 +208,22 @@ export default function SettingsPage() {
 					{/* New Account Content */}
 					<ScrollArea className="h-[70vh]">
 						<div className="pr-4">
-							<UserProfile
-								routing="path"
-								path="/settings"
-								appearance={{ baseTheme: clerkBaseTheme }}
-							/>{" "}
-							{/* Use Clerk UserProfile */}
+							{/* Calculate theme directly before rendering */}
+							{(() => {
+								const isDarkMode =
+									theme === "dark" ||
+									(theme === "system" &&
+										window.matchMedia("(prefers-color-scheme: dark)").matches);
+								const clerkThemeObject = isDarkMode ? dark : undefined;
+
+								return (
+									<UserProfile
+										routing="path"
+										path="/settings"
+										appearance={{ baseTheme: clerkThemeObject }}
+									/>
+								);
+							})()}
 						</div>
 					</ScrollArea>
 				</TabsContent>
