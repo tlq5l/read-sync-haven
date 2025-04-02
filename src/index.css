@@ -117,6 +117,23 @@
 		line-height: 1.6; /* Adjust line-height for readability */
 	}
 
+	/* Apply text size based on data attribute */
+	html[data-text-size="1"] body {
+		font-size: var(--text-size-1);
+	}
+	html[data-text-size="2"] body {
+		font-size: var(--text-size-2);
+	}
+	html[data-text-size="3"] body {
+		font-size: var(--text-size-3);
+	}
+	html[data-text-size="4"] body {
+		font-size: var(--text-size-4);
+	}
+	html[data-text-size="5"] body {
+		font-size: var(--text-size-5);
+	}
+
 	/* Modern standard for forced colors mode */
 	@media (forced-colors: active) {
 		* {
@@ -151,23 +168,6 @@
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
-
-		/* Apply text size based on data attribute */
-		html[data-text-size="1"] body {
-			font-size: var(--text-size-1);
-		}
-		html[data-text-size="2"] body {
-			font-size: var(--text-size-2);
-		}
-		html[data-text-size="3"] body {
-			font-size: var(--text-size-3);
-		}
-		html[data-text-size="4"] body {
-			font-size: var(--text-size-4);
-		}
-		html[data-text-size="5"] body {
-			font-size: var(--text-size-5);
-		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

@@ -4,7 +4,7 @@
 
 import { ThemeProvider } from "@/context/ThemeContext"; // Import real ThemeProvider
 import SettingsPage from "@/pages/SettingsPage";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react"; // Removed unused fireEvent
 // Removed unused imports: waitFor, within, PropsWithChildren
 import { BrowserRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -63,7 +63,6 @@ vi.mock("@/services/db", async (importOriginal) => {
 		highlightsDb: { allDocs: vi.fn().mockResolvedValue({ rows: [] }) },
 		tagsDb: { allDocs: vi.fn().mockResolvedValue({ rows: [] }) },
 	};
-
 });
 // Mock Tabs component synchronously
 vi.mock("@/components/ui/tabs", () => ({
