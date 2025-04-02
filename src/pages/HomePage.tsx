@@ -10,14 +10,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import {
 	TransitionGroup,
 	TransitionItem,
@@ -26,10 +18,15 @@ import { useAnimation } from "@/context/AnimationContext";
 import { useArticles } from "@/context/ArticleContext";
 import { useDebounce } from "@/hooks/useDebounce"; // Import debounce hook
 import { createAnimationFrame } from "@/lib/animation";
-import { getUniqueArticleTypes, getUniqueSiteNames } from "@/lib/articleUtils"; // Import utils
-import type { ArticleSortField } from "@/types/articles";
-import { ArrowDownUp, Filter, Plus, RefreshCw, Search, X } from "lucide-react"; // Import icons
-import { useEffect, useMemo, useRef, useState } from "react"; // Import useMemo, removed unused React import
+// Removed unused article utils import
+import {
+	ArrowDownUp,
+	ChevronDown,
+	PanelLeft,
+	Plus,
+	RefreshCw,
+} from "lucide-react"; // Import icons
+import { useEffect, useRef, useState } from "react"; // Removed unused useMemo import
 import { Link } from "react-router-dom";
 
 export default function HomePage() {
@@ -37,7 +34,7 @@ export default function HomePage() {
 		articles, // Raw articles for deriving filter options
 		processedArticles, // Use this for display
 		isLoading,
-		currentView, // Keep for title, maybe integrate into filters later?
+		// currentView, // Removed unused variable
 		refreshArticles,
 		error,
 		retryLoading,
@@ -47,7 +44,6 @@ export default function HomePage() {
 		sortCriteria,
 		setSortField,
 		toggleSortDirection,
-		allTags, // Use for tag filter
 	} = useArticles();
 	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 	const { synchronizeAnimations } = useAnimation();
@@ -105,28 +101,9 @@ export default function HomePage() {
 		shouldAnimateCards.current = true;
 	}, []);
 
-	const getViewTitle = () => {
-		switch (currentView) {
-			case "unread":
-				return "Unread Articles";
-			case "favorites":
-				return "Favorite Articles";
-			default:
-				return "Home";
-		}
-	};
-
 	// Determine if we should show the empty state
 	// Only show it if we're not loading AND we've completed at least one load
 	// Derive unique filter options from raw articles (memoize for performance)
-	const uniqueSiteNames = useMemo(
-		() => getUniqueSiteNames(articles),
-		[articles],
-	);
-	const uniqueTypes = useMemo(
-		() => getUniqueArticleTypes(articles),
-		[articles],
-	);
 
 	// Determine if we should show the empty state
 	const hasActiveFilters =
@@ -136,6 +113,117 @@ export default function HomePage() {
 		filters.types.length > 0;
 	const showInitialEmptyState =
 		!isLoading && hasLoadedOnce && articles.length === 0 && !hasActiveFilters;
+	<div className="flex items-center justify-between h-14 bg-gray-900 text-gray-100 p-4 border-b border-gray-700">
+		{" "}
+		{/* Added dark theme, padding, border */}
+		{/* Left Section */}
+		<div className="flex items-center gap-4">
+			<Button variant="ghost" size="icon" className="h-8 w-8">
+				<PanelLeft className="h-5 w-5" />
+				<span className="sr-only">Toggle Sidebar</span>
+			</Button>
+
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button variant="ghost" className="flex items-center gap-1 px-2">
+						<span className="font-semibold">Library</span>
+						<ChevronDown className="h-4 w-4 text-gray-400" />{" "}
+						{/* Adjusted muted icon color */}
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent
+					align="start"
+					className="dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"
+				>
+					{" "}
+					{/* Dark theme for dropdown */}
+					{/* Add Library dropdown items here later */}
+					<DropdownMenuItem>Option 1</DropdownMenuItem>
+					<DropdownMenuItem>Option 2</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+
+			<nav className="flex items-center gap-4 text-sm font-medium text-gray-400">
+				{" "}
+				{/* Adjusted muted text color */}
+				{/* Use Buttons for better styling/interaction later */}
+				<Button variant="ghost" size="sm" className="px-2 py-1 h-auto">
+					INBOX
+				</Button>
+				<Button variant="ghost" size="sm" className="px-2 py-1 h-auto">
+					LATER
+				</Button>
+				<Button variant="ghost" size="sm" className="px-2 py-1 h-auto">
+					ARCHIVE
+				</Button>
+			</nav>
+		</div>
+		{/* Right Section */}
+		<div className="flex items-center gap-2">
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button
+						variant="ghost"
+						className="flex items-center gap-1 text-sm px-2"
+					>
+						<ArrowDownUp className="h-4 w-4 text-gray-400" />{" "}
+						{/* Adjusted muted icon color */}
+						<span>Date moved</span>
+						<ChevronDown className="h-4 w-4 text-gray-400" />{" "}
+						{/* Adjusted muted icon color */}
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent
+					align="end"
+					className="dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700"
+				>
+					{" "}
+					{/* Dark theme for dropdown */}
+					{/* Reuse existing sort logic/items */}
+					<DropdownMenuLabel>Sort by</DropdownMenuLabel>
+					<DropdownMenuSeparator />
+					<DropdownMenuCheckboxItem
+						checked={sortCriteria.field === "savedAt"}
+						onCheckedChange={() => setSortField("savedAt")}
+					>
+						Date Saved
+					</DropdownMenuCheckboxItem>
+					<DropdownMenuCheckboxItem
+						checked={sortCriteria.field === "title"}
+						onCheckedChange={() => setSortField("title")}
+					>
+						Title
+					</DropdownMenuCheckboxItem>
+					<DropdownMenuCheckboxItem
+						checked={sortCriteria.field === "siteName"}
+						onCheckedChange={() => setSortField("siteName")}
+					>
+						Source
+					</DropdownMenuCheckboxItem>
+					<DropdownMenuCheckboxItem
+						checked={sortCriteria.field === "estimatedReadTime"}
+						onCheckedChange={() => setSortField("estimatedReadTime")}
+					>
+						Read Time
+					</DropdownMenuCheckboxItem>
+					{/* Add Asc/Desc toggle? Maybe separate button is better */}
+				</DropdownMenuContent>
+			</DropdownMenu>
+			{/* Maybe add the sort direction toggle button here too? */}
+			<Button
+				variant="ghost"
+				size="icon"
+				className="h-8 w-8"
+				onClick={toggleSortDirection}
+				aria-label={`Sort direction: ${sortCriteria.direction === "asc" ? "Ascending" : "Descending"}`}
+			>
+				{/* Icon indicating direction could go here if needed */}
+				<span className="text-xs">
+					{sortCriteria.direction === "asc" ? "ASC" : "DESC"}
+				</span>
+			</Button>
+		</div>
+	</div>;
 	const showFilterEmptyState =
 		!isLoading &&
 		hasLoadedOnce &&
@@ -145,177 +233,7 @@ export default function HomePage() {
 	return (
 		<div className="h-full flex flex-col">
 			<div className="border-b p-4 space-y-4">
-				<h1 className="text-2xl font-bold">{getViewTitle()}</h1>
-
-				{/* Search, Sort, and Filter Controls */}
-				<div className="flex flex-wrap gap-2 items-center">
-					{/* Search Input */}
-					<div className="relative flex-grow min-w-[200px] sm:flex-grow-0 sm:w-auto">
-						<Search
-							className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-							aria-hidden="true"
-						/>
-						<Input
-							type="search"
-							placeholder="Search title, excerpt..."
-							value={localSearchQuery}
-							onChange={(e) => setLocalSearchQuery(e.target.value)}
-							className="pl-8 pr-8 h-9" // Add padding for icons
-						/>
-						{localSearchQuery && (
-							<Button
-								variant="ghost"
-								size="icon"
-								className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
-								onClick={() => setLocalSearchQuery("")}
-							>
-								<X className="h-4 w-4" />
-								<span className="sr-only">Clear search</span>
-							</Button>
-						)}
-					</div>
-
-					{/* Sort Controls */}
-					<div className="flex gap-1 items-center">
-						<Select
-							value={sortCriteria.field}
-							onValueChange={(value) => setSortField(value as ArticleSortField)}
-						>
-							<SelectTrigger className="h-9 w-[150px]">
-								<SelectValue placeholder="Sort by" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="savedAt">Date Saved</SelectItem>
-								<SelectItem value="title">Title</SelectItem>
-								<SelectItem value="siteName">Source</SelectItem>
-								<SelectItem value="estimatedReadTime">Read Time</SelectItem>
-							</SelectContent>
-						</Select>
-						<Button
-							variant="outline"
-							size="icon"
-							className="h-9 w-9"
-							onClick={toggleSortDirection}
-							aria-label={`Sort direction: ${sortCriteria.direction === "asc" ? "Ascending" : "Descending"}`}
-						>
-							<ArrowDownUp className="h-4 w-4" />
-						</Button>
-					</div>
-
-					{/* Filter Controls */}
-					<div className="flex gap-1 items-center">
-						{/* Site Filter */}
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button variant="outline" className="h-9">
-									<Filter className="mr-2 h-4 w-4" /> Site
-									{filters.siteNames.length > 0 && (
-										<span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-xs">
-											{filters.siteNames.length}
-										</span>
-									)}
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="start">
-								<DropdownMenuLabel>Filter by Site</DropdownMenuLabel>
-								<DropdownMenuSeparator />
-								{uniqueSiteNames.map((site) => (
-									<DropdownMenuCheckboxItem
-										key={site}
-										checked={filters.siteNames.includes(site)}
-										onCheckedChange={(checked) => {
-											setFilters((prev) => ({
-												...prev,
-												siteNames: checked
-													? [...prev.siteNames, site]
-													: prev.siteNames.filter((s) => s !== site),
-											}));
-										}}
-									>
-										{site || "Unknown"}
-									</DropdownMenuCheckboxItem>
-								))}
-								{uniqueSiteNames.length === 0 && (
-									<DropdownMenuItem disabled>No sites found</DropdownMenuItem>
-								)}
-							</DropdownMenuContent>
-						</DropdownMenu>
-
-						{/* Type Filter */}
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button variant="outline" className="h-9">
-									<Filter className="mr-2 h-4 w-4" /> Type
-									{filters.types.length > 0 && (
-										<span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-xs">
-											{filters.types.length}
-										</span>
-									)}
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="start">
-								<DropdownMenuLabel>Filter by Type</DropdownMenuLabel>
-								<DropdownMenuSeparator />
-								{uniqueTypes.map((type) => (
-									<DropdownMenuCheckboxItem
-										key={type}
-										checked={filters.types.includes(type)}
-										onCheckedChange={(checked) => {
-											setFilters((prev) => ({
-												...prev,
-												types: checked
-													? [...prev.types, type]
-													: prev.types.filter((t) => t !== type),
-											}));
-										}}
-									>
-										{type.charAt(0).toUpperCase() + type.slice(1)}
-									</DropdownMenuCheckboxItem>
-								))}
-								{uniqueTypes.length === 0 && (
-									<DropdownMenuItem disabled>No types found</DropdownMenuItem>
-								)}
-							</DropdownMenuContent>
-						</DropdownMenu>
-
-						{/* Tag Filter */}
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button variant="outline" className="h-9">
-									<Filter className="mr-2 h-4 w-4" /> Tag
-									{filters.tags.length > 0 && (
-										<span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-xs">
-											{filters.tags.length}
-										</span>
-									)}
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align="start">
-								<DropdownMenuLabel>Filter by Tag</DropdownMenuLabel>
-								<DropdownMenuSeparator />
-								{allTags.map((tag) => (
-									<DropdownMenuCheckboxItem
-										key={tag._id}
-										checked={filters.tags.includes(tag._id)}
-										onCheckedChange={(checked) => {
-											setFilters((prev) => ({
-												...prev,
-												tags: checked
-													? [...prev.tags, tag._id]
-													: prev.tags.filter((t) => t !== tag._id),
-											}));
-										}}
-									>
-										{tag.name}
-									</DropdownMenuCheckboxItem>
-								))}
-								{allTags.length === 0 && (
-									<DropdownMenuItem disabled>No tags found</DropdownMenuItem>
-								)}
-							</DropdownMenuContent>
-						</DropdownMenu>
-					</div>
-				</div>
+				{/* New top bar content will go here */}
 			</div>
 
 			<div className="flex-1 overflow-y-auto p-4">
