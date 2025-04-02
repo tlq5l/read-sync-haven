@@ -13,9 +13,9 @@ import type { Article } from "@/services/db";
 import { formatDistanceToNow } from "date-fns";
 import {
 	Archive,
-	Bookmark,
-	BookmarkCheck,
+	// Bookmark, // Removed unused import
 	Clock,
+	Inbox, // Add Inbox icon
 	MoreHorizontal,
 	Trash2,
 } from "lucide-react";
@@ -42,16 +42,7 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 		delay: index * 30, // Stagger effect based on card position
 	});
 
-	const handleToggleFavorite = async (e: React.MouseEvent) => {
-		e.preventDefault();
-		e.stopPropagation();
-		try {
-			await updateArticleStatus(article._id, { favorite: !article.favorite });
-		} catch (error) {
-			console.error("Error toggling favorite:", error);
-		}
-	};
-
+	// Removed handleToggleFavorite as it's replaced by Move to Inbox
 	const handleDelete = async (e: React.MouseEvent) => {
 		e.preventDefault();
 		e.stopPropagation();
@@ -159,21 +150,19 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 									>
 										<Archive size={16} />
 									</Button>
-									{/* Favorite Button */}
+									{/* Move to Inbox Button (Replaces Favorite) */}
 									<Button
 										variant="ghost"
 										size="icon"
-										className="h-8 w-8 transition-transform duration-200"
-										onClick={handleToggleFavorite}
-										aria-label={
-											article.favorite ? "Remove favorite" : "Add favorite"
-										}
+										className="h-8 w-8"
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											updateArticleStatus(article._id, { status: "inbox" });
+										}}
+										aria-label="Move to Inbox"
 									>
-										{article.favorite ? (
-											<BookmarkCheck size={16} className="text-bondwise-500" />
-										) : (
-											<Bookmark size={16} />
-										)}
+										<Inbox size={16} />
 									</Button>
 									<DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
 										<DropdownMenuTrigger asChild>
@@ -239,21 +228,19 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 									>
 										<Archive size={16} />
 									</Button>
-									{/* Favorite Button */}
+									{/* Move to Inbox Button (Replaces Favorite) */}
 									<Button
 										variant="ghost"
 										size="icon"
-										className="h-8 w-8 transition-transform duration-200"
-										onClick={handleToggleFavorite}
-										aria-label={
-											article.favorite ? "Remove favorite" : "Add favorite"
-										}
+										className="h-8 w-8"
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											updateArticleStatus(article._id, { status: "inbox" });
+										}}
+										aria-label="Move to Inbox"
 									>
-										{article.favorite ? (
-											<BookmarkCheck size={16} className="text-bondwise-500" />
-										) : (
-											<Bookmark size={16} />
-										)}
+										<Inbox size={16} />
 									</Button>
 									<DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
 										<DropdownMenuTrigger asChild>
