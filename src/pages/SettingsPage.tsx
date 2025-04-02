@@ -20,14 +20,7 @@ import {
 	tagsDb,
 	updateMissingMetadata,
 } from "@/services/db"; // Import specific DBs and types
-import {
-	ArrowLeft,
-	Database,
-	HelpCircle,
-	Keyboard,
-	Palette,
-	User,
-} from "lucide-react";
+import { ArrowLeft, Database, Keyboard, Palette, User } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -311,36 +304,6 @@ export default function SettingsPage() {
 						</div>
 					</ScrollArea>
 				</TabsContent>
-
-				<ScrollArea className="h-[16vh] mt-6">
-					<div className="pr-4">
-						<Card>
-							<CardHeader>
-								<CardTitle>About</CardTitle>
-							</CardHeader>
-							<CardContent className="space-y-4">
-								<div className="space-y-2">
-									<h3 className="text-sm font-medium">Read Sync Haven</h3>
-									<p className="text-sm text-muted-foreground">
-										Version 0.1.0 (MVP)
-									</p>
-									<p className="text-sm text-muted-foreground">
-										A local-first read-it-later application for power readers.
-									</p>
-								</div>
-
-								<Separator />
-
-								<div className="space-y-2">
-									<Button variant="outline" className="gap-2">
-										<HelpCircle className="h-4 w-4" />
-										Help & Support
-									</Button>
-								</div>
-							</CardContent>
-						</Card>
-					</div>
-				</ScrollArea>
 			</Tabs>
 		</div>
 	);
