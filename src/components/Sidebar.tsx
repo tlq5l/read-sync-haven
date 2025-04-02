@@ -18,7 +18,6 @@ import {
 	MenuIcon,
 	Moon,
 	Plus,
-	SearchIcon,
 	Settings,
 	Sun,
 } from "lucide-react";
@@ -238,25 +237,6 @@ export default function Sidebar() {
 						autoAnimate={true}
 					>
 						{/* Show these navigation items regardless of authentication state */}
-						<TransitionItem showFrom="left" className="w-full">
-							<Button
-								variant="ghost"
-								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
-								asChild
-							>
-								<Link
-									to="/search"
-									style={isActive("/search") ? styles.activeLink : styles.link}
-								>
-									<SearchIcon size={20} />
-									{!collapsed && (
-										<span className="transition-opacity duration-200">
-											Search
-										</span>
-									)}
-								</Link>
-							</Button>
-						</TransitionItem>
 
 						<TransitionItem showFrom="left" className="w-full">
 							<Button
