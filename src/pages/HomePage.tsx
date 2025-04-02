@@ -1,15 +1,7 @@
 import ArticleCard from "@/components/ArticleCard";
 import { Button } from "@/components/ui/button";
 // Removed unused Checkbox import
-import {
-	DropdownMenu,
-	DropdownMenuCheckboxItem,
-	DropdownMenuContent,
-	DropdownMenuItem, // Add this import
-	DropdownMenuLabel,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+// Removed unused DropdownMenu imports
 import {
 	TransitionGroup,
 	TransitionItem,
@@ -20,9 +12,7 @@ import { useDebounce } from "@/hooks/useDebounce"; // Import debounce hook
 import { createAnimationFrame } from "@/lib/animation";
 // Removed unused article utils import
 import {
-	ArrowDownUp,
-	ChevronDown,
-	PanelLeft,
+	// Removed unused icons: ArrowDownUp, ChevronDown, PanelLeft
 	Plus,
 	RefreshCw,
 } from "lucide-react"; // Import icons
@@ -41,9 +31,7 @@ export default function HomePage() {
 		filters,
 		setFilters,
 		setSearchQuery,
-		sortCriteria,
-		setSortField,
-		toggleSortDirection,
+		// Removed unused sort variables: sortCriteria, setSortField, toggleSortDirection
 	} = useArticles();
 	const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 	const { synchronizeAnimations } = useAnimation();

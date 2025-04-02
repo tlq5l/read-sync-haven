@@ -80,8 +80,6 @@ describe("Sidebar Component", () => {
 			</MockProviders>,
 		);
 		// The button that sets the view to 'all' has the text "Home"
-		expect(
-			screen.getByRole("button", { name: /home/i }),
-		).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: /home/i })).toBeInTheDocument();
 	});
 });
