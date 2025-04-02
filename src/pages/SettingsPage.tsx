@@ -31,7 +31,7 @@ import {
 	Keyboard,
 	Palette,
 	ShieldCheck,
-	User,
+	// User, // Removed unused User icon
 } from "lucide-react"; // Added ShieldCheck for Account
 import { useState } from "react"; // Remove useEffect import
 import { Link } from "react-router-dom";
@@ -169,26 +169,22 @@ export default function SettingsPage() {
 			</div>
 
 			<Tabs
-				defaultValue="profile"
+				defaultValue="account"
 				value={activeTab}
 				onValueChange={setActiveTab}
 				className="space-y-6"
 			>
-				<TabsList className="grid grid-cols-5 mb-4">
+				<TabsList className="grid grid-cols-4 mb-4">
 					{" "}
-					{/* Changed to 5 columns */}
+					{/* Grid layout with 4 columns */}{" "}
+					{/* Removed redundant Profile Tab Trigger */}
 					<TabsTrigger value="account" className="flex items-center gap-1">
 						{" "}
 						{/* New Account Tab */}
 						<ShieldCheck className="h-4 w-4" />
 						<span>Account</span>
 					</TabsTrigger>
-					<TabsTrigger value="profile" className="flex items-center gap-1">
-						{" "}
-						{/* Existing Profile Tab */}
-						<User className="h-4 w-4" />
-						<span>Profile</span>
-					</TabsTrigger>
+					{/* Removed redundant Profile Tab Trigger */}
 					<TabsTrigger value="appearance" className="flex items-center gap-1">
 						<Palette className="h-4 w-4" />
 						<span>Appearance</span>
@@ -228,26 +224,7 @@ export default function SettingsPage() {
 					</ScrollArea>
 				</TabsContent>
 
-				<TabsContent value="profile" className="space-y-6">
-					{" "}
-					{/* Existing Profile Content */}
-					<ScrollArea className="h-[70vh]">
-						<div className="pr-4">
-							{/* Content for the user profile settings (if any separate from Clerk) can go here */}
-							<Card>
-								<CardHeader>
-									<CardTitle>User Profile Settings</CardTitle>
-								</CardHeader>
-								<CardContent>
-									<p className="text-muted-foreground">
-										Additional profile settings can be added here later.
-									</p>
-								</CardContent>
-							</Card>
-						</div>
-					</ScrollArea>
-				</TabsContent>
-
+				{/* Removed redundant Profile Tab Content */}
 				<TabsContent value="appearance" className="space-y-6">
 					<ScrollArea className="h-[70vh]">
 						<div className="pr-4">
