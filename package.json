@@ -93,6 +93,7 @@
 		"@tailwindcss/typography": "^0.5.16",
 		"@testing-library/jest-dom": "^6.6.3",
 		"@testing-library/react": "^16.2.0",
+		"@testing-library/user-event": "^14.6.1",
 		"@types/chrome": "^0.0.313",
 		"@types/lodash": "^4.17.16",
 		"@types/node": "^22.13.15",

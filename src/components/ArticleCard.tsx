@@ -204,7 +204,13 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 							{article.excerpt || "No excerpt available"}
 						</p>
 						<div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
-							<span>{article.siteName || "Unknown source"}</span>
+							<span>
+								{article.type === "pdf" && !article.siteName
+									? "PDF Document"
+									: article.type === "epub" && !article.siteName
+										? "EPUB Book"
+										: article.siteName || "Unknown source"}
+							</span>
 							<div className="flex items-center gap-3">
 								<span>{article.estimatedReadTime || "?"} min read</span>
 								<span>{getFormattedDate()}</span>

@@ -1,106 +1,139 @@
-// Import removed to fix TS6133 (declared but not used)
-import type { Article } from "@/services/db";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+/// <reference types="@testing-library/jest-dom" />
 
-// Mock dependencies - this happens at module evaluation time
+import { renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useArticleActions } from "./useArticleActions";
+
+// Mock the imports first, before any tests
+vi.mock("@/services/epub", () => {
+	return {
+		extractEpubMetadata: vi.fn().mockResolvedValue({
+			title: "Test EPUB",
+			author: "Test Author",
+		}),
+		isValidEpub: vi.fn(),
+		arrayBufferToBase64: vi.fn().mockReturnValue("mock-base64"),
+		getEstimatedReadingTime: vi.fn().mockReturnValue(60),
+	};
+});
+
+vi.mock("@/services/pdf", () => {
+	return {
+		extractPdfMetadata: vi.fn().mockResolvedValue({
+			title: "Test PDF",
+			author: "Test Author",
+			pageCount: 20,
+		}),
+		isValidPdf: vi.fn(),
+		arrayBufferToBase64: vi.fn().mockReturnValue("mock-base64"),
+		getEstimatedReadingTime: vi.fn().mockReturnValue(40),
+	};
+});
+
+// Mock the DB service
 vi.mock("@/services/db", () => ({
-	saveArticle: vi.fn((article) =>
-		Promise.resolve({ ...article, _id: "mockId", _rev: "mockRev" }),
-	),
-	getArticle: vi.fn(),
+	saveArticle: vi.fn().mockImplementation((article) => ({
+		...article,
+		_id: "mock-id",
+		_rev: "mock-rev",
+	})),
 	updateArticle: vi.fn(),
 	deleteArticle: vi.fn(),
+	getArticle: vi.fn(),
+	removeDuplicateArticles: vi.fn(),
 }));
 
-vi.mock("@/services/epub", () => ({
-	isValidEpub: vi.fn((file) => file.name.endsWith(".epub")),
-	extractEpubMetadata: vi.fn().mockResolvedValue({ title: "Test EPUB" }),
-	arrayBufferToBase64: vi.fn().mockReturnValue("base64data"),
+// Mock the parser service
+vi.mock("@/services/parser", () => ({
+	parseArticle: vi.fn(),
 }));
 
-vi.mock("@/services/pdf", () => ({
-	isValidPdf: vi.fn((file) => file.name.endsWith(".pdf")),
-	extractPdfMetadata: vi.fn().mockResolvedValue({ title: "Test PDF" }),
-	arrayBufferToBase64: vi.fn().mockReturnValue("base64data"),
+// Mock toast hook
+vi.mock("@/hooks/use-toast", () => ({
+	useToast: () => ({
+		toast: vi.fn(),
+	}),
 }));
 
+// Mock cloud sync
 vi.mock("@/services/cloudSync", () => ({
 	saveItemToCloud: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("@/hooks/use-toast", () => ({
-	useToast: () => ({ toast: vi.fn() }),
-}));
-
+// Mock clerk auth
 vi.mock("@clerk/clerk-react", () => ({
 	useAuth: () => ({
-		userId: "mockUserId",
+		userId: "test-user-id",
 		isSignedIn: true,
-		getToken: vi.fn().mockResolvedValue("mockToken"),
 	}),
 }));
 
-// Import the mocked modules for assertions
-import * as db from "@/services/db";
-import * as epubUtils from "@/services/epub";
-// Import removed to fix TS6133 (declared but not used)
+// Import the mocked modules
+import * as epubService from "@/services/epub";
+import * as pdfService from "@/services/pdf";
 
 describe("useArticleActions", () => {
+	const refreshArticlesMock = vi.fn().mockResolvedValue(undefined);
+
 	beforeEach(() => {
 		vi.clearAllMocks();
 	});
 
-	it("correctly saves EPUB with fileData and placeholder content", async () => {
-		// Mock implementation to capture the article passed to saveArticle
-		vi.mocked(db.saveArticle).mockImplementation(async (article) => {
-			return { ...article, _id: "mockId", _rev: "mockRev" };
+	it("should add PDF file with proper siteName and estimatedReadTime", async () => {
+		// Set up mocks for this test
+		vi.mocked(pdfService.isValidPdf).mockReturnValue(true);
+		vi.mocked(epubService.isValidEpub).mockReturnValue(false);
+
+		// Mock File implementation
+		const mockFile = new File(["mock content"], "test.pdf", {
+			type: "application/pdf",
 		});
 
-		// Mock File
-		const mockFile = new File([new ArrayBuffer(8)], "test.epub", {
+		// Mock ArrayBuffer
+		Object.defineProperty(mockFile, "arrayBuffer", {
+			value: vi.fn().mockResolvedValue(new ArrayBuffer(1000)),
+		});
+
+		const { result } = renderHook(() => useArticleActions(refreshArticlesMock));
+
+		const savedArticle = await result.current.addArticleByFile(mockFile);
+
+		expect(savedArticle).not.toBeNull();
+		if (savedArticle) {
+			expect(savedArticle.type).toBe("pdf");
+			expect(savedArticle.fileName).toBeDefined();
+			expect(savedArticle.fileSize).toBeDefined();
+			expect(savedArticle.siteName).toBeDefined();
+			expect(savedArticle.estimatedReadTime).toBeDefined();
+		}
+	});
+
+	it("should add EPUB file with proper metadata", async () => {
+		// Set up mocks for this test
+		vi.mocked(epubService.isValidEpub).mockReturnValue(true);
+		vi.mocked(pdfService.isValidPdf).mockReturnValue(false);
+
+		// Mock File implementation
+		const mockFile = new File(["mock content"], "test.epub", {
 			type: "application/epub+zip",
 		});
 
-		// Simplified implementation for the test
-		async function testEpubSave(file: File) {
-			if (epubUtils.isValidEpub(file)) {
-				const fileBuffer = new ArrayBuffer(8);
-				const metadata = await epubUtils.extractEpubMetadata(fileBuffer);
-				const base64Data = epubUtils.arrayBufferToBase64(fileBuffer);
+		// Mock ArrayBuffer
+		Object.defineProperty(mockFile, "arrayBuffer", {
+			value: vi.fn().mockResolvedValue(new ArrayBuffer(2000)),
+		});
 
-				const article: Omit<Article, "_id" | "_rev"> & {
-					_id?: string;
-					_rev?: string;
-				} = {
-					title: metadata.title || file.name,
-					type: "epub" as Article["type"],
-					fileData: base64Data, // This is what we're testing - fileData should be set
-					content: "EPUB content is stored in fileData.", // With a placeholder in content
-					url: `local-epub://${file.name}`,
-					userId: "mockUserId",
-					savedAt: Date.now(),
-					isRead: false,
-					favorite: false,
-					tags: [],
-					excerpt: "Test excerpt", // Required field
-				};
+		const { result } = renderHook(() => useArticleActions(refreshArticlesMock));
 
-				return await db.saveArticle(article);
-			}
-			return null;
+		const savedArticle = await result.current.addArticleByFile(mockFile);
+
+		expect(savedArticle).not.toBeNull();
+		if (savedArticle) {
+			expect(savedArticle.type).toBe("epub");
+			expect(savedArticle.fileName).toBeDefined();
+			expect(savedArticle.fileSize).toBeDefined();
+			expect(savedArticle.siteName).toBeDefined();
+			expect(savedArticle.estimatedReadTime).toBeDefined();
 		}
-
-		// Call the function
-		const result = await testEpubSave(mockFile);
-
-		// Assertions
-		expect(result).not.toBeNull();
-		expect(db.saveArticle).toHaveBeenCalledTimes(1);
-
-		// Check that saveArticle was called with fileData and placeholder content
-		const saveArticleArg = vi.mocked(db.saveArticle).mock.calls[0][0];
-		expect(saveArticleArg.fileData).toBe("base64data");
-		expect(saveArticleArg.content).toBe("EPUB content is stored in fileData.");
-		expect(saveArticleArg.type).toBe("epub");
 	});
 });

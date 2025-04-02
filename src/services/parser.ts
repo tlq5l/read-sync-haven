@@ -1,5 +1,7 @@
 import { Readability } from "@mozilla/readability";
 import DOMPurify from "dompurify";
+// Import JSDOM for Node.js environments
+import { JSDOM } from "jsdom";
 import TurndownService from "turndown";
 
 // No need for Node.js polyfills as we're using browser-native DOMParser
@@ -162,6 +164,18 @@ export async function fetchHtml(url: string): Promise<string> {
 	}
 }
 
+// Define the structure returned by Readability.parse() based on usage and TS errors
+interface ParsedReadabilityArticle {
+	title: string | null | undefined;
+	content: string | null | undefined; // HTML string
+	textContent: string | null | undefined;
+	length: number | null | undefined;
+	excerpt: string | null | undefined;
+	byline: string | null | undefined; // Author
+	siteName: string | null | undefined;
+	// Add other potential properties if needed, though not used directly here
+}
+
 // Parse article content using Readability
 export async function parseArticle(
 	url: string,
@@ -172,17 +186,34 @@ export async function parseArticle(
 
 	const normalizedUrl = normalizeUrl(url);
 	const html = await fetchHtml(normalizedUrl);
+	let article: ParsedReadabilityArticle | null;
 
-	// Use browser's native DOMParser instead of JSDOM
-	const parser = new DOMParser();
-	const document = parser.parseFromString(html, "text/html");
+	// Create a proper DOM document that's compatible with Readability
+	try {
+		// Check if we're in a browser environment
+		if (typeof window !== "undefined" && window.DOMParser) {
+			// Use browser's native DOMParser
+			const parser = new DOMParser();
+			const document = parser.parseFromString(html, "text/html");
 
-	// Use Readability to parse the article
-	const reader = new Readability(document);
-	const article = reader.parse();
+			// Use Readability to parse the article
+			const reader = new Readability(document);
+			article = reader.parse();
+		} else {
+			// Node.js environment - use JSDOM
+			const dom = new JSDOM(html, { url: normalizedUrl });
+			const reader = new Readability(dom.window.document);
+			article = reader.parse();
+		}
 
-	if (!article) {
-		throw new Error("Could not parse article content");
+		if (!article) {
+			throw new Error("Could not parse article content");
+		}
+	} catch (error) {
+		console.error("Error parsing article with Readability:", error);
+		throw new Error(
+			`Failed to parse article: ${error instanceof Error ? error.message : String(error)}`,
+		);
 	}
 
 	// Sanitize HTML content
@@ -238,7 +269,7 @@ export async function parseArticle(
 		finalEstimatedReadTime = 1; // Ensure minimum 1 minute read time
 	}
 
-	return {
+	const result = {
 		title: article.title || "Untitled Article",
 		url: normalizedUrl,
 		content: sanitizedHtml, // Store sanitized HTML
@@ -246,8 +277,10 @@ export async function parseArticle(
 		author: article.byline || undefined,
 		siteName: article.siteName || new URL(normalizedUrl).hostname,
 		estimatedReadTime: finalEstimatedReadTime, // Use the adjusted value
-		type: "article",
+		type: "article" as const, // Explicitly assert type
 	};
+
+	return result;
 }
 
 // Helper function to extract text content from HTML

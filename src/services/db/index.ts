@@ -41,6 +41,9 @@ export {
 export { saveTag, getAllTags, deleteTag, updateTag } from "./tags";
 
 // --- Sync Functionality Placeholder ---
+// --- Migrations ---
+export { updateMissingMetadata } from "./migrations";
+
 // Re-exporting the placeholder from the original file,
 // but this should eventually be implemented properly or removed.
 export function setupSync() {
