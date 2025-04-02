@@ -1,4 +1,5 @@
 import ArticleCard from "@/components/ArticleCard";
+import TopBar from "@/components/TopBar"; // Import the new TopBar component
 import { Button } from "@/components/ui/button";
 // Removed unused Checkbox import
 // Removed unused DropdownMenu imports
@@ -109,11 +110,11 @@ export default function HomePage() {
 		(articles.length > 0 || hasActiveFilters); // Show if filters resulted in no matches
 
 	return (
-		<div className="h-full flex flex-col">
-			<div className="border-b p-4 space-y-4">
-				{/* New top bar content will go here */}
-			</div>
-
+		<div className="h-full flex flex-col bg-background">
+			{" "}
+			{/* Added bg-background */}
+			<TopBar /> {/* Add the TopBar component here */}
+			{/* Remove the old placeholder div for the top bar */}
 			<div className="flex-1 overflow-y-auto p-4">
 				{isLoading && !hasLoadedOnce ? (
 					<div className="flex items-center justify-center h-64">
