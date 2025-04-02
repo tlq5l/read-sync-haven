@@ -86,37 +86,37 @@ const AppWithRouter = () => {
 
 	return (
 		<BrowserRouter>
-			<KeyboardProvider>
-				<Routes>
-					{/* Public auth routes */}
-					<Route path="/sign-in/*" element={<SignInPage />} />
-					<Route path="/sign-up/*" element={<SignUpPage />} />
+			{/* KeyboardProvider removed from here */}
+			<Routes>
+				{/* Public auth routes */}
+				<Route path="/sign-in/*" element={<SignInPage />} />
+				<Route path="/sign-up/*" element={<SignUpPage />} />
 
-					{/* Protected routes */}
-					<Route element={<ProtectedRoute />}>
-						<Route element={<Layout />}>
-							<Route path="/" element={<HomePage />} />{" "}
-							{/* Keep this pointing to the new HomePage */}
-							<Route path="/add" element={<AddPage />} />
-							<Route path="/read/:id" element={<ReadPage />} />
-							<Route path="/search" element={<SearchPage />} />
-							<Route path="/settings" element={<SettingsPage />} />
-							<Route path="/inbox" element={<InboxPage />} />
-							<Route path="/later" element={<LaterPage />} />
-							<Route path="/archive" element={<ArchivePage />} />
-						</Route>
+				{/* Protected routes */}
+				<Route element={<ProtectedRoute />}>
+					<Route element={<Layout />}>
+						<Route path="/" element={<HomePage />} />{" "}
+						{/* Keep this pointing to the new HomePage */}
+						<Route path="/add" element={<AddPage />} />
+						<Route path="/read/:id" element={<ReadPage />} />
+						<Route path="/search" element={<SearchPage />} />
+						<Route path="/settings" element={<SettingsPage />} />
+						<Route path="/inbox" element={<InboxPage />} />
+						<Route path="/later" element={<LaterPage />} />
+						<Route path="/archive" element={<ArchivePage />} />
 					</Route>
+				</Route>
 
-					{/* 404 route */}
-					<Route path="*" element={<NotFound />} />
-				</Routes>
-				<ShortcutsDialog />
-				{/* Render the search overlay */}
-				<GlobalSearchOverlay
-					isOpen={isSearchOverlayOpen}
-					onClose={closeSearchOverlay}
-				/>
-			</KeyboardProvider>
+				{/* 404 route */}
+				<Route path="*" element={<NotFound />} />
+			</Routes>
+			<ShortcutsDialog />
+			{/* Render the search overlay */}
+			<GlobalSearchOverlay
+				isOpen={isSearchOverlayOpen}
+				onClose={closeSearchOverlay}
+			/>
+			{/* KeyboardProvider removed from here */}
 		</BrowserRouter>
 	);
 };
@@ -135,7 +135,10 @@ const App = () => (
 						<TooltipProvider>
 							<Toaster />
 							<Sonner />
-							<AppWithRouter />
+							{/* Wrap AppWithRouter with KeyboardProvider */}
+							<KeyboardProvider>
+								<AppWithRouter />
+							</KeyboardProvider>
 						</TooltipProvider>
 					</QueryClientProvider>
 				</MotionPreferenceHandler>
