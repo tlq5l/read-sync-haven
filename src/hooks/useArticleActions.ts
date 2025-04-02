@@ -385,11 +385,9 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				// Fetch article first to verify ownership before deleting
 				const articleToDelete = await getArticle(id);
 				if (!articleToDelete) {
-					// Already deleted or doesn't exist
-					toast({
-						title: "Article not found",
-						description: "It may have already been removed.",
-					});
+					// Already deleted or doesn't exist locally.
+					// Refresh will reconcile with the cloud state.
+					console.log(`Article ${id} not found locally during remove attempt.`);
 					await refreshArticles(); // Refresh to ensure list consistency
 					return;
 				}
