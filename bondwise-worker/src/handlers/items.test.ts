@@ -263,37 +263,70 @@ describe("Worker Item Handlers", () => {
 		it("should correctly derive siteName from URL if missing", async () => {
 			// Add an item missing siteName to the mock KV
 			const itemMissingSiteName: WorkerArticle = {
-				_id: "article_no_site", userId: testUserId, url: "https://sub.domain.co.uk/path", title: "No Site Name", type: "article", savedAt: Date.now(), isRead: false, favorite: false, estimatedReadTime: 2
+				_id: "article_no_site",
+				userId: testUserId,
+				url: "https://sub.domain.co.uk/path",
+				title: "No Site Name",
+				type: "article",
+				savedAt: Date.now(),
+				isRead: false,
+				favorite: false,
+				estimatedReadTime: 2,
 			};
-			mockKvNamespace._store.set(createUserItemKey(testUserId, itemMissingSiteName._id), JSON.stringify(itemMissingSiteName));
+			mockKvNamespace._store.set(
+				createUserItemKey(testUserId, itemMissingSiteName._id),
+				JSON.stringify(itemMissingSiteName),
+			);
 
 			const request = new Request("http://example.com/items");
 			const response = await handleListItems(request, mockEnv, testUserId);
 			const body = (await response.json()) as WorkerArticle[];
-			const testedItem = body.find(a => a._id === itemMissingSiteName._id);
+			const testedItem = body.find((a) => a._id === itemMissingSiteName._id);
 			expect(testedItem).toBeDefined();
 			expect(testedItem?.siteName).toBe("sub.domain.co.uk"); // Expect derived hostname
 		});
 
 		it("should use default siteName if URL is invalid or missing", async () => {
 			const itemInvalidUrl: WorkerArticle = {
-				_id: "article_invalid_url", userId: testUserId, url: "invalid-url", title: "Invalid URL", type: "article", savedAt: Date.now(), isRead: false, favorite: false, estimatedReadTime: 1
+				_id: "article_invalid_url",
+				userId: testUserId,
+				url: "invalid-url",
+				title: "Invalid URL",
+				type: "article",
+				savedAt: Date.now(),
+				isRead: false,
+				favorite: false,
+				estimatedReadTime: 1,
 			};
 			const itemPdfNoUrl: WorkerArticle = {
-				_id: "pdf_no_url", userId: testUserId, url: "", title: "PDF No URL", type: "pdf", savedAt: Date.now(), isRead: false, favorite: false, estimatedReadTime: 1
+				_id: "pdf_no_url",
+				userId: testUserId,
+				url: "",
+				title: "PDF No URL",
+				type: "pdf",
+				savedAt: Date.now(),
+				isRead: false,
+				favorite: false,
+				estimatedReadTime: 1,
 			};
-			mockKvNamespace._store.set(createUserItemKey(testUserId, itemInvalidUrl._id), JSON.stringify(itemInvalidUrl));
-			mockKvNamespace._store.set(createUserItemKey(testUserId, itemPdfNoUrl._id), JSON.stringify(itemPdfNoUrl));
+			mockKvNamespace._store.set(
+				createUserItemKey(testUserId, itemInvalidUrl._id),
+				JSON.stringify(itemInvalidUrl),
+			);
+			mockKvNamespace._store.set(
+				createUserItemKey(testUserId, itemPdfNoUrl._id),
+				JSON.stringify(itemPdfNoUrl),
+			);
 
 			const request = new Request("http://example.com/items");
 			const response = await handleListItems(request, mockEnv, testUserId);
 			const body = (await response.json()) as WorkerArticle[];
 
-			const testedItemInvalid = body.find(a => a._id === itemInvalidUrl._id);
+			const testedItemInvalid = body.find((a) => a._id === itemInvalidUrl._id);
 			expect(testedItemInvalid).toBeDefined();
 			expect(testedItemInvalid?.siteName).toBe("Unknown Source"); // Fallback for article
 
-			const testedItemPdf = body.find(a => a._id === itemPdfNoUrl._id);
+			const testedItemPdf = body.find((a) => a._id === itemPdfNoUrl._id);
 			expect(testedItemPdf).toBeDefined();
 			expect(testedItemPdf?.siteName).toBe("PDF Document"); // Fallback for PDF
 		});
@@ -302,51 +335,101 @@ describe("Worker Item Handlers", () => {
 			// Approx 400 words -> 2 mins
 			const longContent = "<p>Word </p>".repeat(400); // Revert to simple string
 			const itemMissingReadTime: WorkerArticle = {
-				_id: "article_no_readtime", userId: testUserId, url: "http://example.com/no-readtime", title: "No Read Time", type: "article", savedAt: Date.now(), isRead: false, favorite: false, siteName: "Test", content: longContent
+				_id: "article_no_readtime",
+				userId: testUserId,
+				url: "http://example.com/no-readtime",
+				title: "No Read Time",
+				type: "article",
+				savedAt: Date.now(),
+				isRead: false,
+				favorite: false,
+				siteName: "Test",
+				content: longContent,
 			};
-			mockKvNamespace._store.set(createUserItemKey(testUserId, itemMissingReadTime._id), JSON.stringify(itemMissingReadTime));
+			mockKvNamespace._store.set(
+				createUserItemKey(testUserId, itemMissingReadTime._id),
+				JSON.stringify(itemMissingReadTime),
+			);
 
 			const request = new Request("http://example.com/items");
 			const response = await handleListItems(request, mockEnv, testUserId);
 			const body = (await response.json()) as WorkerArticle[];
-			const testedItem = body.find(a => a._id === itemMissingReadTime._id);
+			const testedItem = body.find((a) => a._id === itemMissingReadTime._id);
 			expect(testedItem).toBeDefined();
 			expect(testedItem?.estimatedReadTime).toBe(2); // Expect calculated time
 		});
 
 		it("should use default estimatedReadTime (1) if missing and content is empty/missing", async () => {
 			const itemNoContent: WorkerArticle = {
-				_id: "article_no_content", userId: testUserId, url: "http://example.com/no-content", title: "No Content", type: "article", savedAt: Date.now(), isRead: false, favorite: false, siteName: "Test", content: "" // Empty content
+				_id: "article_no_content",
+				userId: testUserId,
+				url: "http://example.com/no-content",
+				title: "No Content",
+				type: "article",
+				savedAt: Date.now(),
+				isRead: false,
+				favorite: false,
+				siteName: "Test",
+				content: "", // Empty content
 			};
 			const itemMissingContent: WorkerArticle = {
-				_id: "article_missing_content", userId: testUserId, url: "http://example.com/missing-content", title: "Missing Content", type: "article", savedAt: Date.now(), isRead: false, favorite: false, siteName: "Test" // No content field
+				_id: "article_missing_content",
+				userId: testUserId,
+				url: "http://example.com/missing-content",
+				title: "Missing Content",
+				type: "article",
+				savedAt: Date.now(),
+				isRead: false,
+				favorite: false,
+				siteName: "Test", // No content field
 			};
-			mockKvNamespace._store.set(createUserItemKey(testUserId, itemNoContent._id), JSON.stringify(itemNoContent));
-			mockKvNamespace._store.set(createUserItemKey(testUserId, itemMissingContent._id), JSON.stringify(itemMissingContent));
+			mockKvNamespace._store.set(
+				createUserItemKey(testUserId, itemNoContent._id),
+				JSON.stringify(itemNoContent),
+			);
+			mockKvNamespace._store.set(
+				createUserItemKey(testUserId, itemMissingContent._id),
+				JSON.stringify(itemMissingContent),
+			);
 
 			const request = new Request("http://example.com/items");
 			const response = await handleListItems(request, mockEnv, testUserId);
 			const body = (await response.json()) as WorkerArticle[];
 
-			const testedItemNoContent = body.find(a => a._id === itemNoContent._id);
+			const testedItemNoContent = body.find((a) => a._id === itemNoContent._id);
 			expect(testedItemNoContent).toBeDefined();
 			expect(testedItemNoContent?.estimatedReadTime).toBe(1); // Default 1 min
 
-			const testedItemMissingContent = body.find(a => a._id === itemMissingContent._id);
+			const testedItemMissingContent = body.find(
+				(a) => a._id === itemMissingContent._id,
+			);
 			expect(testedItemMissingContent).toBeDefined();
 			expect(testedItemMissingContent?.estimatedReadTime).toBe(1); // Default 1 min
 		});
 
 		it("should handle NaN in estimatedReadTime and calculate fallback", async () => {
 			const itemNanReadTime: WorkerArticle = {
-				_id: "article_nan_readtime", userId: testUserId, url: "http://example.com/nan", title: "NaN Read Time", type: "article", savedAt: Date.now(), isRead: false, favorite: false, siteName: "Test", content: "<p>Word </p>".repeat(250), estimatedReadTime: Number.NaN // Revert to simple string, keep Number.NaN
+				_id: "article_nan_readtime",
+				userId: testUserId,
+				url: "http://example.com/nan",
+				title: "NaN Read Time",
+				type: "article",
+				savedAt: Date.now(),
+				isRead: false,
+				favorite: false,
+				siteName: "Test",
+				content: "<p>Word </p>".repeat(250),
+				estimatedReadTime: Number.NaN, // Revert to simple string, keep Number.NaN
 			};
-			mockKvNamespace._store.set(createUserItemKey(testUserId, itemNanReadTime._id), JSON.stringify(itemNanReadTime));
+			mockKvNamespace._store.set(
+				createUserItemKey(testUserId, itemNanReadTime._id),
+				JSON.stringify(itemNanReadTime),
+			);
 
 			const request = new Request("http://example.com/items");
 			const response = await handleListItems(request, mockEnv, testUserId);
 			const body = (await response.json()) as WorkerArticle[];
-			const testedItem = body.find(a => a._id === itemNanReadTime._id);
+			const testedItem = body.find((a) => a._id === itemNanReadTime._id);
 			expect(testedItem).toBeDefined();
 			expect(testedItem?.estimatedReadTime).toBe(2); // Expect calculated time (250 words -> 2 min)
 		});

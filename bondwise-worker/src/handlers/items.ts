@@ -83,16 +83,18 @@ export async function handleListItems(
 						try {
 							// Extract hostname, removing 'www.' if present
 							let hostname = new URL(parsedItem.url).hostname;
-							hostname = hostname.startsWith("www.") ? hostname.substring(4) : hostname;
+							hostname = hostname.startsWith("www.")
+								? hostname.substring(4)
+								: hostname;
 							parsedItem.siteName = hostname;
 						} catch {
 							parsedItem.siteName = "Unknown Source"; // Fallback on URL parse error
 						}
 					} else if (!parsedItem.siteName) {
 						// Fallback if URL is also missing or invalid
-						if (parsedItem.type === 'pdf') {
+						if (parsedItem.type === "pdf") {
 							parsedItem.siteName = "PDF Document";
-						} else if (parsedItem.type === 'epub') {
+						} else if (parsedItem.type === "epub") {
 							parsedItem.siteName = "EPUB Book";
 						} else {
 							parsedItem.siteName = "Unknown Source";
@@ -103,19 +105,20 @@ export async function handleListItems(
 					if (
 						parsedItem.estimatedReadTime === undefined ||
 						parsedItem.estimatedReadTime === null ||
-					       Number.isNaN(parsedItem.estimatedReadTime) // Also check for NaN
+						Number.isNaN(parsedItem.estimatedReadTime) // Also check for NaN
 					) {
 						// Calculate only if content exists, otherwise leave as undefined (or default to 1?)
 						if (parsedItem.content) {
-					         parsedItem.estimatedReadTime = calculateReadTime(parsedItem.content);
-					       } else {
-					         // Decide fallback: undefined or 1? Let's default to 1 min if content is missing.
-					         parsedItem.estimatedReadTime = 1;
-					       }
+							parsedItem.estimatedReadTime = calculateReadTime(
+								parsedItem.content,
+							);
+						} else {
+							// Decide fallback: undefined or 1? Let's default to 1 min if content is missing.
+							parsedItem.estimatedReadTime = 1;
+						}
 					}
 
 					items.push(parsedItem); // Push the potentially modified item
-
 				} catch (parseError) {
 					console.error(
 						`Failed to parse item with key ${key.name}:`,

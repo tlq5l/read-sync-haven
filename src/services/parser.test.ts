@@ -1,12 +1,4 @@
-import { Readability } from "@mozilla/readability";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Use vi.hoisted for mocks that need to be available before imports
 const mockParse = vi.hoisted(() => vi.fn());
@@ -33,7 +25,6 @@ vi.mock("@mozilla/readability", () => {
 		Readability: ReadabilityMock,
 	};
 });
-
 
 // Now import the module
 import { parseArticle } from "./parser"; // Import the real function
@@ -72,10 +63,13 @@ describe("parseArticle", () => {
 
 	// --- Test cases ---
 
-	it("should correctly parse article, calculate read time, and fallback siteName", async () => { // FAILED PREVIOUSLY
+	it("should correctly parse article, calculate read time, and fallback siteName", async () => {
+		// FAILED PREVIOUSLY
 		// Setup
 		const testUrl = "https://example.com/article1";
-		mockFetch.mockResolvedValue(new Response("<html><body>Mock HTML</body></html>"));
+		mockFetch.mockResolvedValue(
+			new Response("<html><body>Mock HTML</body></html>"),
+		);
 
 		// Mock Readability.parse result
 		mockParse.mockReturnValue({
@@ -105,10 +99,13 @@ describe("parseArticle", () => {
 		expect(result.excerpt).toBe("Test excerpt...");
 	});
 
-	it("should use siteName from Readability if available", async () => { // FAILED PREVIOUSLY
+	it("should use siteName from Readability if available", async () => {
+		// FAILED PREVIOUSLY
 		// Setup
 		const testUrl = "https://anothersite.org/page";
-		mockFetch.mockResolvedValue(new Response("<html><body>Mock HTML</body></html>"));
+		mockFetch.mockResolvedValue(
+			new Response("<html><body>Mock HTML</body></html>"),
+		);
 
 		mockParse.mockReturnValue({
 			title: "Article Title",
@@ -129,10 +126,13 @@ describe("parseArticle", () => {
 		expect(result.estimatedReadTime).toBe(1); // Low word count
 	});
 
-	it("should handle minimal content and calculate minimum read time", async () => { // FAILED PREVIOUSLY
+	it("should handle minimal content and calculate minimum read time", async () => {
+		// FAILED PREVIOUSLY
 		// Setup
 		const testUrl = "https://minimal.com";
-		mockFetch.mockResolvedValue(new Response("<html><body>Mock HTML</body></html>"));
+		mockFetch.mockResolvedValue(
+			new Response("<html><body>Mock HTML</body></html>"),
+		);
 
 		mockParse.mockReturnValue({
 			title: "Minimal",
@@ -154,15 +154,15 @@ describe("parseArticle", () => {
 		expect(result.estimatedReadTime).toBe(1); // Minimum read time
 	});
 
-	it("should throw error for invalid URL", async () => { // PASSED PREVIOUSLY
-		await expect(parseArticle("invalid-url")).rejects.toThrow(
-			"Invalid URL",
-		);
+	it("should throw error for invalid URL", async () => {
+		// PASSED PREVIOUSLY
+		await expect(parseArticle("invalid-url")).rejects.toThrow("Invalid URL");
 		expect(mockFetch).not.toHaveBeenCalled();
 		expect(mockParse).not.toHaveBeenCalled();
 	});
 
-	it("should throw error if fetch fails (simulating network error)", async () => { // FAILED PREVIOUSLY (Incorrect error)
+	it("should throw error if fetch fails (simulating network error)", async () => {
+		// FAILED PREVIOUSLY (Incorrect error)
 		// Setup
 		const testUrl = "https://failfetch.com";
 		const fetchError = new Error("Network Error");
@@ -181,10 +181,13 @@ describe("parseArticle", () => {
 		expect(mockParse).not.toHaveBeenCalled(); // Parse should not be called if fetch fails
 	});
 
-	it("should throw error if Readability fails to parse (returns null)", async () => { // FAILED PREVIOUSLY (Incorrect error)
+	it("should throw error if Readability fails to parse (returns null)", async () => {
+		// FAILED PREVIOUSLY (Incorrect error)
 		// Setup
 		const testUrl = "https://emptyhtml.com";
-		mockFetch.mockResolvedValue(new Response("<html><body>Empty content</body></html>"));
+		mockFetch.mockResolvedValue(
+			new Response("<html><body>Empty content</body></html>"),
+		);
 
 		mockParse.mockReturnValue(null); // Simulate Readability returning null
 
