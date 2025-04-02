@@ -70,145 +70,147 @@ export default function EpubReader({
 				const { base64ToArrayBuffer } = await import("@/services/epub");
 				const arrayBuffer = base64ToArrayBuffer(fileData);
 
-			// Create EPUB book instance
-			epubBook = ePub(arrayBuffer) as ExtendedBook; // Cast to ExtendedBook
-			setBook(epubBook);
+				// Create EPUB book instance
+				epubBook = ePub(arrayBuffer) as ExtendedBook; // Cast to ExtendedBook
+				setBook(epubBook);
 
-			// Create rendition when book is ready
-			epubBook.ready
-				.then(() => {
-					if (!viewerRef.current || !epubBook) return;
+				// Create rendition when book is ready
+				epubBook.ready
+					.then(() => {
+						if (!viewerRef.current || !epubBook) return;
 
-					// Use scrolled-document mode for better scrolling of content
-					const epubRendition = epubBook.renderTo(
-						viewerRef.current as HTMLElement,
-						{
-							width: "100%",
-							height: "100%",
-							flow: "scrolled-doc", // Use scrolled-doc flow
-							ignoreClass: "annotator-hl",
-							spread: "none",
-							manager: "continuous", // Add continuous manager for better scrolling
-						},
-					) as ExtendedRendition;
+						// Use scrolled-document mode for better scrolling of content
+						const epubRendition = epubBook.renderTo(
+							viewerRef.current as HTMLElement,
+							{
+								width: "100%",
+								height: "100%",
+								flow: "scrolled-doc", // Use scrolled-doc flow
+								ignoreClass: "annotator-hl",
+								spread: "none",
+								manager: "continuous", // Add continuous manager for better scrolling
+							},
+						) as ExtendedRendition;
 
-					// Listen for rendering events - use typed content hook
-					epubRendition.hooks.content.register((contents: EpubContents) => {
-						const body = contents.document.body;
-						if (body) {
-							// Make document scrollable
-							body.style.overflow = "auto";
-							body.style.maxWidth = "100%";
-						}
-					});
-
-					// Display the book from beginning and apply scrolling to content
-					epubRendition.display().then(() => {
-						setLoading(false);
-						setContentRendered(true);
-						console.log("EPUB content displayed successfully");
-
-						// Function to apply styles to iframes
-						const applyIframeStyles = () => {
-							const iframes = viewerRef.current?.querySelectorAll("iframe");
-							if (iframes?.length) {
-								for (const iframe of Array.from(iframes)) {
-									iframe.style.border = "0";
-									iframe.style.width = "100%";
-									iframe.style.height = "100%";
-									iframe.style.overflow = "auto";
-								}
+						// Listen for rendering events - use typed content hook
+						epubRendition.hooks.content.register((contents: EpubContents) => {
+							const body = contents.document.body;
+							if (body) {
+								// Make document scrollable
+								body.style.overflow = "auto";
+								body.style.maxWidth = "100%";
 							}
-						};
-						applyIframeStyles();
-					});
+						});
 
-					// Store rendition for navigation
-					setRendition(epubRendition);
+						// Display the book from beginning and apply scrolling to content
+						epubRendition.display().then(() => {
+							setLoading(false);
+							setContentRendered(true);
+							console.log("EPUB content displayed successfully");
 
-					// Track location changes
-					epubRendition.on("locationChanged", (loc) => {
-						if (loc?.start) {
-							setCurrentLocation(loc.start.cfi);
-							console.log("EPUB location changed:", loc.start.cfi);
-						}
-					});
-
-					// Add rendering error handler
-					epubRendition.on("rendered", (section) => {
-						console.log(
-							"EPUB section rendered:",
-							section?.href || "unknown section",
-						);
-					});
-
-					// --- Extract Full Text ---
-					epubBook?.ready // Null check
-						.then(() => epubBook?.locations.generate(1000)) // Null check
-						.then(async () => {
-							if (!epubBook) {
-								// Null check
-								onTextExtracted(null);
-								return;
-							}
-							let fullText = "";
-							// Helper to load and extract text from a section
-							const loadSectionText = async (sectionHref: string) => {
-								if (!epubBook) return ""; // Null check
-								try {
-									const section = epubBook.spine.get(sectionHref);
-									if (section) {
-										// Try loading section by passing book's request method
-										if (
-											epubBook.request &&
-											typeof epubBook.request === "function"
-										) {
-											await section.load(epubBook.request); // Pass the book's request function
-											return section.contents?.textContent || "";
-										}
-										console.warn(
-											`epubBook.request method not found or not a function for section ${sectionHref}. Cannot extract text.`,
-										);
-										return "";
+							// Function to apply styles to iframes
+							const applyIframeStyles = () => {
+								const iframes = viewerRef.current?.querySelectorAll("iframe");
+								if (iframes?.length) {
+									for (const iframe of Array.from(iframes)) {
+										iframe.style.border = "0";
+										iframe.style.width = "100%";
+										iframe.style.height = "100%";
+										iframe.style.overflow = "auto";
 									}
-								} catch (loadErr) {
+								}
+							};
+							applyIframeStyles();
+						});
+
+						// Store rendition for navigation
+						setRendition(epubRendition);
+
+						// Track location changes
+						epubRendition.on("locationChanged", (loc) => {
+							if (loc?.start) {
+								setCurrentLocation(loc.start.cfi);
+								console.log("EPUB location changed:", loc.start.cfi);
+							}
+						});
+
+						// Add rendering error handler
+						epubRendition.on("rendered", (section) => {
+							console.log(
+								"EPUB section rendered:",
+								section?.href || "unknown section",
+							);
+						});
+
+						// --- Extract Full Text ---
+						epubBook?.ready // Null check
+							.then(() => epubBook?.locations.generate(1000)) // Null check
+							.then(async () => {
+								if (!epubBook) {
+									// Null check
+									onTextExtracted(null);
+									return;
+								}
+								let fullText = "";
+								// Helper to load and extract text from a section
+								const loadSectionText = async (sectionHref: string) => {
+									if (!epubBook) return ""; // Null check
+									try {
+										const section = epubBook.spine.get(sectionHref);
+										if (section) {
+											// Try loading section by passing book's request method
+											if (
+												epubBook.request &&
+												typeof epubBook.request === "function"
+											) {
+												await section.load(epubBook.request); // Pass the book's request function
+												return section.contents?.textContent || "";
+											}
+											console.warn(
+												`epubBook.request method not found or not a function for section ${sectionHref}. Cannot extract text.`,
+											);
+											return "";
+										}
+									} catch (loadErr) {
+										console.warn(
+											`Could not load/extract text from section ${sectionHref}:`,
+											loadErr,
+										);
+									}
+									return "";
+								};
+
+								// Iterate through spine items sequentially
+								if (epubBook?.spine?.items) {
+									for (const section of epubBook.spine.items) {
+										if (section.href) {
+											const sectionText = await loadSectionText(section.href);
+											fullText = `${fullText}${sectionText}\n\n`; // Use template literal
+										}
+									}
+								} else {
 									console.warn(
-										`Could not load/extract text from section ${sectionHref}:`,
-										loadErr,
+										"EPUB spine items not found for text extraction.",
 									);
 								}
-								return "";
-							};
-
-							// Iterate through spine items sequentially
-							if (epubBook?.spine?.items) {
-								for (const section of epubBook.spine.items) {
-									if (section.href) {
-										const sectionText = await loadSectionText(section.href);
-										fullText = `${fullText}${sectionText}\n\n`; // Use template literal
-									}
-								}
-							} else {
-								console.warn("EPUB spine items not found for text extraction.");
-							}
-							console.log(
-								"EPUB Full Text Extracted (first 200 chars):",
-								fullText.substring(0, 200),
-							);
-							onTextExtracted(fullText.trim()); // Call callback
-						})
-						.catch((textErr) => {
-							console.error("Error extracting EPUB text:", textErr);
-							onTextExtracted(null); // Indicate failure
-						});
-					// --- End Extract Full Text ---
-				})
-				.catch((err) => {
-					console.error("Error rendering EPUB:", err);
-					setError("Failed to render EPUB file. Please try again.");
-					setLoading(false);
-					onTextExtracted(null); // Indicate failure on render error too
-				});
+								console.log(
+									"EPUB Full Text Extracted (first 200 chars):",
+									fullText.substring(0, 200),
+								);
+								onTextExtracted(fullText.trim()); // Call callback
+							})
+							.catch((textErr) => {
+								console.error("Error extracting EPUB text:", textErr);
+								onTextExtracted(null); // Indicate failure
+							});
+						// --- End Extract Full Text ---
+					})
+					.catch((err) => {
+						console.error("Error rendering EPUB:", err);
+						setError("Failed to render EPUB file. Please try again.");
+						setLoading(false);
+						onTextExtracted(null); // Indicate failure on render error too
+					});
 			} catch (err) {
 				console.error("Error initializing EPUB:", err);
 				setError(

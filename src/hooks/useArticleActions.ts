@@ -144,8 +144,9 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					const fileBuffer = await file.arrayBuffer();
 					const metadata = await epubModule.extractEpubMetadata(fileBuffer);
 					const base64Content = epubModule.arrayBufferToBase64(fileBuffer);
-					const estimatedReadingTime =
-						await epubModule.getEstimatedReadingTime(fileBuffer.byteLength);
+					const estimatedReadingTime = await epubModule.getEstimatedReadingTime(
+						fileBuffer.byteLength,
+					);
 
 					articleToSave = {
 						userId,
@@ -179,10 +180,11 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 							fileBuffer,
 						);
 						const base64Content = pdfModule.arrayBufferToBase64(fileBuffer);
-						const estimatedReadingTime = await pdfModule.getEstimatedReadingTime(
-							fileBuffer.byteLength,
-							metadata.pageCount,
-						);
+						const estimatedReadingTime =
+							await pdfModule.getEstimatedReadingTime(
+								fileBuffer.byteLength,
+								metadata.pageCount,
+							);
 
 						articleToSave = {
 							userId,

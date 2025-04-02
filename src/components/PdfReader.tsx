@@ -43,25 +43,25 @@ export default function PdfReader({
 				const { base64ToArrayBuffer } = await import("@/services/pdf");
 				const arrayBuffer = base64ToArrayBuffer(fileData);
 
-			// Create a Blob from the ArrayBuffer
-			const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+				// Create a Blob from the ArrayBuffer
+				const blob = new Blob([arrayBuffer], { type: "application/pdf" });
 
-			// Create an object URL for the Blob
-			const url = URL.createObjectURL(blob);
-			setObjectUrl(url);
-			setIsLoading(false);
+				// Create an object URL for the Blob
+				const url = URL.createObjectURL(blob);
+				setObjectUrl(url);
+				setIsLoading(false);
 
-			// Clean up the URL when the component unmounts
-			return () => {
-				if (url) URL.revokeObjectURL(url);
-			};
-		} catch (err) {
-			console.error("Error processing PDF:", err);
-			setError("Failed to load PDF file");
-			setIsLoading(false);
-			onTextExtracted(null); // Signal text extraction failure/unsupported
-			return undefined;
-		}
+				// Clean up the URL when the component unmounts
+				return () => {
+					if (url) URL.revokeObjectURL(url);
+				};
+			} catch (err) {
+				console.error("Error processing PDF:", err);
+				setError("Failed to load PDF file");
+				setIsLoading(false);
+				onTextExtracted(null); // Signal text extraction failure/unsupported
+				return undefined;
+			}
 		};
 
 		loadPdf();
