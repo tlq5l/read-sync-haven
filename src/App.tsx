@@ -85,8 +85,8 @@ const AppWithRouter = () => {
 	const { isSearchOverlayOpen, closeSearchOverlay } = useKeyboard();
 
 	return (
-		<BrowserRouter>
-			{/* KeyboardProvider removed from here */}
+		// Return content within a single fragment
+		<>
 			<Routes>
 				{/* Public auth routes */}
 				<Route path="/sign-in/*" element={<SignInPage />} />
@@ -116,8 +116,7 @@ const AppWithRouter = () => {
 				isOpen={isSearchOverlayOpen}
 				onClose={closeSearchOverlay}
 			/>
-			{/* KeyboardProvider removed from here */}
-		</BrowserRouter>
+		</>
 	);
 };
 
@@ -136,9 +135,12 @@ const App = () => (
 							<Toaster />
 							<Sonner />
 							{/* Wrap AppWithRouter with KeyboardProvider */}
-							<KeyboardProvider>
-								<AppWithRouter />
-							</KeyboardProvider>
+							{/* Wrap KeyboardProvider with BrowserRouter */}
+							<BrowserRouter>
+								<KeyboardProvider>
+									<AppWithRouter />
+								</KeyboardProvider>
+							</BrowserRouter>
 						</TooltipProvider>
 					</QueryClientProvider>
 				</MotionPreferenceHandler>
