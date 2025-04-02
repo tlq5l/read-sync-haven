@@ -14,6 +14,9 @@ interface KeyboardContextType {
 	isShortcutsDialogOpen: boolean;
 	openShortcutsDialog: () => void;
 	closeShortcutsDialog: () => void;
+	isSearchOverlayOpen: boolean; // Added state for search overlay
+	openSearchOverlay: () => void; // Added function to open search overlay
+	closeSearchOverlay: () => void; // Added function to close search overlay
 }
 
 const KeyboardContext = createContext<KeyboardContextType | undefined>(
@@ -26,6 +29,7 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 	const { toast } = useToast();
 	const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
 	const [isShortcutsDialogOpen, setIsShortcutsDialogOpen] = useState(false);
+	const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false); // State for search overlay
 
 	// Initialize shortcuts with their actions
 	useEffect(() => {
@@ -77,17 +81,8 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 					case "show-shortcuts":
 						action = () => setIsShortcutsDialogOpen(true);
 						break;
-					case "focus-search":
-						action = () => {
-							const searchInput = document.getElementById(
-								"global-search-input",
-							) as HTMLInputElement | null;
-							if (searchInput) {
-								searchInput.focus();
-							} else {
-								navigate("/search");
-							}
-						};
+					case "focus-search": // Will be renamed later, now opens overlay
+						action = () => setIsSearchOverlayOpen(true);
 						break;
 					case "delete-article":
 						action = () => {
@@ -150,6 +145,8 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 
 	const openShortcutsDialog = () => setIsShortcutsDialogOpen(true);
 	const closeShortcutsDialog = () => setIsShortcutsDialogOpen(false);
+	const openSearchOverlay = () => setIsSearchOverlayOpen(true);
+	const closeSearchOverlay = () => setIsSearchOverlayOpen(false);
 
 	return (
 		<KeyboardContext.Provider
@@ -158,6 +155,9 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 				isShortcutsDialogOpen,
 				openShortcutsDialog,
 				closeShortcutsDialog,
+				isSearchOverlayOpen,
+				openSearchOverlay,
+				closeSearchOverlay,
 			}}
 		>
 			{children}

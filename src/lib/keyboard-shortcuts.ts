@@ -76,9 +76,9 @@ export const shortcutGroups: ShortcutGroup[] = [
 				},
 			},
 			{
-				id: "focus-search",
-				name: "Focus Search",
-				description: "Focus the search input or navigate to search page",
+				id: "open-search-overlay", // Renamed ID
+				name: "Open Search",
+				description: "Open the global search overlay", // Updated description
 				category: "navigation",
 				keys: {
 					key: "/",

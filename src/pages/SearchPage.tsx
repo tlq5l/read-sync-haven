@@ -117,7 +117,7 @@ export default function SearchPage() {
 					<div className="relative">
 						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 						<Input
-							id="global-search-input" // Added ID for keyboard shortcut focus
+							// Removed ID as focus is handled by the global overlay now
 							placeholder="Search articles..."
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}

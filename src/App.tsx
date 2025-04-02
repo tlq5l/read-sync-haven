@@ -13,9 +13,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import GlobalSearchOverlay from "./components/GlobalSearchOverlay"; // Import the new overlay
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
+import { useKeyboard } from "./context/KeyboardContext"; // Import useKeyboard hook
 import AddPage from "./pages/AddPage";
 import ArchivePage from "./pages/ArchivePage";
 import HomePage from "./pages/HomePage";
@@ -78,36 +80,46 @@ const MotionPreferenceHandler = ({
 	return <>{children}</>;
 };
 
-const AppWithRouter = () => (
-	<BrowserRouter>
-		<KeyboardProvider>
-			<Routes>
-				{/* Public auth routes */}
-				<Route path="/sign-in/*" element={<SignInPage />} />
-				<Route path="/sign-up/*" element={<SignUpPage />} />
+const AppWithRouter = () => {
+	// Get search overlay state and close function from context
+	const { isSearchOverlayOpen, closeSearchOverlay } = useKeyboard();
 
-				{/* Protected routes */}
-				<Route element={<ProtectedRoute />}>
-					<Route element={<Layout />}>
-						<Route path="/" element={<HomePage />} />{" "}
-						{/* Keep this pointing to the new HomePage */}
-						<Route path="/add" element={<AddPage />} />
-						<Route path="/read/:id" element={<ReadPage />} />
-						<Route path="/search" element={<SearchPage />} />
-						<Route path="/settings" element={<SettingsPage />} />
-						<Route path="/inbox" element={<InboxPage />} />
-						<Route path="/later" element={<LaterPage />} />
-						<Route path="/archive" element={<ArchivePage />} />
+	return (
+		<BrowserRouter>
+			<KeyboardProvider>
+				<Routes>
+					{/* Public auth routes */}
+					<Route path="/sign-in/*" element={<SignInPage />} />
+					<Route path="/sign-up/*" element={<SignUpPage />} />
+
+					{/* Protected routes */}
+					<Route element={<ProtectedRoute />}>
+						<Route element={<Layout />}>
+							<Route path="/" element={<HomePage />} />{" "}
+							{/* Keep this pointing to the new HomePage */}
+							<Route path="/add" element={<AddPage />} />
+							<Route path="/read/:id" element={<ReadPage />} />
+							<Route path="/search" element={<SearchPage />} />
+							<Route path="/settings" element={<SettingsPage />} />
+							<Route path="/inbox" element={<InboxPage />} />
+							<Route path="/later" element={<LaterPage />} />
+							<Route path="/archive" element={<ArchivePage />} />
+						</Route>
 					</Route>
-				</Route>
 
-				{/* 404 route */}
-				<Route path="*" element={<NotFound />} />
-			</Routes>
-			<ShortcutsDialog />
-		</KeyboardProvider>
-	</BrowserRouter>
-);
+					{/* 404 route */}
+					<Route path="*" element={<NotFound />} />
+				</Routes>
+				<ShortcutsDialog />
+				{/* Render the search overlay */}
+				<GlobalSearchOverlay
+					isOpen={isSearchOverlayOpen}
+					onClose={closeSearchOverlay}
+				/>
+			</KeyboardProvider>
+		</BrowserRouter>
+	);
+};
 
 const App = () => (
 	<ClerkProvider
