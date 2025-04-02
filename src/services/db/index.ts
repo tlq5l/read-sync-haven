@@ -2,10 +2,10 @@
 
 // --- Core Initialization & Config ---
 export {
-    articlesDb,
-    highlightsDb,
-    initializeDatabase,
-    tagsDb
+	articlesDb,
+	highlightsDb,
+	initializeDatabase,
+	tagsDb,
 } from "./config";
 
 // --- Types ---
@@ -13,28 +13,28 @@ export type { Article, Highlight, Tag } from "./types";
 
 // --- Utilities ---
 export {
-    arrayBufferToBase64,
-    executeWithRetry,
-    isOffline,
-    registerOfflineListeners
+	arrayBufferToBase64,
+	executeWithRetry,
+	isOffline,
+	registerOfflineListeners,
 } from "./utils";
 
 // --- Article Operations ---
 export {
-    deleteArticle,
-    getAllArticles,
-    getArticle,
-    removeDuplicateArticles,
-    saveArticle,
-    updateArticle
+	deleteArticle,
+	getAllArticles,
+	getArticle,
+	removeDuplicateArticles,
+	saveArticle,
+	updateArticle,
 } from "./articles";
 
 // --- Highlight Operations ---
 export {
-    deleteHighlight,
-    getHighlightsByArticle,
-    saveHighlight,
-    updateHighlight
+	deleteHighlight,
+	getHighlightsByArticle,
+	saveHighlight,
+	updateHighlight,
 } from "./highlights";
 
 // --- Tag Operations ---
