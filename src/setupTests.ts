@@ -1,7 +1,25 @@
-import * as matchers from "@testing-library/jest-dom/matchers";
 // src/setupTests.ts
+import * as matchers from "@testing-library/jest-dom/matchers";
 import { expect, vi } from "vitest"; // Import vi
-// import { expect } from "vitest"; // Removed duplicate import
+
+// Polyfill EventTarget for JSDOM environment if it's missing
+if (typeof global.EventTarget === "undefined") {
+	// A simple polyfill or assign from a known source if available
+	// For basic cases, assigning Event might work if Event itself exists
+	// Or use a more robust polyfill if needed
+	// Example: global.EventTarget = require('event-target-shim'); // If using a shim
+	// For now, let's try assigning Event if it exists, otherwise a basic object
+	global.EventTarget =
+		typeof Event !== "undefined"
+			? EventTarget // Assign the EventTarget constructor directly
+			: class EventTargetShim {
+					addEventListener() {}
+					removeEventListener() {}
+					dispatchEvent() {
+						return true;
+					}
+				};
+}
 
 // Ensure process.listeners exists for Vitest's error handlers
 if (typeof process !== "undefined" && typeof process.listeners !== "function") {
