@@ -184,6 +184,24 @@ export default function Sidebar() {
 						</Button>
 					</TransitionItem>
 
+					<TransitionItem showFrom="left" className="w-full">
+						{/* Library Button */}
+						<Button
+							variant="ghost"
+							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
+							onClick={() => {
+								setCurrentView("all"); // Reset view similar to Home
+								navigate("/inbox");
+							}}
+							style={isActive("/inbox") ? styles.activeLink : styles.link}
+						>
+							<Library size={20} />
+							{!collapsed && (
+								<span className="transition-opacity duration-200">Library</span>
+							)}
+						</Button>
+					</TransitionItem>
+
 					{/* Removed Unread and Favorites buttons - handled by TopBar */}
 				</TransitionGroup>
 
