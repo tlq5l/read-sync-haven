@@ -98,7 +98,7 @@ export default defineConfig(({ mode }) => ({
 				Buffer: true,
 				global: true,
 			},
-			include: ["util", "path", "events", "stream"], // Add 'stream'
+			// Removed 'include' array to polyfill all supported modules by default
 			protocolImports: true,
 		}),
 	],
