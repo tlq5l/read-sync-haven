@@ -107,6 +107,12 @@ let _mockSetSortCriteria: React.Dispatch<
 	React.SetStateAction<SortCriteria>
 > | null = null;
 
+// Create mock functions at module level to allow importing into tests
+export const mockOptimisticRemoveArticle = vi.fn().mockResolvedValue(undefined);
+export const mockRefreshArticles = vi.fn().mockResolvedValue(mockRawArticles);
+export const mockRetryLoading = vi.fn();
+// Add other action mocks here if needed for other tests
+
 export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	children,
 }) => {
@@ -213,10 +219,10 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			setSortField, // Provide stable helper
 			toggleSortDirection, // Provide stable helper
 			setSelectedCategory, // Added mock setter
-			// Mock potentially needed action functions simply
-			refreshArticles: vi.fn().mockResolvedValue(mockRawArticles),
-			retryLoading: vi.fn(),
-			optimisticRemoveArticle: vi.fn().mockResolvedValue(undefined),
+			// Use the exported mock functions in the context value
+			refreshArticles: mockRefreshArticles,
+			retryLoading: mockRetryLoading,
+			optimisticRemoveArticle: mockOptimisticRemoveArticle,
 		}),
 		[
 			// Only include values that actually change and affect the output

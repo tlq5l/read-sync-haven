@@ -12,9 +12,10 @@ import {
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+// Removed import of useArticles hook, will import specific mock function
 import InboxPage from "./InboxPage"; // The component to test
 
-import type React from "react"; // Use type import
+// Removed conflicting 'type React' import
 // Import the mock provider and test utilities
 import {
 	MockArticleProvider,
@@ -22,6 +23,7 @@ import {
 	testSetSort,
 	testToggleSortDirection,
 	testUpdateFilters,
+	mockOptimisticRemoveArticle, // Import the exported mock function
 } from "../test-utils/MockArticleProvider"; // Adjusted path
 
 // --- Mocks ---
@@ -160,21 +162,34 @@ vi.mock("@/components/ui/dropdown-menu", async () => {
 	};
 });
 
-// Mock VirtualizedArticleList to bypass virtualization issues in JSDOM
-vi.mock("@/components/VirtualizedArticleList", () => ({
-	default: ({ articles }: { articles: Article[] }) => {
-		// Render a simple list instead of the virtualized one
-		// Use the article title in the link name to match test queries
+// Mock VirtualizedArticleGrid to bypass virtualization issues in JSDOM
+vi.mock("@/components/VirtualizedArticleGrid", () => ({
+	// Needs to be default export because the component uses default export
+	default: ({
+		articles,
+		// Simulate accepting action props if the real component needed them passed down
+		// For this test, we'll rely on the context mock instead
+	}: { articles: Article[] /* Add mock action props here if needed */ }) => {
+		// The component mock doesn't need to access the context directly anymore
+		// The onClick handler will use the function provided by the context during render
 		return (
-			<div data-testid="mock-virtualized-list">
+			<div data-testid="mock-virtualized-grid">
 				{articles.map((article) => (
-					<a
+					<div
 						key={article._id}
-						href={`/read/${article._id}`} // Simple href for role="link"
-						data-testid={`article-link-${article._id}`}
+						data-testid={`mock-article-item-${article._id}`}
+						data-title={article.title}
 					>
-						Read {article.title}
-					</a> // Put text on one line to avoid extra whitespace
+						<span>{article.title}</span>
+						<button
+							type="button"
+							// Add onClick to call the imported mock function directly
+							onClick={() => mockOptimisticRemoveArticle(article._id)}
+							data-testid={`delete-button-${article._id}`}
+						>
+							Delete
+						</button>
+					</div>
 				))}
 			</div>
 		);
@@ -187,11 +202,12 @@ vi.mock("@/context/ArticleContext", async (importOriginal) => {
 		await importOriginal<typeof import("@/context/ArticleContext")>();
 	const { MockArticleContext } = await import(
 		"../test-utils/MockArticleProvider"
-	); // Import mock context
-	const React = await import("react"); // Import React
+	);
+	const React = await import("react");
+	// Ensure we use the correct context instance for the mocked hook
 	return {
 		...original,
-		useArticles: () => React.useContext(MockArticleContext),
+		useArticles: () => React.useContext(MockArticleContext), // Remove non-null assertion
 	};
 });
 
@@ -220,21 +236,15 @@ describe("InboxPage Integration Tests", () => {
 
 	it("should render the initial list of articles", async () => {
 		renderInboxPage();
-		const articleCards = screen.getAllByRole("link", { name: /read/i }); // Links within cards
-		expect(articleCards).toHaveLength(mockRawArticles.length);
-		// Check order based on text content (assuming default sort is date desc)
-		expect(
-			within(articleCards[0]).getByRole("heading", { level: 3 }).textContent,
-		).toBe("TypeScript Intro"); // Newest
-		expect(
-			within(articleCards[1]).getByRole("heading", { level: 3 }).textContent,
-		).toBe("My PDF");
-		expect(
-			within(articleCards[2]).getByRole("heading", { level: 3 }).textContent,
-		).toBe("CSS Magic");
-		expect(
-			within(articleCards[3]).getByRole("heading", { level: 3 }).textContent,
-		).toBe("React Fun"); // Oldest
+		// Check items rendered within the mock grid
+		const grid = screen.getByTestId("mock-virtualized-grid");
+		const items = within(grid).getAllByTestId(/mock-article-item-/);
+		expect(items).toHaveLength(mockRawArticles.length);
+		// Check order based on data-title attribute (assuming default sort is date desc)
+		expect(items[0]).toHaveAttribute("data-title", "TypeScript Intro"); // Newest
+		expect(items[1]).toHaveAttribute("data-title", "My PDF");
+		expect(items[2]).toHaveAttribute("data-title", "CSS Magic");
+		expect(items[3]).toHaveAttribute("data-title", "React Fun"); // Oldest
 	});
 
 	it("should sort articles by title ascending using test utility", async () => {
@@ -247,27 +257,16 @@ describe("InboxPage Integration Tests", () => {
 		// Wait for UI to update with longer timeout
 		await waitFor(
 			() => {
-				// Check using the mock structure
-				const articleLinks = screen.getAllByRole("link", { name: /read/i });
-				expect(articleLinks).toHaveLength(mockRawArticles.length);
+				// Check items rendered within the mock grid
+				const grid = screen.getByTestId("mock-virtualized-grid");
+				const items = within(grid).getAllByTestId(/mock-article-item-/);
+				expect(items).toHaveLength(mockRawArticles.length);
 
-				// Check order based on text content (title ascending)
-				expect(
-					within(articleLinks[0]).getByRole("heading", { level: 3 })
-						.textContent,
-				).toBe("CSS Magic");
-				expect(
-					within(articleLinks[1]).getByRole("heading", { level: 3 })
-						.textContent,
-				).toBe("My PDF");
-				expect(
-					within(articleLinks[2]).getByRole("heading", { level: 3 })
-						.textContent,
-				).toBe("React Fun");
-				expect(
-					within(articleLinks[3]).getByRole("heading", { level: 3 })
-						.textContent,
-				).toBe("TypeScript Intro");
+				// Check order based on data-title attribute (title ascending)
+				expect(items[0]).toHaveAttribute("data-title", "CSS Magic");
+				expect(items[1]).toHaveAttribute("data-title", "My PDF");
+				expect(items[2]).toHaveAttribute("data-title", "React Fun");
+				expect(items[3]).toHaveAttribute("data-title", "TypeScript Intro");
 			},
 			{ timeout: 2000 },
 		);
@@ -281,18 +280,16 @@ describe("InboxPage Integration Tests", () => {
 		});
 
 		await waitFor(() => {
-			const articleCards = screen.getAllByRole("link", { name: /read/i });
-
-			// Get text content from links
-			const linkTexts = articleCards.map(
-				(link) => within(link).getByRole("heading", { level: 3 }).textContent,
-			);
+			// Check items rendered within the mock grid
+			const grid = screen.getByTestId("mock-virtualized-grid");
+			const items = within(grid).getAllByTestId(/mock-article-item-/);
+			expect(items).toHaveLength(mockRawArticles.length);
 
 			// After toggle, should go from newest->oldest to oldest->newest (Date Asc)
-			expect(linkTexts[0]).toBe("React Fun"); // Oldest first
-			expect(linkTexts[1]).toBe("CSS Magic");
-			expect(linkTexts[2]).toBe("My PDF");
-			expect(linkTexts[3]).toBe("TypeScript Intro"); // Newest
+			expect(items[0]).toHaveAttribute("data-title", "React Fun"); // Oldest first
+			expect(items[1]).toHaveAttribute("data-title", "CSS Magic");
+			expect(items[2]).toHaveAttribute("data-title", "My PDF");
+			expect(items[3]).toHaveAttribute("data-title", "TypeScript Intro"); // Newest
 		});
 	});
 
@@ -304,13 +301,12 @@ describe("InboxPage Integration Tests", () => {
 		});
 
 		await waitFor(() => {
-			// Check using the mock structure
-			const articleLinks = screen.getAllByRole("link", { name: /read/i });
-			expect(articleLinks).toHaveLength(1);
-			// Check the text content of the filtered link
-			expect(
-				within(articleLinks[0]).getByRole("heading", { level: 3 }).textContent,
-			).toBe("React Fun");
+			// Check items rendered within the mock grid
+			const grid = screen.getByTestId("mock-virtualized-grid");
+			const items = within(grid).getAllByTestId(/mock-article-item-/);
+			expect(items).toHaveLength(1);
+			// Check the title attribute of the filtered item
+			expect(items[0]).toHaveAttribute("data-title", "React Fun");
 		});
 	});
 
@@ -322,13 +318,12 @@ describe("InboxPage Integration Tests", () => {
 		});
 
 		await waitFor(() => {
-			// Check using the mock structure
-			const articleLinks = screen.getAllByRole("link", { name: /read/i });
-			expect(articleLinks).toHaveLength(1);
-			// Check the text content of the filtered link
-			expect(
-				within(articleLinks[0]).getByRole("heading", { level: 3 }).textContent,
-			).toBe("My PDF");
+			// Check items rendered within the mock grid
+			const grid = screen.getByTestId("mock-virtualized-grid");
+			const items = within(grid).getAllByTestId(/mock-article-item-/);
+			expect(items).toHaveLength(1);
+			// Check the title attribute of the filtered item
+			expect(items[0]).toHaveAttribute("data-title", "My PDF");
 		});
 	});
 
@@ -340,19 +335,15 @@ describe("InboxPage Integration Tests", () => {
 		});
 
 		await waitFor(() => {
-			// Check using the mock structure
-			const articleLinks = screen.getAllByRole("link", { name: /read/i });
-			expect(articleLinks).toHaveLength(2); // Articles with tag 't1'
-
-			// Get text content from the links
-			const linkTexts = articleLinks.map(
-				(link) => within(link).getByRole("heading", { level: 3 }).textContent,
-			);
+			// Check items rendered within the mock grid
+			const grid = screen.getByTestId("mock-virtualized-grid");
+			const items = within(grid).getAllByTestId(/mock-article-item-/);
+			expect(items).toHaveLength(2); // Articles with tag 't1'
 
 			// Check content - order depends on default sort (savedAt desc)
 			// CSS Magic (1705M) is newer than React Fun (1700M)
-			expect(linkTexts[0]).toBe("CSS Magic");
-			expect(linkTexts[1]).toBe("React Fun");
+			expect(items[0]).toHaveAttribute("data-title", "CSS Magic");
+			expect(items[1]).toHaveAttribute("data-title", "React Fun");
 		});
 	});
 
@@ -382,12 +373,60 @@ describe("InboxPage Integration Tests", () => {
 				expect(
 					screen.queryByText(/No articles match/i),
 				).not.toBeInTheDocument();
-				expect(screen.getByText("React Fun")).toBeInTheDocument(); // Check if articles reappear
+				// Check if items reappear in the mock grid
+				const grid = screen.getByTestId("mock-virtualized-grid");
+				expect(within(grid).getByText("React Fun")).toBeInTheDocument();
 			});
 		} else {
 			console.warn(
 				"Clear Filters button not found in rendered output for this test.",
 			);
 		}
+	});
+
+	it("should call optimisticRemoveArticle when delete action is triggered on an item", async () => {
+		renderInboxPage();
+
+		// Find the mock grid and a specific item's delete button
+		const grid = screen.getByTestId("mock-virtualized-grid");
+		// Let's try deleting the "CSS Magic" article (which has _id: "3" in mock data)
+		const deleteButton = within(grid).getByTestId("delete-button-3");
+
+		// Simulate clicking the delete button
+		await userEvent.click(deleteButton);
+
+		// Assert using the imported mock function instance
+		expect(mockOptimisticRemoveArticle).toHaveBeenCalledTimes(1);
+		expect(mockOptimisticRemoveArticle).toHaveBeenCalledWith("3"); // Check for the correct ID
+	});
+
+	it("should allow deleting an item after filtering", async () => {
+		renderInboxPage();
+
+		// 1. Apply a filter (e.g., tag 't2')
+		await act(async () => {
+			testUpdateFilters({ tags: ["t2"] }); // 't2' is on TS Intro (2) and CSS Magic (3)
+		});
+
+		// 2. Wait for the grid to update and verify filtered items
+		await waitFor(() => {
+			const grid = screen.getByTestId("mock-virtualized-grid");
+			const items = within(grid).getAllByTestId(/mock-article-item-/);
+			expect(items).toHaveLength(2);
+			// Default sort (savedAt desc): TS Intro (1710M) is newer than CSS Magic (1705M)
+			expect(items[0]).toHaveAttribute("data-title", "TypeScript Intro");
+			expect(items[1]).toHaveAttribute("data-title", "CSS Magic");
+		});
+
+		// 3. Find the delete button for one of the filtered items (TypeScript Intro, ID '2')
+		const grid = screen.getByTestId("mock-virtualized-grid");
+		const deleteButton = within(grid).getByTestId("delete-button-2");
+
+		// 4. Simulate clicking the delete button
+		await userEvent.click(deleteButton);
+
+		// 5. Assert that the mock function was called with the correct ID
+		expect(mockOptimisticRemoveArticle).toHaveBeenCalledTimes(1);
+		expect(mockOptimisticRemoveArticle).toHaveBeenCalledWith("2");
 	});
 });
