@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchCloudItems } from "@/services/cloudSync";
 import {
 	type Article,
-	articlesDb,
+	// articlesDb, // Removed unused import
 	bulkSaveArticles,
 	getAllArticles,
 } from "@/services/db"; // Import bulkSaveArticles, articlesDb, remove saveArticle
@@ -214,7 +214,6 @@ export function useArticleSync(
 				});
 
 				// Save/Update fetched articles locally using bulkDocs
-				let savedOrUpdatedArticles: Article[] = [];
 				if (articlesToBulkSave.length > 0) {
 					console.log(
 						`Sync Hook: Attempting to bulk save/update ${articlesToBulkSave.length} synced articles locally...`,
@@ -223,48 +222,23 @@ export function useArticleSync(
 						const bulkResponse = await bulkSaveArticles(articlesToBulkSave);
 						console.log("Sync Hook: Bulk save operation completed.");
 
-						const successfulOps = bulkResponse.filter(
+						const successfulOpsCount = bulkResponse.filter(
 							(res): res is PouchDB.Core.Response => "ok" in res && res.ok,
-						);
-						const failedOps = bulkResponse.filter(
-							(res): res is PouchDB.Core.Error => "error" in res && !!res.error,
-						);
+						).length;
+						const failedOpsCount = bulkResponse.length - successfulOpsCount;
 
-						if (failedOps.length > 0) {
+						if (failedOpsCount > 0) {
 							console.warn(
-								`Sync Hook: Failed to bulk save/update ${failedOps.length} articles.`,
-								failedOps,
+								`Sync Hook: Failed to bulk save/update ${failedOpsCount} articles.`,
+								bulkResponse.filter(
+									(res): res is PouchDB.Core.Error =>
+										"error" in res && !!res.error,
+								),
 							);
 						}
-
-						if (successfulOps.length > 0) {
+						if (successfulOpsCount > 0) {
 							console.log(
-								`Sync Hook: Successfully saved/updated ${successfulOps.length} articles via bulk operation. Fetching updated docs...`,
-							);
-							// Fetch only the successfully updated documents to merge into state
-							const successfulIds = successfulOps.map((res) => res.id);
-							// Use getAllArticles with specific IDs (assuming it supports fetching by keys)
-							// If getAllArticles doesn't support fetching by keys directly, we might need
-							// to use articlesDb.allDocs({ keys: successfulIds, include_docs: true })
-							// For now, let's assume getAllArticles can handle it or adapt it later.
-							// NOTE: Re-implementing the fetch logic here for clarity as getAllArticles does filtering/sorting we don't need yet.
-							const updatedDocsResponse = await articlesDb.allDocs<Article>({
-								keys: successfulIds,
-								include_docs: true,
-							});
-							savedOrUpdatedArticles = updatedDocsResponse.rows
-								// Filter first to ensure type narrowing
-								.filter(
-									(
-										row,
-									): row is PouchDB.Core.AllDocsResponse<Article>["rows"][number] & {
-										doc: Article;
-									} => !("error" in row) && !!row.doc,
-								)
-								// Now map over the correctly typed filtered array
-								.map((row) => row.doc);
-							console.log(
-								`Sync Hook: Fetched ${savedOrUpdatedArticles.length} updated articles after bulk save.`,
+								`Sync Hook: Successfully saved/updated ${successfulOpsCount} articles via bulk operation.`,
 							);
 						}
 					} catch (bulkErr) {
@@ -272,26 +246,28 @@ export function useArticleSync(
 							"Sync Hook: Critical error during bulk save operation:",
 							bulkErr,
 						);
-						// Decide how to proceed - maybe rely on cache?
+						// Decide how to proceed - maybe rely on cache? Or rethrow?
+						// For now, we'll continue and try to fetch all local data.
 					}
 				}
 
-				// Merge updated/new articles with existing state
-				const currentArticlesMap = new Map(
-					articles.map((article) => [article._id, article]),
+				// --- Refetch ALL local articles after sync/bulk save ---
+				// This ensures the state reflects the absolute latest local data,
+				// including items potentially added just before the sync started.
+				console.log(
+					"Sync Hook: Refetching all local articles after cloud sync and bulk save...",
 				);
-				// Use for...of loop as suggested by Biome
-				for (const updatedArticle of savedOrUpdatedArticles) {
-					currentArticlesMap.set(updatedArticle._id, updatedArticle);
-				}
+				const allLocalArticles = await getAllArticles({ userIds: [userId] });
+				console.log(
+					`Sync Hook: Fetched ${allLocalArticles.length} articles from local DB after sync.`,
+				);
 
-				// Get all articles from the map, deduplicate, and sort
-				const mergedArticles = Array.from(currentArticlesMap.values());
+				// Deduplicate the freshly fetched local articles
 				const dedupedArticlesAfterSync =
-					deduplicateArticlesById(mergedArticles);
-				if (dedupedArticlesAfterSync.length < mergedArticles.length) {
+					deduplicateArticlesById(allLocalArticles);
+				if (dedupedArticlesAfterSync.length < allLocalArticles.length) {
 					console.log(
-						`Sync Hook: Removed ${mergedArticles.length - dedupedArticlesAfterSync.length} duplicate articles after merge.`,
+						`Sync Hook: Removed ${allLocalArticles.length - dedupedArticlesAfterSync.length} duplicate articles after refetch.`,
 					);
 				}
 
@@ -345,7 +321,7 @@ export function useArticleSync(
 		},
 		// Dependencies: These influence the cloud sync operation
 		// filterAndSortArticles and runOneTimeFileSync are stable imports from "@/lib/articleUtils"
-		[isSignedIn, userId, getToken, user, toast, articles], // Add 'articles' dependency
+		[isSignedIn, userId, getToken, user, toast], // Removed 'articles' dependency
 	);
 
 	// --- Main Load and Sync Effect ---
