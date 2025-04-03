@@ -26,6 +26,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t1"],
 		estimatedReadTime: 5,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "2",
@@ -41,6 +42,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t2"],
 		estimatedReadTime: 15,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "3",
@@ -56,6 +58,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t1", "t2"],
 		estimatedReadTime: 10,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "4",
@@ -71,6 +74,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t3"],
 		estimatedReadTime: 20,
 		type: "pdf",
+		version: 1, // Added version
 	},
 ];
 export const mockTags: Tag[] = [

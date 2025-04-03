@@ -67,6 +67,7 @@ async function processEpubFile(
 		estimatedReadTime: estimatedReadingTime,
 		fileName: file.name,
 		fileSize: fileBuffer.byteLength,
+		version: 1, // Added version
 	};
 }
 
@@ -108,6 +109,7 @@ async function processPdfFile(
 		estimatedReadTime: estimatedReadingTime,
 		fileName: file.name,
 		fileSize: fileBuffer.byteLength,
+		version: 1, // Added version
 	};
 }
 
@@ -151,6 +153,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					favorite: false,
 					tags: [],
 					readingProgress: 0, // Initialize progress
+					version: 1, // Add missing version
 				};
 
 				const savedArticle = await saveArticle(articleWithUser);
@@ -422,7 +425,8 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					throw new Error("Cannot delete article without revision ID.");
 				}
 
-				await deleteArticle(id, articleToDelete._rev);
+				// Call updated deleteArticle (soft delete) which only needs the ID
+				await deleteArticle(id);
 
 				toast({
 					title: "Article removed",

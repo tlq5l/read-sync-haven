@@ -153,6 +153,7 @@ describe("useArticleActions", () => {
 			type: "article" as const,
 			url: "https://url-example.com/test", // Ensure URL is included
 			status: "inbox" as const, // Correct type
+			version: 1, // Add missing version
 		};
 		vi.mocked(parseArticle).mockResolvedValue(mockParsedData);
 

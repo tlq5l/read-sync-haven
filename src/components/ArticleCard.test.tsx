@@ -54,6 +54,7 @@ describe("ArticleCard", () => {
 			type: "article",
 			siteName: "Example Website",
 			estimatedReadTime: 5,
+			version: 1,
 		};
 
 		renderCard(webArticle);
@@ -81,6 +82,7 @@ describe("ArticleCard", () => {
 			type: "pdf",
 			siteName: "PDF Document",
 			estimatedReadTime: 10,
+			version: 1,
 		};
 
 		renderCard(pdfArticle);
@@ -117,6 +119,7 @@ describe("ArticleCard", () => {
 			type: "epub",
 			siteName: "EPUB Book",
 			estimatedReadTime: 120,
+			version: 1,
 		};
 
 		renderCard(epubArticle);
@@ -151,6 +154,7 @@ describe("ArticleCard", () => {
 			favorite: false,
 			tags: [],
 			type: "article",
+			version: 1,
 		};
 
 		renderCard(articleWithMissingFields);
@@ -176,6 +180,7 @@ describe("ArticleCard", () => {
 			type: "pdf",
 			// siteName intentionally missing
 			estimatedReadTime: 15,
+			version: 1,
 		};
 
 		renderCard(pdfWithoutSiteName);
@@ -214,6 +219,7 @@ describe("ArticleCard", () => {
 			type: "epub",
 			// siteName intentionally missing
 			estimatedReadTime: 90,
+			version: 1,
 		};
 
 		renderCard(epubWithoutSiteName);
@@ -252,6 +258,7 @@ describe("ArticleCard", () => {
 			tags: [],
 			type: "article",
 			siteName: "Style Site",
+			version: 1,
 		};
 		renderCard(webArticle);
 		const cardElement = screen
@@ -278,6 +285,7 @@ describe("ArticleCard", () => {
 			tags: [],
 			type: "article",
 			siteName: "Structure Site",
+			version: 1,
 		};
 		renderCard(webArticle);
 
@@ -321,6 +329,7 @@ describe("ArticleCard", () => {
 			tags: [],
 			type: "article",
 			siteName: "Clamp Site",
+			version: 1,
 		};
 		renderCard(webArticle);
 
@@ -349,6 +358,7 @@ describe("ArticleCard", () => {
 			tags: [],
 			type: "article",
 			siteName: "Short Site",
+			version: 1,
 		};
 		renderCard(shortContentArticle);
 
@@ -376,6 +386,7 @@ describe("ArticleCard", () => {
 			favorite: false,
 			tags: [],
 			type: "article",
+			version: 1,
 		};
 		renderCard(unreadArticle);
 		expect(screen.getByTestId("unread-status")).toBeInTheDocument();
@@ -396,6 +407,7 @@ describe("ArticleCard", () => {
 			favorite: false,
 			tags: [],
 			type: "article",
+			version: 1,
 		};
 		renderCard(readArticle);
 		expect(screen.getByTestId("read-status")).toBeInTheDocument();
@@ -410,12 +422,16 @@ describe("ArticleCard", () => {
 			url: "https://example.com/null-title",
 			content: "<p>Content</p>",
 			excerpt: "Excerpt",
+			// Remove duplicate version property
 			savedAt: Date.now(),
 			status: "inbox",
 			isRead: false,
 			favorite: false,
 			tags: [],
 			type: "article",
+			version: 1, // This version property was already correctly added here
+			// version: 1, // Keep only one version property
+			// Removed duplicate version from here
 		};
 		renderCard(nullTitleArticle);
 		const card = screen.getByTestId("article-card");
@@ -436,6 +452,7 @@ describe("ArticleCard", () => {
 			favorite: false,
 			tags: [],
 			type: "article",
+			version: 1, // Added missing version
 		};
 		renderCard(nullExcerptArticle);
 		const card = screen.getByTestId("article-card");
