@@ -34,7 +34,7 @@ import {
 	Sun,
 	Video, // Icon for Videos
 } from "lucide-react";
-import React, { useEffect, useState } from "react"; // Add React default import
+import React, { useState } from "react"; // Add React default import, removed unused useEffect
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
@@ -48,7 +48,7 @@ export default function Sidebar() {
 	const { synchronizeAnimations } = useAnimation();
 	const { isSignedIn } = useAuth();
 	// const { user } = useUser(); // Removed as unused
-	const [isDarkMode, setIsDarkMode] = useState(false);
+	// const [isDarkMode, setIsDarkMode] = useState(false); // Removed: Using Tailwind dark mode variants (Corrected)
 
 	// Define categories for the dropdown (excluding "All")
 	const categories: ArticleCategory[] = [
@@ -75,25 +75,7 @@ export default function Sidebar() {
 		duration: 200,
 	});
 
-	useEffect(() => {
-		// Update dark mode state when theme changes
-		const darkMode =
-			theme === "dark" ||
-			(theme === "system" &&
-				window.matchMedia("(prefers-color-scheme: dark)").matches);
-		setIsDarkMode(darkMode);
-
-		// Add listener for system preference changes
-		const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-		const handleChange = (e: MediaQueryListEvent) => {
-			if (theme === "system") {
-				setIsDarkMode(e.matches);
-			}
-		};
-
-		mediaQuery.addEventListener("change", handleChange);
-		return () => mediaQuery.removeEventListener("change", handleChange);
-	}, [theme]);
+	// useEffect(() => { ... }, [theme]); // Removed: Tailwind handles dark mode (Corrected)
 
 	const isActive = (path: string) => location.pathname === path;
 	// const isViewActive = (view: "all" | "unread" | "favorites") =>
@@ -110,51 +92,27 @@ export default function Sidebar() {
 		});
 	};
 
-	// Define styles directly to ensure visibility
-	const styles = {
-		container: {
-			backgroundColor: isDarkMode ? "#131825" : "#ffffff",
-			color: isDarkMode ? "#e1e7ef" : "#333333",
-			borderColor: isDarkMode ? "#1f2937" : "#e5e7eb",
-		},
-		header: {
-			color: isDarkMode ? "#ffffff" : "#111827",
-			fontWeight: "bold",
-		},
-		navLabel: {
-			color: isDarkMode ? "#9ca3af" : "#6b7280",
-			fontWeight: 500,
-		},
-		link: {
-			color: isDarkMode ? "#e1e7ef" : "#4b5563",
-		},
-		activeLink: {
-			backgroundColor: isDarkMode ? "#1e293b" : "#f3f4f6",
-			color: isDarkMode ? "#ffffff" : "#111827",
-		},
-		userGreeting: {
-			color: isDarkMode ? "#d1d5db" : "#4b5563",
-		},
-	};
+	// const styles = { ... }; // Removed: Using Tailwind classes (Corrected)
 
 	return (
 		<div
 			ref={sidebarAnimation.ref}
 			className={cn(
 				"h-screen flex flex-col border-r gpu-accelerated",
+				"bg-white text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-700", // Added Tailwind classes
 				"transition-all ease-in-out duration-200",
 				collapsed ? "w-16" : "w-64",
 			)}
-			style={styles.container}
+			// style={styles.container} // Removed style prop
 		>
 			<div
-				className="flex items-center p-4 border-b"
-				style={{ borderColor: styles.container.borderColor }}
+				className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700" // Corrected: Single className with merged styles
+				// style={{ borderColor: styles.container.borderColor }} // Style prop correctly removed
 			>
 				{!collapsed && (
 					<h1
-						className="text-xl font-bold transition-opacity duration-200"
-						style={styles.header}
+						className="text-xl font-bold transition-opacity duration-200 text-gray-900 dark:text-white" // Corrected: Single className with merged styles
+						// style={styles.header} // Style prop correctly removed
 					>
 						Read Sync Haven
 					</h1>
@@ -195,14 +153,17 @@ export default function Sidebar() {
 						<Button
 							variant="ghost"
 							className={cn(
-								"w-full flex items-center gap-3 py-2 transition-all duration-200",
-								collapsed ? "justify-center" : "justify-start", // Center icon when collapsed
+								"w-full flex items-center gap-3 py-2 transition-all duration-200", // Original cn()
+								collapsed ? "justify-center" : "justify-start", // Original cn() arg
+								"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100", // Merged base styles
+								isActive("/") &&
+									"bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100", // Merged active styles
 							)}
 							onClick={() => {
 								setCurrentView("all"); // Reset view when going home
 								navigate("/");
 							}}
-							style={isActive("/") ? styles.activeLink : styles.link}
+							// style={isActive("/") ? styles.activeLink : styles.link} // Style prop correctly removed
 						>
 							<Home size={20} />
 							{!collapsed && (
@@ -217,8 +178,9 @@ export default function Sidebar() {
 						<Button
 							variant="ghost"
 							className={cn(
-								"w-full flex items-center gap-3 py-2 transition-all duration-200",
-								collapsed ? "justify-center" : "justify-start", // Center icon when collapsed
+								"w-full flex items-center gap-3 py-2 transition-all duration-200", // Original cn()
+								collapsed ? "justify-center" : "justify-start", // Original cn() arg
+								"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100", // Merged base styles
 							)}
 							onClick={() => {
 								if (!collapsed) {
@@ -227,7 +189,7 @@ export default function Sidebar() {
 								setSelectedCategory(null); // Clear category filter
 								navigate("/inbox"); // Navigate to the main library view
 							}}
-							style={styles.link} // Use base link style for the trigger
+							// style={styles.link} // Style prop correctly removed
 						>
 							{!collapsed && // Only show chevron when not collapsed
 								(isLibraryOpen ? (
@@ -258,13 +220,19 @@ export default function Sidebar() {
 											key={cat ?? "all"}
 											variant="ghost"
 											size="sm"
-											className="w-full flex items-center justify-start gap-2 py-1 h-8 text-sm"
+											className={cn(
+												// Corrected: Single className with merged styles
+												"w-full flex items-center justify-start gap-2 py-1 h-8 text-sm", // Original classes
+												"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100", // Merged base styles
+												isActiveCategory &&
+													"bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100", // Merged active styles
+											)}
 											onClick={() => {
 												setSelectedCategory(cat);
 												// Optional: navigate to a base view if needed
 												// navigate("/inbox");
 											}}
-											style={isActiveCategory ? styles.activeLink : styles.link}
+											// style={isActiveCategory ? styles.activeLink : styles.link} // Style prop correctly removed
 										>
 											{/* Render the icon */}
 											{React.createElement(categoryIcons[cat], {
@@ -287,93 +255,98 @@ export default function Sidebar() {
 					{/* Remove padding when collapsed */}
 					{!collapsed && (
 						<h3
-							className="text-sm font-medium mb-2 transition-opacity duration-200"
-							style={styles.navLabel}
+							className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200" // Corrected: Single className with merged styles
+							// style={styles.navLabel} // Style prop correctly removed
 						>
 							Navigation
 						</h3>
 					)}
-					<TransitionGroup
-						groupId="sidebar-navigation"
-						className={cn("space-y-1")} // No padding needed here directly
-						// Removed staggerChildren and staggerDelay to prevent animation delay on theme switch
-						autoAnimate={true}
-					>
+					<div className={cn("space-y-1")}>
+						{" "}
+						{/* Replaced TransitionGroup with plain div */}
 						{/* Show these navigation items regardless of authentication state */}
-
-						<TransitionItem showFrom="left" className="w-full">
+						{/* Settings Link */}
+						<Button
+							variant="ghost"
+							className={cn(
+								"w-full flex items-center gap-3 py-2 transition-all duration-200",
+								collapsed ? "justify-center" : "justify-start",
+							)}
+							asChild
+						>
+							<Link
+								to="/settings"
+								className={cn(
+									"flex items-center gap-3 py-2",
+									"w-full",
+									"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+									isActive("/settings") &&
+										"bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100",
+									collapsed ? "justify-center" : "justify-start",
+								)}
+							>
+								<Settings size={20} />
+								{!collapsed && (
+									<span className="transition-opacity duration-200">
+										Settings
+									</span>
+								)}
+							</Link>
+						</Button>
+						{/* Theme Toggle Button */}
+						<Button
+							variant="ghost"
+							className={cn(
+								"w-full flex items-center gap-3 py-2 transition-all duration-200",
+								collapsed ? "justify-center" : "justify-start",
+								"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+							)}
+							onClick={toggleTheme}
+						>
+							{theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
+							{!collapsed && (
+								<span className="transition-opacity duration-200">
+									{theme === "dark" ? "Dark Mode" : "Light Mode"}
+								</span>
+							)}
+						</Button>
+						{/* Sign In Link (Conditional) */}
+						{!isSignedIn && (
 							<Button
 								variant="ghost"
 								className={cn(
 									"w-full flex items-center gap-3 py-2 transition-all duration-200",
-									collapsed ? "justify-center" : "justify-start", // Center icon when collapsed
+									collapsed ? "justify-center" : "justify-start",
 								)}
 								asChild
 							>
 								<Link
-									to="/settings"
-									style={
-										isActive("/settings") ? styles.activeLink : styles.link
-									}
+									to="/sign-in"
+									className={cn(
+										"flex items-center gap-3 py-2",
+										"w-full",
+										"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+										collapsed ? "justify-center" : "justify-start",
+									)}
 								>
-									<Settings size={20} />
+									<LogIn size={20} />
 									{!collapsed && (
 										<span className="transition-opacity duration-200">
-											Settings
+											Sign In
 										</span>
 									)}
 								</Link>
 							</Button>
-						</TransitionItem>
-
-						<TransitionItem showFrom="left" className="w-full">
-							<Button
-								variant="ghost"
-								className={cn(
-									"w-full flex items-center gap-3 py-2 transition-all duration-200",
-									collapsed ? "justify-center" : "justify-start", // Center icon when collapsed
-								)}
-								onClick={toggleTheme}
-								style={styles.link}
-							>
-								{theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
-								{!collapsed && (
-									<span className="transition-opacity duration-200">
-										{theme === "dark" ? "Dark Mode" : "Light Mode"}
-									</span>
-								)}
-							</Button>
-						</TransitionItem>
-
-						{!isSignedIn && (
-							<TransitionItem showFrom="left" className="w-full">
-								<Button
-									variant="ghost"
-									className={cn(
-										"w-full flex items-center gap-3 py-2 transition-all duration-200",
-										collapsed ? "justify-center" : "justify-start", // Center icon when collapsed
-									)}
-									asChild
-								>
-									<Link to="/sign-in" style={styles.link}>
-										<LogIn size={20} />
-										{!collapsed && (
-											<span className="transition-opacity duration-200">
-												Sign In
-											</span>
-										)}
-									</Link>
-								</Button>
-							</TransitionItem>
 						)}
-					</TransitionGroup>
+					</div>{" "}
+					{/* Closing plain div */}
 				</div>
 			</div>
 
 			{isSignedIn && (
 				<div
-					className="p-4 border-t"
-					style={{ borderColor: styles.container.borderColor }}
+					className="p-4 border-t border-gray-200 dark:border-gray-700" // Corrected: Single className with merged styles
+					// style={{ borderColor: styles.container.borderColor }} // Style prop correctly removed
 				>
 					<Button className="w-full gap-2 transition-all duration-200" asChild>
 						<Link to="/add">
