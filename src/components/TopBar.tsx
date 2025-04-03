@@ -1,11 +1,6 @@
 // Removed unused React import
 import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import {} from "@/components/ui/dropdown-menu"; // Removed DropdownMenu related imports
 import {
 	Select,
 	SelectContent,
@@ -15,15 +10,15 @@ import {
 } from "@/components/ui/select";
 import { useArticles } from "@/context/ArticleContext";
 import type { ArticleSortField } from "@/types/articles";
-import { ArrowDownUp, ChevronDown, Library } from "lucide-react";
+import { ArrowDownUp } from "lucide-react"; // Removed ChevronDown, Library
 import { Link, useLocation } from "react-router-dom";
 
 // Removed unused getSortLabel function
 
 export default function TopBar() {
 	const {
-		currentView,
-		setCurrentView,
+		// currentView, // Removed unused variable
+		// setCurrentView, // Removed unused variable
 		sortCriteria,
 		setSortField,
 		toggleSortDirection,
@@ -36,35 +31,7 @@ export default function TopBar() {
 		<div className="flex items-center justify-between p-2 px-4 border-b bg-background text-foreground sticky top-0 z-10">
 			{/* Left Section: Library Dropdown and Views */}
 			<div className="flex items-center space-x-2">
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant="ghost" className="flex items-center gap-2 px-2">
-							<Library size={18} />
-							<span className="font-medium">Library</span>
-							<ChevronDown size={16} className="opacity-50" />
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align="start">
-						<DropdownMenuItem
-							onClick={() => setCurrentView("all")}
-							disabled={currentView === "all"}
-						>
-							All
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							onClick={() => setCurrentView("unread")}
-							disabled={currentView === "unread"}
-						>
-							Unread
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							onClick={() => setCurrentView("favorites")}
-							disabled={currentView === "favorites"}
-						>
-							Favorites
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
+				{/* Library Dropdown Removed */}
 
 				{/* Navigation Links */}
 				<Button
