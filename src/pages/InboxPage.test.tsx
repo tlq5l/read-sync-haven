@@ -2,11 +2,12 @@
 import type { Article } from "@/services/db";
 // Removed unused import: filterArticles, sortArticles
 import {
-    act,
-    cleanup,
-    render,
-    screen,
-    waitFor,
+	act,
+	cleanup,
+	render,
+	screen,
+	waitFor,
+	within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -16,11 +17,11 @@ import InboxPage from "./InboxPage"; // The component to test
 import type React from "react"; // Use type import
 // Import the mock provider and test utilities
 import {
-    MockArticleProvider,
-    mockRawArticles,
-    testSetSort,
-    testToggleSortDirection,
-    testUpdateFilters,
+	MockArticleProvider,
+	mockRawArticles,
+	testSetSort,
+	testToggleSortDirection,
+	testUpdateFilters,
 } from "../test-utils/MockArticleProvider"; // Adjusted path
 
 // --- Mocks ---
@@ -222,10 +223,18 @@ describe("InboxPage Integration Tests", () => {
 		const articleCards = screen.getAllByRole("link", { name: /read/i }); // Links within cards
 		expect(articleCards).toHaveLength(mockRawArticles.length);
 		// Check order based on text content (assuming default sort is date desc)
-		expect(articleCards[0].textContent).toBe("Read TypeScript Intro"); // Newest
-		expect(articleCards[1].textContent).toBe("Read My PDF");
-		expect(articleCards[2].textContent).toBe("Read CSS Magic");
-		expect(articleCards[3].textContent).toBe("Read React Fun"); // Oldest
+		expect(
+			within(articleCards[0]).getByRole("heading", { level: 3 }).textContent,
+		).toBe("TypeScript Intro"); // Newest
+		expect(
+			within(articleCards[1]).getByRole("heading", { level: 3 }).textContent,
+		).toBe("My PDF");
+		expect(
+			within(articleCards[2]).getByRole("heading", { level: 3 }).textContent,
+		).toBe("CSS Magic");
+		expect(
+			within(articleCards[3]).getByRole("heading", { level: 3 }).textContent,
+		).toBe("React Fun"); // Oldest
 	});
 
 	it("should sort articles by title ascending using test utility", async () => {
@@ -243,10 +252,22 @@ describe("InboxPage Integration Tests", () => {
 				expect(articleLinks).toHaveLength(mockRawArticles.length);
 
 				// Check order based on text content (title ascending)
-				expect(articleLinks[0].textContent).toBe("Read CSS Magic");
-				expect(articleLinks[1].textContent).toBe("Read My PDF");
-				expect(articleLinks[2].textContent).toBe("Read React Fun");
-				expect(articleLinks[3].textContent).toBe("Read TypeScript Intro");
+				expect(
+					within(articleLinks[0]).getByRole("heading", { level: 3 })
+						.textContent,
+				).toBe("CSS Magic");
+				expect(
+					within(articleLinks[1]).getByRole("heading", { level: 3 })
+						.textContent,
+				).toBe("My PDF");
+				expect(
+					within(articleLinks[2]).getByRole("heading", { level: 3 })
+						.textContent,
+				).toBe("React Fun");
+				expect(
+					within(articleLinks[3]).getByRole("heading", { level: 3 })
+						.textContent,
+				).toBe("TypeScript Intro");
 			},
 			{ timeout: 2000 },
 		);
@@ -263,13 +284,15 @@ describe("InboxPage Integration Tests", () => {
 			const articleCards = screen.getAllByRole("link", { name: /read/i });
 
 			// Get text content from links
-			const linkTexts = articleCards.map((link) => link.textContent);
+			const linkTexts = articleCards.map(
+				(link) => within(link).getByRole("heading", { level: 3 }).textContent,
+			);
 
 			// After toggle, should go from newest->oldest to oldest->newest (Date Asc)
-			expect(linkTexts[0]).toBe("Read React Fun"); // Oldest first
-			expect(linkTexts[1]).toBe("Read CSS Magic");
-			expect(linkTexts[2]).toBe("Read My PDF");
-			expect(linkTexts[3]).toBe("Read TypeScript Intro"); // Newest
+			expect(linkTexts[0]).toBe("React Fun"); // Oldest first
+			expect(linkTexts[1]).toBe("CSS Magic");
+			expect(linkTexts[2]).toBe("My PDF");
+			expect(linkTexts[3]).toBe("TypeScript Intro"); // Newest
 		});
 	});
 
@@ -277,7 +300,7 @@ describe("InboxPage Integration Tests", () => {
 		renderInboxPage();
 
 		await act(async () => {
-			testUpdateFilters({ siteNames: ["reactjs.org"] });
+			testUpdateFilters({ siteNames: ["React.dev"] });
 		});
 
 		await waitFor(() => {
@@ -285,7 +308,9 @@ describe("InboxPage Integration Tests", () => {
 			const articleLinks = screen.getAllByRole("link", { name: /read/i });
 			expect(articleLinks).toHaveLength(1);
 			// Check the text content of the filtered link
-			expect(articleLinks[0].textContent).toBe("Read React Fun");
+			expect(
+				within(articleLinks[0]).getByRole("heading", { level: 3 }).textContent,
+			).toBe("React Fun");
 		});
 	});
 
@@ -301,7 +326,9 @@ describe("InboxPage Integration Tests", () => {
 			const articleLinks = screen.getAllByRole("link", { name: /read/i });
 			expect(articleLinks).toHaveLength(1);
 			// Check the text content of the filtered link
-			expect(articleLinks[0].textContent).toBe("Read My PDF");
+			expect(
+				within(articleLinks[0]).getByRole("heading", { level: 3 }).textContent,
+			).toBe("My PDF");
 		});
 	});
 
@@ -309,7 +336,7 @@ describe("InboxPage Integration Tests", () => {
 		renderInboxPage();
 
 		await act(async () => {
-			testUpdateFilters({ selectedTags: ["t1"] }); // t1 is on CSS Magic and React Fun articles
+			testUpdateFilters({ tags: ["t1"] }); // t1 is on CSS Magic and React Fun articles
 		});
 
 		await waitFor(() => {
@@ -318,12 +345,14 @@ describe("InboxPage Integration Tests", () => {
 			expect(articleLinks).toHaveLength(2); // Articles with tag 't1'
 
 			// Get text content from the links
-			const linkTexts = articleLinks.map((link) => link.textContent);
+			const linkTexts = articleLinks.map(
+				(link) => within(link).getByRole("heading", { level: 3 }).textContent,
+			);
 
 			// Check content - order depends on default sort (savedAt desc)
 			// CSS Magic (1705M) is newer than React Fun (1700M)
-			expect(linkTexts[0]).toBe("Read CSS Magic"); // Already fixed whitespace in mock
-			expect(linkTexts[1]).toBe("Read React Fun");
+			expect(linkTexts[0]).toBe("CSS Magic");
+			expect(linkTexts[1]).toBe("React Fun");
 		});
 	});
 

@@ -354,7 +354,7 @@ describe("Worker Integration Tests", () => {
 			const res = await worker.fetch(req, env, ctx);
 			// TODO: Revisit mocking strategy. Currently cannot override MSW handler
 			// for 502 failure due to TS rootDir constraint. Default handler returns 200.
-			expect(res.status).toBe(200); // Adjusting expectation to match current mock behavior
+			expect(res.status).toBe(502); // Expect 502 when GCF fetch fails
 		});
 	});
 

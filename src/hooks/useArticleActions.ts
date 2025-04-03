@@ -163,6 +163,26 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				// Trigger refresh after successful save
 				await refreshArticles();
 
+				// Sync to Cloud (fire and forget)
+				saveItemToCloud(savedArticle)
+					.then((status: CloudSyncStatus) => {
+						if (status === "success") {
+							console.log(
+								`Successfully synced article ${savedArticle._id} to cloud.`,
+							);
+						} else {
+							console.warn(
+								`Sync for article ${savedArticle._id} failed with status: ${status}`,
+							);
+						}
+					})
+					.catch((err) => {
+						console.error(
+							`Error syncing article ${savedArticle._id} to cloud:`,
+							err,
+						);
+					});
+
 				return savedArticle;
 			} catch (err) {
 				console.error("Failed to add article by URL:", err);

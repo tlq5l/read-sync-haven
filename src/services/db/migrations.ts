@@ -63,9 +63,6 @@ export async function updateMissingMetadata(): Promise<number> {
 				// Store initial missing status to ensure we only update if needed
 				const initiallyMissingSiteName = !doc.siteName;
 				const initiallyMissingReadTime = !doc.estimatedReadTime;
-				const initiallyMissingExcerpt =
-					!doc.excerpt || doc.excerpt.trim() === "";
-				const hasContentForExcerpt = !!doc.content && doc.content.trim() !== "";
 
 				let needsUpdate = false; // Use a flag to track if a necessary update occurred
 				const docToUpdate = { ...doc }; // Clone doc
