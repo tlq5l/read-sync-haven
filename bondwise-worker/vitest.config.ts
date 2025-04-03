@@ -27,7 +27,7 @@ export default defineConfig({
 			},
 		},
 		// Optional: Add setup files if needed
-		// setupFiles: ['./test/setup.ts'],
+		setupFiles: ["./src/testSetup.ts"], // Load the worker-specific setup file
 		globals: true, // Use Vitest's global APIs
 		// Include source files in coverage report
 		coverage: {
