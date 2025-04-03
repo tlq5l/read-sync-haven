@@ -649,7 +649,10 @@ describe("useArticleSync", () => {
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
 		expect(mockOperationsQueueDbAllDocs).toHaveBeenCalled();
-		expect(mockSaveItemToCloud).toHaveBeenCalledWith(localUpdatedArticle, "test-token"); // Expect token
+		expect(mockSaveItemToCloud).toHaveBeenCalledWith(
+			localUpdatedArticle,
+			"test-token",
+		); // Expect token
 		expect(mockOperationsQueueDbBulkDocs).toHaveBeenCalledWith(
 			expect.arrayContaining([
 				expect.objectContaining({ _id: "qupd-1", _deleted: true }),
@@ -660,5 +663,65 @@ describe("useArticleSync", () => {
 		expect(result.current.articles).toHaveLength(1); // Should have the updated article
 		expect(result.current.articles[0].version).toBe(2);
 		expect(result.current.articles[0].title).toBe(localUpdatedArticle.title);
+	});
+
+	it("should skip offline queue processing if token is null", async () => {
+		// Mock getToken to return null for this specific test
+		stableGetToken.mockResolvedValueOnce(null); // Override the default mock
+
+		// Setup a dummy queue item to ensure queue would be processed if token existed
+		const queuedOpDoc: QueuedOperation &
+			PouchDB.Core.IdMeta &
+			PouchDB.Core.RevisionIdMeta = {
+			_id: "qnull-1",
+			_rev: "qrev-null",
+			type: "delete",
+			docId: "null-doc",
+			timestamp: Date.now(),
+			retryCount: 0,
+		};
+		const queuedOpRow = {
+			doc: queuedOpDoc,
+			id: queuedOpDoc._id,
+			key: queuedOpDoc._id,
+			value: { rev: queuedOpDoc._rev },
+		};
+		mockOperationsQueueDbAllDocs.mockResolvedValue({
+			offset: 0,
+			total_rows: 1,
+			rows: [queuedOpRow],
+		});
+
+		// Mock other functions to allow sync to proceed after queue skip attempt
+		mockGetAllArticles.mockResolvedValue([]);
+		mockFetchCloudItems.mockResolvedValue([]);
+
+		// Spy on console.error to check for the specific warning
+		const consoleErrorSpy = vi
+			.spyOn(console, "error")
+			.mockImplementation(() => {});
+
+		const { result } = renderHook(() => useArticleSync(true));
+
+		// Wait for the sync process to potentially throw or complete
+		await waitFor(() => {
+			// The sync process should throw because token is null after the queue check
+			expect(result.current.error).not.toBeNull();
+			expect(result.current.error?.message).toContain(
+				"Authentication token missing, cannot sync.",
+			);
+		});
+
+		// Check that the specific error message for skipping queue was logged
+		expect(consoleErrorSpy).toHaveBeenCalledWith(
+			"Sync Hook: Cannot process offline queue, authentication token is missing.",
+		);
+		// Ensure queue processing functions were NOT called
+		expect(mockDeleteItemFromCloud).not.toHaveBeenCalled();
+		expect(mockSaveItemToCloud).not.toHaveBeenCalled();
+		expect(mockOperationsQueueDbBulkDocs).not.toHaveBeenCalled();
+
+		// Clean up the spy
+		consoleErrorSpy.mockRestore();
 	});
 });
