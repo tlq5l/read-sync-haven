@@ -19,11 +19,11 @@ import InboxPage from "./InboxPage"; // The component to test
 // Import the mock provider and test utilities
 import {
 	MockArticleProvider,
+	mockOptimisticRemoveArticle, // Import the exported mock function
 	mockRawArticles,
 	testSetSort,
 	testToggleSortDirection,
 	testUpdateFilters,
-	mockOptimisticRemoveArticle, // Import the exported mock function
 } from "../test-utils/MockArticleProvider"; // Adjusted path
 
 // --- Mocks ---

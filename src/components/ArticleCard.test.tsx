@@ -236,4 +236,209 @@ describe("ArticleCard", () => {
 		// Also check the read time (this query seems fine)
 		expect(screen.getByText("90 min read")).toBeInTheDocument();
 	});
+
+	// Test for structure and styling related to fixed height and content alignment
+	it("should have fixed height and flex column classes", () => {
+		const webArticle: Article = {
+			_id: "article-style-test",
+			title: "Style Test",
+			url: "https://example.com/style",
+			content: "<p>Content</p>",
+			excerpt: "Excerpt",
+			savedAt: Date.now(),
+			status: "inbox",
+			isRead: false,
+			favorite: false,
+			tags: [],
+			type: "article",
+			siteName: "Style Site",
+		};
+		renderCard(webArticle);
+		const cardElement = screen
+			.getByTestId("article-card")
+			.closest(".flex.flex-col.h-\\[200px\\]"); // Check the parent Card element
+		expect(cardElement).toBeInTheDocument();
+		expect(cardElement).toHaveClass("flex");
+		expect(cardElement).toHaveClass("flex-col");
+		expect(cardElement).toHaveClass("h-[200px]");
+		expect(cardElement).toHaveClass("overflow-hidden");
+	});
+
+	it("should have correct internal flex structure for content alignment", () => {
+		const webArticle: Article = {
+			_id: "article-structure-test",
+			title: "Structure Test",
+			url: "https://example.com/structure",
+			content: "<p>Content</p>",
+			excerpt: "Excerpt",
+			savedAt: Date.now(),
+			status: "inbox",
+			isRead: false,
+			favorite: false,
+			tags: [],
+			type: "article",
+			siteName: "Structure Site",
+		};
+		renderCard(webArticle);
+
+		// Check CardContent flex properties
+		const cardContent = screen
+			.getByTestId("article-card")
+			.querySelector(".p-0"); // This corresponds to CardContent
+		expect(cardContent).toHaveClass("flex-grow");
+		expect(cardContent).toHaveClass("flex");
+		expect(cardContent).toHaveClass("flex-col");
+
+		// Check inner p-4 div flex properties
+		const innerDiv = cardContent?.querySelector(".p-4");
+		expect(innerDiv).toHaveClass("flex");
+		expect(innerDiv).toHaveClass("flex-col");
+		expect(innerDiv).toHaveClass("flex-grow");
+
+		// Check the wrapper around title/excerpt has flex-grow
+		const titleExcerptWrapper = innerDiv?.querySelector(".flex-grow.mb-3");
+		expect(titleExcerptWrapper).toBeInTheDocument();
+
+		// Check the metadata section has mt-auto
+		const metadataDiv = innerDiv?.querySelector(".mt-auto");
+		expect(metadataDiv).toBeInTheDocument();
+		expect(metadataDiv).toHaveClass("mt-auto");
+	});
+
+	it("should apply line-clamp-2 to title and excerpt", () => {
+		const webArticle: Article = {
+			_id: "article-clamp-test",
+			title: "Very Long Title That Should Definitely Be Clamped After Two Lines",
+			url: "https://example.com/clamp",
+			content: "<p>Content</p>",
+			excerpt:
+				"This is a very long excerpt that absolutely needs to be clamped because it goes on and on and on, far beyond what should be displayed in a small card preview area.",
+			savedAt: Date.now(),
+			status: "inbox",
+			isRead: false,
+			favorite: false,
+			tags: [],
+			type: "article",
+			siteName: "Clamp Site",
+		};
+		renderCard(webArticle);
+
+		const card = screen.getByTestId("article-card");
+		const titleElement = within(card).getByRole("heading", { level: 3 });
+		const excerptElement = within(card).getByText(
+			/This is a very long excerpt/,
+			{ exact: false },
+		); // Find the paragraph
+
+		expect(titleElement).toHaveClass("line-clamp-2");
+		expect(excerptElement).toHaveClass("line-clamp-2");
+	});
+
+	it("should maintain flex structure with short content", () => {
+		const shortContentArticle: Article = {
+			_id: "article-short-content",
+			title: "Short",
+			url: "https://example.com/short",
+			content: "<p>Tiny</p>",
+			excerpt: "Brief.",
+			savedAt: Date.now(),
+			status: "inbox",
+			isRead: false,
+			favorite: false,
+			tags: [],
+			type: "article",
+			siteName: "Short Site",
+		};
+		renderCard(shortContentArticle);
+
+		const card = screen.getByTestId("article-card");
+		const cardContent = card.querySelector(".p-0");
+		const innerDiv = cardContent?.querySelector(".p-4");
+		const titleExcerptWrapper = innerDiv?.querySelector(".flex-grow.mb-3");
+		const metadataDiv = innerDiv?.querySelector(".mt-auto");
+
+		expect(titleExcerptWrapper).toBeInTheDocument();
+		expect(metadataDiv).toBeInTheDocument();
+		expect(metadataDiv).toHaveClass("mt-auto");
+	});
+
+	it("should display 'Unread' status text when isRead is false", () => {
+		const unreadArticle: Article = {
+			_id: "unread-article",
+			title: "Unread Test",
+			url: "https://example.com/unread",
+			content: "<p>Content</p>",
+			excerpt: "Excerpt",
+			savedAt: Date.now(),
+			status: "inbox",
+			isRead: false, // Explicitly false
+			favorite: false,
+			tags: [],
+			type: "article",
+		};
+		renderCard(unreadArticle);
+		expect(screen.getByTestId("unread-status")).toBeInTheDocument();
+		expect(screen.getByTestId("unread-status")).toHaveTextContent("Unread");
+		expect(screen.queryByTestId("read-status")).not.toBeInTheDocument();
+	});
+
+	it("should display 'Read' status text when isRead is true", () => {
+		const readArticle: Article = {
+			_id: "read-article",
+			title: "Read Test",
+			url: "https://example.com/read",
+			content: "<p>Content</p>",
+			excerpt: "Excerpt",
+			savedAt: Date.now(),
+			status: "inbox",
+			isRead: true, // Explicitly true
+			favorite: false,
+			tags: [],
+			type: "article",
+		};
+		renderCard(readArticle);
+		expect(screen.getByTestId("read-status")).toBeInTheDocument();
+		expect(screen.getByTestId("read-status")).toHaveTextContent("Read");
+		expect(screen.queryByTestId("unread-status")).not.toBeInTheDocument();
+	});
+
+	it("should display 'Untitled' when title is null or empty", () => {
+		const nullTitleArticle: Article = {
+			_id: "null-title",
+			title: "", // Empty title
+			url: "https://example.com/null-title",
+			content: "<p>Content</p>",
+			excerpt: "Excerpt",
+			savedAt: Date.now(),
+			status: "inbox",
+			isRead: false,
+			favorite: false,
+			tags: [],
+			type: "article",
+		};
+		renderCard(nullTitleArticle);
+		const card = screen.getByTestId("article-card");
+		const titleElement = within(card).getByRole("heading", { level: 3 });
+		expect(titleElement).toHaveTextContent("Untitled");
+	});
+
+	it("should display 'No excerpt available' when excerpt is null or empty", () => {
+		const nullExcerptArticle: Article = {
+			_id: "null-excerpt",
+			title: "Title Exists",
+			url: "https://example.com/null-excerpt",
+			content: "<p>Content</p>",
+			excerpt: "", // Empty excerpt
+			savedAt: Date.now(),
+			status: "inbox",
+			isRead: false,
+			favorite: false,
+			tags: [],
+			type: "article",
+		};
+		renderCard(nullExcerptArticle);
+		const card = screen.getByTestId("article-card");
+		const excerptElement = within(card).getByText("No excerpt available");
+		expect(excerptElement).toBeInTheDocument();
+	});
 });

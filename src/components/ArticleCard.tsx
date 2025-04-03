@@ -108,7 +108,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 			ref={cardAnimation.ref}
 			tabIndex={0} // Make card focusable
 			onKeyDown={handleKeyDown} // Add keydown handler
-			className="overflow-hidden transition-all gpu-accelerated duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" // Add focus styles
+			className="flex flex-col h-[200px] overflow-hidden transition-all gpu-accelerated duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" // Add focus styles, FIXED height, and flex
 			style={{
 				opacity: 0,
 				transform: "translateY(20px) translateZ(0)",
@@ -118,11 +118,16 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 			}}
 		>
 			<Link to={`/read/${article._id}`} data-testid="article-card">
-				<CardContent className="p-0">
-					<div className="p-4">
+				<CardContent className="p-0 flex-grow flex flex-col">
+					{" "}
+					{/* Keep CardContent growing */}
+					{/* Allow content to grow */}
+					<div className="p-4 flex flex-col flex-grow">
+						{" "}
+						{/* Make inner div grow, remove justify-between */}
 						{article.isRead ? (
 							<div className="flex justify-between items-start mb-2">
-								<span className="text-xs text-muted-foreground">Read</span>
+								<span className="text-xs text-muted-foreground" data-testid="read-status">Read</span>
 								<div className="flex items-center gap-1">
 									{/* Move to Later Button */}
 									<Button
@@ -198,7 +203,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 							</div>
 						) : (
 							<div className="flex justify-between items-start mb-2">
-								<span className="text-xs font-medium text-bondwise-500">
+								<span className="text-xs font-medium text-bondwise-500" data-testid="unread-status">
 									Unread
 								</span>
 								<div className="flex items-center gap-1">
@@ -275,13 +280,19 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 								</div>
 							</div>
 						)}
-						<h3 className="text-lg font-medium line-clamp-2 mb-2">
-							{article.title || "Untitled"}
-						</h3>
-						<p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-							{article.excerpt || "No excerpt available"}
-						</p>
-						<div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+						{/* Wrap title and excerpt and make this section grow */}
+						<div className="flex-grow mb-3">
+							<h3 className="text-lg font-medium line-clamp-2 mb-2">
+								{article.title || "Untitled"}
+							</h3>
+							<p className="text-sm text-muted-foreground line-clamp-2">
+								{article.excerpt || "No excerpt available"}
+							</p>
+						</div>
+						{/* Keep bottom metadata section */}
+						<div className="flex items-center justify-between text-xs text-muted-foreground mt-auto">
+							{" "}
+							{/* Use mt-auto to push to bottom */}
 							<span>
 								{article.type === "pdf" && !article.siteName
 									? "PDF Document"
@@ -294,6 +305,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 								<span>{getFormattedDate()}</span>
 							</div>
 						</div>
+						{/* Spacer div removed, rely on justify-between */}
 					</div>
 				</CardContent>
 			</Link>
