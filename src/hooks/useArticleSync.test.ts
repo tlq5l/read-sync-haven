@@ -724,4 +724,103 @@ describe("useArticleSync", () => {
 		// Clean up the spy
 		consoleErrorSpy.mockRestore();
 	});
+
+	it("should handle API 401 error during offline delete processing", async () => {
+		const queuedDeleteOpDoc: QueuedOperation &
+			PouchDB.Core.IdMeta &
+			PouchDB.Core.RevisionIdMeta = {
+			_id: "qdel-fail-1",
+			_rev: "qrev-fail-1",
+			type: "delete",
+			docId: "fail-doc-1",
+			timestamp: Date.now(),
+			retryCount: 0,
+		};
+		const queuedDeleteOpRow = {
+			doc: queuedDeleteOpDoc,
+			id: queuedDeleteOpDoc._id,
+			key: queuedDeleteOpDoc._id,
+			value: { rev: queuedDeleteOpDoc._rev },
+		};
+		mockOperationsQueueDbAllDocs.mockResolvedValue({
+			offset: 0,
+			total_rows: 1,
+			rows: [queuedDeleteOpRow],
+		});
+
+		// Mock deleteItemFromCloud to return unauthorized
+		mockDeleteItemFromCloud.mockResolvedValueOnce("unauthorized");
+
+		// Mock other calls to let sync proceed
+		mockGetAllArticles.mockResolvedValue([]);
+		mockFetchCloudItems.mockResolvedValue([]);
+
+		const consoleWarnSpy = vi
+			.spyOn(console, "warn")
+			.mockImplementation(() => {});
+
+		const { result } = renderHook(() => useArticleSync(true));
+		await waitFor(() => expect(result.current.isLoading).toBe(false));
+		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+
+		// Check that deleteItemFromCloud was called with the token
+		expect(mockDeleteItemFromCloud).toHaveBeenCalledWith(
+			"fail-doc-1",
+			"test-token",
+		);
+		// Check that the queue item was updated (retry count incremented)
+		expect(mockOperationsQueueDbBulkDocs).toHaveBeenCalledWith(
+			expect.arrayContaining([
+				expect.objectContaining({ _id: "qdel-fail-1", retryCount: 1 }),
+			]),
+		);
+		// Check for the warning log
+		expect(consoleWarnSpy).toHaveBeenCalledWith(
+			"Sync Hook: Queued delete failed for fail-doc-1, status: unauthorized",
+		);
+		consoleWarnSpy.mockRestore();
+	});
+
+	it("should pass token during reconciliation delete re-attempt", async () => {
+		const localDeletedArticle = {
+			...baseMockArticle("recon-del-1", 2, 2000),
+			deletedAt: Date.now(),
+			_rev: "rev-recon-del-1",
+		};
+		const cloudArticleStillExists = baseMockArticle("recon-del-1", 1, 1000); // Lower version
+
+		// Mock needed by hard delete check
+		mockArticlesDbGet.mockResolvedValue(localDeletedArticle);
+
+		// Setup mocks
+		mockGetAllArticles.mockResolvedValueOnce([]); // Empty initial cache
+		mockGetAllArticles.mockResolvedValueOnce([localDeletedArticle]); // Reconciliation fetch
+		mockFetchCloudItems.mockResolvedValue([cloudArticleStillExists]); // Cloud has older version
+		mockDeleteItemFromCloud.mockResolvedValue("success"); // Mock successful delete re-attempt
+		mockOperationsQueueDbAllDocs.mockResolvedValue({
+			offset: 0,
+			total_rows: 0,
+			rows: [],
+		}); // Empty queue
+
+		const { result } = renderHook(() => useArticleSync(true));
+		await waitFor(() => expect(result.current.isLoading).toBe(false));
+		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+
+		// Check that deleteItemFromCloud was called during reconciliation with the token
+		expect(mockDeleteItemFromCloud).toHaveBeenCalledWith(
+			"recon-del-1",
+			"test-token",
+		);
+		// Check that local hard delete was triggered
+		expect(mockArticlesDbBulkDocs).toHaveBeenCalledWith(
+			expect.arrayContaining([
+				expect.objectContaining({
+					_id: "recon-del-1",
+					_rev: "rev-recon-del-1",
+					_deleted: true,
+				}),
+			]),
+		);
+	});
 });
