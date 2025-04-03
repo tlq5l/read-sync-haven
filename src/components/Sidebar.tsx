@@ -12,7 +12,8 @@ import type { ArticleCategory } from "@/services/db"; // Import ArticleCategory
 import { useAuth } from "@clerk/clerk-react"; // Removed unused useUser and UserButton
 import {
 	BookOpen, // Icon for Books
-	ChevronsUpDown, // Icon for Library collapse
+	ChevronDown, // Icon for Library open
+	ChevronRight, // Icon for Library closed
 	// ChevronLeft, // Removed old icon
 	// ChevronRight, // Removed old icon
 	// Clock, // Removed unused icon
@@ -184,7 +185,7 @@ export default function Sidebar() {
 			<div className="flex-grow overflow-y-auto py-4">
 				<TransitionGroup
 					groupId="sidebar-items"
-					className="px-2 space-y-1"
+					className={cn("space-y-1", !collapsed && "px-2")} // Remove padding when collapsed
 					staggerChildren={true}
 					staggerDelay={30}
 					autoAnimate={true}
@@ -193,7 +194,10 @@ export default function Sidebar() {
 						{/* Home Button */}
 						<Button
 							variant="ghost"
-							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
+							className={cn(
+								"w-full flex items-center gap-3 py-2 transition-all duration-200",
+								collapsed ? "justify-center" : "justify-start", // Center icon when collapsed
+							)}
 							onClick={() => {
 								setCurrentView("all"); // Reset view when going home
 								navigate("/");
@@ -212,16 +216,27 @@ export default function Sidebar() {
 						{/* Collapsible Library Trigger */}
 						<Button
 							variant="ghost"
-							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
+							className={cn(
+								"w-full flex items-center gap-3 py-2 transition-all duration-200",
+								collapsed ? "justify-center" : "justify-start", // Center icon when collapsed
+							)}
 							onClick={() => {
-								setIsLibraryOpen(!isLibraryOpen);
+								if (!collapsed) {
+									setIsLibraryOpen(!isLibraryOpen); // Only toggle if not collapsed
+								}
 								setSelectedCategory(null); // Clear category filter
 								navigate("/inbox"); // Navigate to the main library view
 							}}
 							style={styles.link} // Use base link style for the trigger
 						>
-							<ChevronsUpDown size={16} /> {/* Use single icon */}
-							<Library size={20} className="ml-1" /> {/* Adjust icon spacing */}
+							{!collapsed && // Only show chevron when not collapsed
+								(isLibraryOpen ? (
+									<ChevronDown size={16} />
+								) : (
+									<ChevronRight size={16} />
+								))}
+							<Library size={20} className={cn(!collapsed && "ml-1")} />{" "}
+							{/* Adjust icon spacing only when not collapsed */}
 							{!collapsed && (
 								<span className="transition-opacity duration-200 font-medium">
 									Library
@@ -267,7 +282,9 @@ export default function Sidebar() {
 					{/* Removed Unread and Favorites buttons - handled by TopBar */}
 				</TransitionGroup>
 
-				<div className="mt-8 px-3">
+				<div className={cn("mt-8", !collapsed && "px-3")}>
+					{" "}
+					{/* Remove padding when collapsed */}
 					{!collapsed && (
 						<h3
 							className="text-sm font-medium mb-2 transition-opacity duration-200"
@@ -278,9 +295,8 @@ export default function Sidebar() {
 					)}
 					<TransitionGroup
 						groupId="sidebar-navigation"
-						className="space-y-1"
-						staggerChildren={true}
-						staggerDelay={30}
+						className={cn("space-y-1")} // No padding needed here directly
+						// Removed staggerChildren and staggerDelay to prevent animation delay on theme switch
 						autoAnimate={true}
 					>
 						{/* Show these navigation items regardless of authentication state */}
@@ -288,7 +304,10 @@ export default function Sidebar() {
 						<TransitionItem showFrom="left" className="w-full">
 							<Button
 								variant="ghost"
-								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
+								className={cn(
+									"w-full flex items-center gap-3 py-2 transition-all duration-200",
+									collapsed ? "justify-center" : "justify-start", // Center icon when collapsed
+								)}
 								asChild
 							>
 								<Link
@@ -310,7 +329,10 @@ export default function Sidebar() {
 						<TransitionItem showFrom="left" className="w-full">
 							<Button
 								variant="ghost"
-								className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
+								className={cn(
+									"w-full flex items-center gap-3 py-2 transition-all duration-200",
+									collapsed ? "justify-center" : "justify-start", // Center icon when collapsed
+								)}
 								onClick={toggleTheme}
 								style={styles.link}
 							>
@@ -327,7 +349,10 @@ export default function Sidebar() {
 							<TransitionItem showFrom="left" className="w-full">
 								<Button
 									variant="ghost"
-									className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
+									className={cn(
+										"w-full flex items-center gap-3 py-2 transition-all duration-200",
+										collapsed ? "justify-center" : "justify-start", // Center icon when collapsed
+									)}
 									asChild
 								>
 									<Link to="/sign-in" style={styles.link}>

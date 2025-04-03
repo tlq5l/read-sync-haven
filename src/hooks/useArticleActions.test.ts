@@ -72,9 +72,9 @@ vi.mock("@clerk/clerk-react", () => ({
 import * as epubService from "@/services/epub";
 import * as pdfService from "@/services/pdf";
 
-import { parseArticle } from '@/services/parser'; // Import mocked parser
-import { saveArticle } from '@/services/db'; // Import mocked db function
-import { saveItemToCloud } from '@/services/cloudSync'; // Import mocked cloud sync
+import { saveItemToCloud } from "@/services/cloudSync"; // Import mocked cloud sync
+import { saveArticle } from "@/services/db"; // Import mocked db function
+import { parseArticle } from "@/services/parser"; // Import mocked parser
 
 describe("useArticleActions", () => {
 	const refreshArticlesMock = vi.fn().mockResolvedValue(undefined);
@@ -140,7 +140,6 @@ describe("useArticleActions", () => {
 			expect(savedArticle.estimatedReadTime).toBeDefined();
 		}
 	});
-});
 
 	it("should add article by URL", async () => {
 		// Mock parseArticle response
@@ -152,9 +151,9 @@ describe("useArticleActions", () => {
 			siteName: "url-example.com",
 			estimatedReadTime: 4,
 			type: "article" as const,
-            url: "https://url-example.com/test", // Ensure URL is included
-            status: "inbox" as const, // Correct type
-  };
+			url: "https://url-example.com/test", // Ensure URL is included
+			status: "inbox" as const, // Correct type
+		};
 		vi.mocked(parseArticle).mockResolvedValue(mockParsedData);
 
 		const { result } = renderHook(() => useArticleActions(refreshArticlesMock));
@@ -182,4 +181,4 @@ describe("useArticleActions", () => {
 		expect(savedArticle?._id).toBe("mock-id"); // From saveArticle mock
 		expect(savedArticle?.title).toBe("Test URL Article");
 	});
-
+});

@@ -36,7 +36,8 @@ vi.mock("@/context/ArticleContext", async (importOriginal) => {
 			removeArticle: vi.fn().mockResolvedValue(undefined),
 			updateReadingProgress: vi.fn().mockResolvedValue(undefined),
 			isDbInitialized: true,
-			filters: { // Add filters object
+			filters: {
+				// Add filters object
 				siteNames: [],
 				types: [],
 				tags: [],

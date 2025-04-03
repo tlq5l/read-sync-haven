@@ -1,4 +1,4 @@
-import { useToast } from "@/hooks/use-toast";
+// import { useToast } from "@/hooks/use-toast"; // Removed unused import
 import { debounce } from "@/lib/utils";
 import { type CloudSyncStatus, saveItemToCloud } from "@/services/cloudSync";
 import { type Article, getArticle, updateArticle } from "@/services/db";
@@ -77,7 +77,6 @@ export function useReadingProgress() {
 
 				// Sync progress update to cloud using the debounced function
 				debouncedSyncProgress(updatedArticle);
-
 			} catch (err) {
 				console.error("Failed to update reading progress:", err);
 				// No toast for progress updates

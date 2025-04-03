@@ -87,11 +87,15 @@ describe("ArticleCard", () => {
 		// Check for source text directly within the card
 		const card = screen.getByTestId("article-card");
 		// Find the specific info div containing source/time
-		const infoDiv = card.querySelector(".flex.items-center.justify-between.text-xs.text-muted-foreground");
+		const infoDiv = card.querySelector(
+			".flex.items-center.justify-between.text-xs.text-muted-foreground",
+		);
 		expect(infoDiv).toBeInTheDocument(); // Ensure the container div is found
 		if (!infoDiv) throw new Error("Info div not found for PDF test");
 		// Find the first span directly within the infoDiv
-		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(":scope > span:first-child");
+		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(
+			":scope > span:first-child",
+		);
 		expect(sourceSpan).toBeInTheDocument(); // Check if the span exists
 		expect(sourceSpan).toHaveTextContent("PDF Document"); // Check its content
 		expect(screen.getByText("10 min read")).toBeInTheDocument();
@@ -119,11 +123,15 @@ describe("ArticleCard", () => {
 		// Check for source text directly within the card
 		const card = screen.getByTestId("article-card");
 		// Find the specific info div containing source/time
-		const infoDiv = card.querySelector(".flex.items-center.justify-between.text-xs.text-muted-foreground");
+		const infoDiv = card.querySelector(
+			".flex.items-center.justify-between.text-xs.text-muted-foreground",
+		);
 		expect(infoDiv).toBeInTheDocument(); // Ensure the container div is found
 		if (!infoDiv) throw new Error("Info div not found for EPUB test");
 		// Find the first span directly within the infoDiv
-		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(":scope > span:first-child");
+		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(
+			":scope > span:first-child",
+		);
 		expect(sourceSpan).toBeInTheDocument(); // Check if the span exists
 		expect(sourceSpan).toHaveTextContent("EPUB Book"); // Check its content
 		expect(screen.getByText("120 min read")).toBeInTheDocument();
@@ -175,11 +183,15 @@ describe("ArticleCard", () => {
 		// Check for fallback text directly within the card
 		const card = screen.getByTestId("article-card");
 		// Find the specific info div containing source/time
-		const infoDiv = card.querySelector(".flex.items-center.justify-between.text-xs.text-muted-foreground");
+		const infoDiv = card.querySelector(
+			".flex.items-center.justify-between.text-xs.text-muted-foreground",
+		);
 		expect(infoDiv).toBeInTheDocument(); // Ensure the container div is found
 		if (!infoDiv) throw new Error("Info div not found for PDF fallback test");
 		// Find the first span directly within the infoDiv
-		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(":scope > span:first-child");
+		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(
+			":scope > span:first-child",
+		);
 		expect(sourceSpan).toBeInTheDocument(); // Check if the span exists
 		expect(sourceSpan).toHaveTextContent("PDF Document"); // Check its content
 		// Also check the read time (this query seems fine)
@@ -209,11 +221,15 @@ describe("ArticleCard", () => {
 		// Check for fallback text directly within the card
 		const card = screen.getByTestId("article-card");
 		// Find the specific info div containing source/time
-		const infoDiv = card.querySelector(".flex.items-center.justify-between.text-xs.text-muted-foreground");
+		const infoDiv = card.querySelector(
+			".flex.items-center.justify-between.text-xs.text-muted-foreground",
+		);
 		expect(infoDiv).toBeInTheDocument(); // Ensure the container div is found
 		if (!infoDiv) throw new Error("Info div not found for EPUB fallback test");
 		// Find the first span directly within the infoDiv
-		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(":scope > span:first-child");
+		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(
+			":scope > span:first-child",
+		);
 		expect(sourceSpan).toBeInTheDocument(); // Check if the span exists
 		expect(sourceSpan).toHaveTextContent("EPUB Book"); // Check its content
 		// Also check the read time (this query seems fine)

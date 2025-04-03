@@ -337,8 +337,10 @@ describe("Worker Integration Tests", () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
 
 			// Temporarily mock global fetch for this specific test to simulate GCF failure
-			const fetchSpy = vi.spyOn(globalThis, 'fetch');
-			fetchSpy.mockResolvedValueOnce(new Response("GCF Error", { status: 500 }));
+			const fetchSpy = vi.spyOn(globalThis, "fetch");
+			fetchSpy.mockResolvedValueOnce(
+				new Response("GCF Error", { status: 500 }),
+			);
 			// Alternatively, simulate a network error:
 			// fetchSpy.mockRejectedValueOnce(new Error("Network failure"));
 

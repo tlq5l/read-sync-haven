@@ -2,9 +2,9 @@
 
 import { v4 as uuidv4 } from "uuid";
 import { articlesDb } from "./config"; // Import the initialized DB instance
+import { removeDuplicateArticles } from "./duplicates"; // Import from new file
 import type { Article, ArticleCategory } from "./types"; // Import ArticleCategory
 import { executeWithRetry } from "./utils";
-import { removeDuplicateArticles } from "./duplicates"; // Import from new file
 
 // Helper to infer category from type
 const inferCategoryFromType = (type: Article["type"]): ArticleCategory => {

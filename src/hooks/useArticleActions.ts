@@ -1,5 +1,5 @@
 import { useToast } from "@/hooks/use-toast";
-import { debounce } from "@/lib/utils"; // Import debounce
+// import { debounce } from "@/lib/utils"; // Removed unused import
 import {
 	type CloudSyncStatus, // Import the status type
 	deleteItemFromCloud,
@@ -27,77 +27,88 @@ import { parseArticle } from "@/services/parser";
 // 	arrayBufferToBase64 as pdfToBase64,
 // } from "@/services/pdf";
 import { useAuth } from "@clerk/clerk-react"; // Removed useUser as unused
-import { useCallback, useMemo } from "react"; // Import useMemo
+import { useCallback } from "react"; // Removed unused useMemo
 import { useReadingProgress } from "./useReadingProgress"; // Import the new hook
 
 // Helper function to process EPUB files
-async function processEpubFile(file: File, userId: string): Promise<Omit<Article, "_id" | "_rev">> {
-    // Dynamically import epub module
-    const epubModule = await import("@/services/epub");
-    if (!epubModule.isValidEpub(file)) {
-        throw new Error("Invalid EPUB file.");
-    }
-    const fileBuffer = await file.arrayBuffer();
-    const metadata = await epubModule.extractEpubMetadata(fileBuffer);
-    const base64Content = epubModule.arrayBufferToBase64(fileBuffer);
-    const estimatedReadingTime = await epubModule.getEstimatedReadingTime(fileBuffer.byteLength);
+async function processEpubFile(
+	file: File,
+	userId: string,
+): Promise<Omit<Article, "_id" | "_rev">> {
+	// Dynamically import epub module
+	const epubModule = await import("@/services/epub");
+	if (!epubModule.isValidEpub(file)) {
+		throw new Error("Invalid EPUB file.");
+	}
+	const fileBuffer = await file.arrayBuffer();
+	const metadata = await epubModule.extractEpubMetadata(fileBuffer);
+	const base64Content = epubModule.arrayBufferToBase64(fileBuffer);
+	const estimatedReadingTime = await epubModule.getEstimatedReadingTime(
+		fileBuffer.byteLength,
+	);
 
-    return {
-        userId,
-        title: metadata.title || file.name.replace(/\.epub$/i, ""),
-        type: "epub",
-        fileData: base64Content,
-        content: "EPUB content is stored in fileData.",
-        url: `local-epub://${file.name}`,
-        savedAt: Date.now(),
-        status: "inbox",
-        isRead: false,
-        favorite: false,
-        tags: [],
-        author: metadata.author,
-        publishedDate: metadata.publishedDate,
-        excerpt: metadata.description || "EPUB file",
-        readingProgress: 0,
-        siteName: "EPUB Book",
-        estimatedReadTime: estimatedReadingTime,
-        fileName: file.name,
-        fileSize: fileBuffer.byteLength,
-    };
+	return {
+		userId,
+		title: metadata.title || file.name.replace(/\.epub$/i, ""),
+		type: "epub",
+		fileData: base64Content,
+		content: "EPUB content is stored in fileData.",
+		url: `local-epub://${file.name}`,
+		savedAt: Date.now(),
+		status: "inbox",
+		isRead: false,
+		favorite: false,
+		tags: [],
+		author: metadata.author,
+		publishedDate: metadata.publishedDate,
+		excerpt: metadata.description || "EPUB file",
+		readingProgress: 0,
+		siteName: "EPUB Book",
+		estimatedReadTime: estimatedReadingTime,
+		fileName: file.name,
+		fileSize: fileBuffer.byteLength,
+	};
 }
 
 // Helper function to process PDF files
-async function processPdfFile(file: File, userId: string): Promise<Omit<Article, "_id" | "_rev">> {
-    // Dynamically import pdf module
-    const pdfModule = await import("@/services/pdf");
-    if (!pdfModule.isValidPdf(file)) {
-        throw new Error("Invalid PDF file.");
-    }
-    const fileBuffer = await file.arrayBuffer();
-    const metadata = await pdfModule.extractPdfMetadata(file, fileBuffer);
-    const base64Content = pdfModule.arrayBufferToBase64(fileBuffer);
-    const estimatedReadingTime = await pdfModule.getEstimatedReadingTime(fileBuffer.byteLength, metadata.pageCount);
+async function processPdfFile(
+	file: File,
+	userId: string,
+): Promise<Omit<Article, "_id" | "_rev">> {
+	// Dynamically import pdf module
+	const pdfModule = await import("@/services/pdf");
+	if (!pdfModule.isValidPdf(file)) {
+		throw new Error("Invalid PDF file.");
+	}
+	const fileBuffer = await file.arrayBuffer();
+	const metadata = await pdfModule.extractPdfMetadata(file, fileBuffer);
+	const base64Content = pdfModule.arrayBufferToBase64(fileBuffer);
+	const estimatedReadingTime = await pdfModule.getEstimatedReadingTime(
+		fileBuffer.byteLength,
+		metadata.pageCount,
+	);
 
-    return {
-        userId,
-        title: metadata.title || file.name.replace(/\.pdf$/i, ""),
-        type: "pdf",
-        content: base64Content, // Store base64 content for PDF
-        url: `local-pdf://${file.name}`,
-        savedAt: Date.now(),
-        status: "inbox",
-        isRead: false,
-        favorite: false,
-        tags: [],
-        author: metadata.author,
-        publishedDate: metadata.publishedDate,
-        excerpt: metadata.description || "PDF file",
-        pageCount: metadata.pageCount,
-        readingProgress: 0,
-        siteName: "PDF Document",
-        estimatedReadTime: estimatedReadingTime,
-        fileName: file.name,
-        fileSize: fileBuffer.byteLength,
-    };
+	return {
+		userId,
+		title: metadata.title || file.name.replace(/\.pdf$/i, ""),
+		type: "pdf",
+		content: base64Content, // Store base64 content for PDF
+		url: `local-pdf://${file.name}`,
+		savedAt: Date.now(),
+		status: "inbox",
+		isRead: false,
+		favorite: false,
+		tags: [],
+		author: metadata.author,
+		publishedDate: metadata.publishedDate,
+		excerpt: metadata.description || "PDF file",
+		pageCount: metadata.pageCount,
+		readingProgress: 0,
+		siteName: "PDF Document",
+		estimatedReadTime: estimatedReadingTime,
+		fileName: file.name,
+		fileSize: fileBuffer.byteLength,
+	};
 }
 
 /**

@@ -11,15 +11,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Tooltip,
 	TooltipContent,
-	TooltipProvider,
+	// TooltipProvider, // Removed unused import
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 // Removed useIsMobile import
 import { cn } from "@/lib/utils";
 // Import context and constants
 import {
-	SIDEBAR_WIDTH,
-	SIDEBAR_WIDTH_ICON,
+	// SIDEBAR_WIDTH, // Removed unused import
+	// SIDEBAR_WIDTH_ICON, // Removed unused import
 	SIDEBAR_WIDTH_MOBILE,
 	SidebarProvider, // Keep Provider export for potential external use if needed, but remove definition
 	useSidebar,
