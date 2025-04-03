@@ -1,14 +1,16 @@
 import { v4 as uuidv4 } from "uuid"; // For generating unique IDs
 
-// Define the structure for saved items
+// Define the structure for saved items to match Worker's expectations
 interface SavedItem {
-	id: string;
+	_id: string;  // Changed from id to _id to match Worker
 	url: string;
 	title: string;
 	content?: string; // Main content for articles
-	scrapedAt: string;
+	savedAt: number;  // Changed from scrapedAt:string to savedAt:number to match Worker
 	type: "article" | "youtube" | "other"; // Add more types later
 	userId: string; // Added userId field
+	isRead?: boolean;
+	favorite?: boolean;
 }
 
 // API response interface
@@ -49,6 +51,50 @@ async function getUserId(): Promise<string | null> {
 	);
 
 	return null;
+}
+
+// Function to get or generate authentication token
+async function getAuthToken(): Promise<string | null> {
+	// First check if we have a valid stored token
+	const storedToken = await chrome.storage.local.get(["authToken", "authTokenExpiry"]);
+
+	// Check if token exists and is not expired (24-hour validity)
+	if (storedToken.authToken &&
+		storedToken.authTokenExpiry &&
+		Date.now() < storedToken.authTokenExpiry) {
+		return storedToken.authToken;
+	}
+
+	// If no token or expired, get the userId (email)
+	const userIdResult = await chrome.storage.local.get(["userId"]);
+	if (!userIdResult.userId) {
+		console.error("No user ID found. Please set up your email first.");
+		return null;
+	}
+
+	// Generate a simple token based on user email + timestamp + shared secret
+	// Format: base64(email:timestamp:signature)
+	// where signature is base64(email:timestamp:SECRET_KEY)
+	const timestamp = Date.now();
+	const email = userIdResult.userId;
+	const SECRET_KEY = "bondwise-secure-key-2025"; // This would be better stored securely
+
+	// Create signature using email and timestamp
+	const signatureInput = `${email}:${timestamp}:${SECRET_KEY}`;
+	const signature = btoa(signatureInput);
+
+	// Create the final token
+	const token = btoa(`${email}:${timestamp}:${signature}`);
+
+	// Store token with 24-hour expiry
+	const expiryTime = timestamp + (24 * 60 * 60 * 1000);
+	await chrome.storage.local.set({
+		authToken: token,
+		authTokenExpiry: expiryTime
+	});
+
+	console.log("Generated new authentication token with 24-hour validity");
+	return token;
 }
 
 // Listen for messages from other parts of the extension (e.g., popup)
@@ -101,15 +147,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 							}
 
 							const newItem: SavedItem = {
-								id: uuidv4(),
+								_id: uuidv4(),  // Changed from id to _id
 								url: scrapeResponse.data.url,
 								title: scrapeResponse.data.title,
 								content: scrapeResponse.data.content,
-								scrapedAt: new Date().toISOString(),
+								savedAt: Date.now(),  // Changed from scrapedAt (ISO string) to savedAt (timestamp)
 								type: scrapeResponse.data.type || "other",
 								userId: userId, // Include user ID
+								isRead: false,  // Added required fields
+								favorite: false
 							};
-
 							const workerUrl =
 								"https://bondwise-sync-api.vikione.workers.dev/items";
 
@@ -122,10 +169,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 									`Attempting to POST item to Worker: ${workerUrl}`,
 									newItem,
 								);
+								// Get authentication token
+								const token = await getAuthToken();
+								if (!token) {
+									throw new Error("Failed to generate authentication token");
+								}
+
+								console.log("Using authentication token for API request");
 								const response = await fetch(workerUrl, {
 									method: "POST",
 									headers: {
 										"Content-Type": "application/json",
+										"Authorization": `Bearer ${token}`  // Add token to request
 									},
 									body: JSON.stringify(newItem),
 								});
@@ -179,10 +234,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 									"Attempting to save item to chrome.storage.local:",
 									newItem,
 								);
-								await chrome.storage.local.set({ [newItem.id]: newItem });
+								await chrome.storage.local.set({ [newItem._id]: newItem });
 								console.log(
 									"chrome.storage.local.set completed for ID:",
-									newItem.id,
+									newItem._id,
 								);
 							} catch (localError) {
 								console.error("Error saving to local storage:", localError);
@@ -218,10 +273,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 									"Attempting to save item to chrome.storage.local:",
 									newItem,
 								);
-								await chrome.storage.local.set({ [newItem.id]: newItem });
+								await chrome.storage.local.set({ [newItem._id]: newItem });
 								console.log(
 									"chrome.storage.local.set completed for ID:",
-									newItem.id,
+									newItem._id,
 								);
 							} catch (localError) {
 								console.error("Error saving to local storage:", localError);

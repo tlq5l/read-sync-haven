@@ -12,24 +12,75 @@ import { errorResponse } from "./utils"; // Import errorResponse helper
  * @param env - The worker environment variables and bindings.
  * @returns An AuthResult object indicating success (with userId) or error (with Response).
  */
+/**
+ * Authenticates an incoming request using Clerk or simplified token.
+ */
 export async function authenticateRequestWithClerk(
 	request: Request,
 	env: Env,
 ): Promise<AuthResult> {
+	// Check for Authorization header
+	const authHeader = request.headers.get("Authorization");
+	if (!authHeader || !authHeader.startsWith("Bearer ")) {
+		console.warn(
+			"Authentication failed: Missing Authorization Bearer token.",
+		);
+		return {
+			status: "error",
+			response: errorResponse("Missing Authorization Bearer token", 401),
+		};
+	}
+
+	const token = authHeader.substring(7); // Remove "Bearer " prefix
+
+	// First try to validate as a simplified token
+	try {
+		const decodedToken = atob(token);
+		const tokenParts = decodedToken.split(':');
+
+		if (tokenParts.length === 3) {
+			const [email, timestamp, signature] = tokenParts;
+
+			// Verify the token isn't too old (24 hour validity)
+			const tokenAge = Date.now() - Number(timestamp);
+			if (tokenAge > 24 * 60 * 60 * 1000) {
+				console.warn("Simplified token is expired");
+				return {
+					status: "error",
+					response: errorResponse("Token expired", 401),
+				};
+			}
+
+			// Decode and verify signature
+			try {
+				const decodedSignature = atob(signature);
+				const signatureParts = decodedSignature.split(':');
+
+				if (signatureParts.length === 3) {
+					const [sigEmail, sigTimestamp, secret] = signatureParts;
+
+					// Verify all parts match and secret is correct
+					if (sigEmail === email &&
+						sigTimestamp === timestamp &&
+						secret === "bondwise-secure-key-2025") {
+
+						console.log(`Simplified token authentication successful for: ${email}`);
+						return { status: "success", userId: email };
+					}
+				}
+			} catch (e) {
+				// Signature decode failed, continue to Clerk auth
+				console.log("Simplified token signature validation failed, trying Clerk");
+			}
+		}
+	} catch (e) {
+		// Token decode failed, continue to Clerk auth
+		console.log("Simplified token format invalid, trying Clerk");
+	}
+
+	// If simplified token validation fails, try Clerk authentication
 	const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
 	try {
-		// Check for Authorization header before calling Clerk
-		const authHeader = request.headers.get("Authorization");
-		if (!authHeader || !authHeader.startsWith("Bearer ")) {
-			console.warn(
-				"Authentication failed: Missing Authorization Bearer token.",
-			);
-			return {
-				status: "error",
-				response: errorResponse("Missing Authorization Bearer token", 401),
-			};
-		}
-
 		// Use Clerk's robust request authentication
 		const requestState = await clerk.authenticateRequest(request, {
 			secretKey: env.CLERK_SECRET_KEY,
