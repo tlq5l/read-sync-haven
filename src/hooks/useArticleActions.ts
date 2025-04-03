@@ -29,6 +29,7 @@ import { parseArticle } from "@/services/parser";
 import { useAuth } from "@clerk/clerk-react"; // Removed useUser as unused
 import { useCallback, useMemo } from "react"; // Import useMemo
 import { useReadingProgress } from "./useReadingProgress"; // Import the new hook
+
 // Helper function to process EPUB files
 async function processEpubFile(file: File, userId: string): Promise<Omit<Article, "_id" | "_rev">> {
     // Dynamically import epub module
@@ -352,6 +353,8 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 		},
 		[toast, userId, isSignedIn, refreshArticles],
 	);
+
+	// Removed updateReadingProgress logic (moved to useReadingProgress hook)
 
 	// Remove article - Returns true on successful DB delete, false otherwise.
 	// Refresh is handled by the caller/context optimistically.
