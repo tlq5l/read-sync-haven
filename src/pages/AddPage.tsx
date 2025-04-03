@@ -88,7 +88,7 @@ export default function AddPage() {
 								}}
 								isUploading={isUploading && uploadType === "epub"}
 								accept=".epub"
-								maxSize={50 * 1024 * 1024} // 50MB
+								maxSize={150 * 1024 * 1024} // 150MB
 							/>
 						</CardContent>
 					</Card>
@@ -112,7 +112,7 @@ export default function AddPage() {
 								}}
 								isUploading={isUploading && uploadType === "pdf"}
 								accept=".pdf"
-								maxSize={50 * 1024 * 1024} // 50MB
+								maxSize={150 * 1024 * 1024} // 150MB
 							/>
 						</CardContent>
 					</Card>

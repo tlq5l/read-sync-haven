@@ -16,7 +16,7 @@ export default function FileUpload({
 	onFileSelect,
 	isUploading = false,
 	accept = ".epub",
-	maxSize = 50 * 1024 * 1024, // 50MB default
+	maxSize = 150 * 1024 * 1024, // 150MB default
 }: FileUploadProps) {
 	const [isDragging, setIsDragging] = useState(false);
 	const [error, setError] = useState<string | null>(null);
