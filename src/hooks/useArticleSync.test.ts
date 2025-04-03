@@ -232,6 +232,8 @@ describe("useArticleSync", () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 
+		// Explicitly clear this critical mock's history
+		mockBulkSaveArticles.mockClear();
 		// --- Reset Core Mocks ---
 		mockGetAllArticles.mockReset().mockResolvedValue([]);
 		mockFetchCloudItems.mockReset().mockResolvedValue([]);
@@ -824,3 +826,247 @@ describe("useArticleSync", () => {
 		);
 	});
 });
+
+// --- Tests for Handling Invalid Cloud Data ---
+describe("Handling Invalid Cloud Data", () => {
+	it("should log warning and skip saving cloud article missing content", async () => {
+		const invalidCloudArticle = {
+			...baseMockArticle("invalid-1", 1, 3000),
+			content: undefined, // Missing content
+		};
+		mockFetchCloudItems.mockResolvedValue([invalidCloudArticle]);
+		mockGetAllArticles.mockResolvedValue([]); // No local articles initially
+
+		const consoleWarnSpy = vi
+			.spyOn(console, "warn")
+			.mockImplementation(() => {});
+
+		const { result } = renderHook(() => useArticleSync(true));
+
+		await waitFor(() => expect(result.current.isLoading).toBe(false));
+		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+
+		// Check that the warning was logged
+		expect(consoleWarnSpy).toHaveBeenCalledWith(
+			expect.stringContaining(
+				`Sync Hook: Invalid or incomplete article data received from cloud for ID: ${invalidCloudArticle._id}. Skipping.`,
+			),
+			expect.objectContaining({ _id: invalidCloudArticle._id }),
+		);
+
+		// Check that bulkSaveArticles was NOT called
+		expect(mockBulkSaveArticles).not.toHaveBeenCalled();
+		expect(result.current.articles).toEqual([]); // No articles should be added
+
+		consoleWarnSpy.mockRestore();
+	});
+
+	it("should log warning and skip saving cloud article missing title", async () => {
+		const invalidCloudArticle = {
+			...baseMockArticle("invalid-2", 1, 3000),
+			title: undefined as any, // Missing title
+		};
+		mockFetchCloudItems.mockResolvedValue([invalidCloudArticle]);
+		mockGetAllArticles.mockResolvedValue([]);
+
+		const consoleWarnSpy = vi
+			.spyOn(console, "warn")
+			.mockImplementation(() => {});
+
+		const { result } = renderHook(() => useArticleSync(true));
+
+		await waitFor(() => expect(result.current.isLoading).toBe(false));
+		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+
+		expect(consoleWarnSpy).toHaveBeenCalledWith(
+			expect.stringContaining(
+				`Sync Hook: Invalid or incomplete article data received from cloud for ID: ${invalidCloudArticle._id}. Skipping.`,
+			),
+			expect.objectContaining({ _id: invalidCloudArticle._id }),
+		);
+		expect(mockBulkSaveArticles).not.toHaveBeenCalled();
+		expect(result.current.articles).toEqual([]);
+
+		consoleWarnSpy.mockRestore();
+	});
+
+	it("should log warning and skip saving cloud article missing url", async () => {
+		const invalidCloudArticle = {
+			...baseMockArticle("invalid-3", 1, 3000),
+			url: undefined as any, // Missing url
+		};
+		mockFetchCloudItems.mockResolvedValue([invalidCloudArticle]);
+		mockGetAllArticles.mockResolvedValue([]);
+
+		const consoleWarnSpy = vi
+			.spyOn(console, "warn")
+			.mockImplementation(() => {});
+
+		const { result } = renderHook(() => useArticleSync(true));
+
+		await waitFor(() => expect(result.current.isLoading).toBe(false));
+		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+
+		expect(consoleWarnSpy).toHaveBeenCalledWith(
+			expect.stringContaining(
+				`Sync Hook: Invalid or incomplete article data received from cloud for ID: ${invalidCloudArticle._id}. Skipping.`,
+			),
+			expect.objectContaining({ _id: invalidCloudArticle._id }),
+		);
+		expect(mockBulkSaveArticles).not.toHaveBeenCalled();
+		expect(result.current.articles).toEqual([]);
+
+		consoleWarnSpy.mockRestore();
+	});
+
+	it("should process valid articles even if some invalid articles are received", async () => {
+		const validCloudArticle = baseMockArticle("valid-1", 1, 4000);
+		const invalidCloudArticle = {
+			...baseMockArticle("invalid-4", 1, 3000),
+			content: undefined, // Missing content
+		};
+		mockFetchCloudItems.mockResolvedValue([
+			validCloudArticle,
+			invalidCloudArticle,
+		]);
+
+		// Mock getAllArticles:
+		// 1. Initial cache load: Empty
+		mockGetAllArticles.mockResolvedValueOnce([]);
+		// 2. Reconciliation fetch (includes deleted): Empty
+		mockGetAllArticles.mockResolvedValueOnce([]);
+		// 3. Final fetch for UI update (non-deleted): Returns the saved valid article
+		mockGetAllArticles.mockResolvedValue([validCloudArticle]);
+
+		const consoleWarnSpy = vi
+			.spyOn(console, "warn")
+			.mockImplementation(() => {});
+
+		const { result } = renderHook(() => useArticleSync(true));
+
+		await waitFor(() => expect(result.current.isLoading).toBe(false));
+		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+
+		// Check warning for the invalid one
+		expect(consoleWarnSpy).toHaveBeenCalledWith(
+			expect.stringContaining(
+				`Sync Hook: Invalid or incomplete article data received from cloud for ID: ${invalidCloudArticle._id}. Skipping.`,
+			),
+			expect.objectContaining({ _id: invalidCloudArticle._id }),
+		);
+
+		// Check bulkSave was called ONLY with the valid one
+		expect(mockBulkSaveArticles).toHaveBeenCalledTimes(1);
+		expect(mockBulkSaveArticles).toHaveBeenCalledWith(
+			expect.arrayContaining([
+				expect.objectContaining({ _id: validCloudArticle._id }),
+			]),
+		);
+		expect(mockBulkSaveArticles).not.toHaveBeenCalledWith(
+			expect.arrayContaining([
+				expect.objectContaining({ _id: invalidCloudArticle._id }),
+			]),
+		);
+
+		// Check final state contains only the valid article
+		expect(result.current.articles).toHaveLength(1);
+		expect(result.current.articles[0]._id).toBe(validCloudArticle._id);
+
+		consoleWarnSpy.mockRestore();
+	});
+
+	it("should skip invalid cloud UPDATE", async () => {
+		// Reset mockBulkSaveArticles to ensure it's clean for this test
+		mockBulkSaveArticles.mockReset();
+
+		const localArticle = baseMockArticle("valid-1", 1, 3000);
+		const invalidCloudUpdate = {
+			...baseMockArticle("valid-1", 2, 4000, " Invalid Update"),
+			content: undefined, // Missing content
+		};
+		mockGetAllArticles.mockResolvedValueOnce([localArticle]); // Initial
+		mockGetAllArticles.mockResolvedValueOnce([localArticle]); // Reconciliation
+		mockGetAllArticles.mockResolvedValue([localArticle]); // Final
+		mockFetchCloudItems.mockResolvedValue([invalidCloudUpdate]);
+
+		// Mock the bulkSaveArticles function to track what it's called with
+		const bulkSaveSpy = vi.fn();
+		mockBulkSaveArticles.mockImplementation(bulkSaveSpy);
+
+		const consoleWarnSpy = vi
+			.spyOn(console, "warn")
+			.mockImplementation(() => {});
+
+		const { result } = renderHook(() => useArticleSync(true));
+		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+
+		expect(consoleWarnSpy).toHaveBeenCalledWith(
+			expect.stringContaining(
+				"Invalid or incomplete article data received from cloud",
+			),
+			expect.objectContaining({ _id: "valid-1" }),
+		);
+		// Check that bulkSaveSpy was not called with the invalid article
+		expect(bulkSaveSpy).not.toHaveBeenCalledWith(
+			expect.arrayContaining([
+				expect.objectContaining({ _id: "valid-1", content: undefined }),
+			]),
+		);
+		expect(result.current.articles[0].version).toBe(1); // Should retain local version 1
+
+		consoleWarnSpy.mockRestore();
+	});
+
+	it("should skip invalid cloud UNDELETE/UPDATE", async () => {
+		// Reset all mocks to ensure they're clean for this test
+		mockBulkSaveArticles.mockReset();
+		mockDeleteItemFromCloud.mockReset();
+		mockArticlesDbBulkDocs.mockReset();
+
+		const localDeletedArticle = {
+			...baseMockArticle("deleted-1", 1, 3000),
+			deletedAt: Date.now(),
+			_rev: "rev-deleted-1",
+		};
+		const invalidCloudUndelete = {
+			...baseMockArticle("deleted-1", 2, 4000, " Invalid Undelete"),
+			content: undefined, // Missing content
+		};
+		mockGetAllArticles.mockResolvedValueOnce([]); // Initial
+		mockGetAllArticles.mockResolvedValueOnce([localDeletedArticle]); // Reconciliation
+		mockGetAllArticles.mockResolvedValue([]); // Final (should remain deleted locally)
+		mockFetchCloudItems.mockResolvedValue([invalidCloudUndelete]);
+
+		// Mock the bulkSaveArticles function to track what it's called with
+		const bulkSaveSpy = vi.fn();
+		mockBulkSaveArticles.mockImplementation(bulkSaveSpy);
+
+		const consoleWarnSpy = vi
+			.spyOn(console, "warn")
+			.mockImplementation(() => {});
+
+		const { result } = renderHook(() => useArticleSync(true));
+		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+
+		expect(consoleWarnSpy).toHaveBeenCalledWith(
+			expect.stringContaining(
+				"Invalid or incomplete article data received from cloud",
+			),
+			expect.objectContaining({ _id: "deleted-1" }),
+		);
+		// Check that bulkSaveSpy was not called with the invalid article
+		expect(bulkSaveSpy).not.toHaveBeenCalledWith(
+			expect.arrayContaining([
+				expect.objectContaining({ _id: "deleted-1", content: undefined }),
+			]),
+		);
+		// Should not attempt to re-delete from cloud as local delete is older
+		expect(mockDeleteItemFromCloud).not.toHaveBeenCalled();
+		// Should not trigger hard delete as cloud version wasn't processed
+		expect(mockArticlesDbBulkDocs).not.toHaveBeenCalled();
+		expect(result.current.articles).toEqual([]); // Should remain empty (locally soft-deleted)
+
+		consoleWarnSpy.mockRestore();
+	});
+});
+// Removed duplicate closing brackets

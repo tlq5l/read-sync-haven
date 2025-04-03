@@ -118,6 +118,8 @@ export async function handleListItems(
 						}
 					}
 
+					// Log structure before sending back
+					// console.log(`Returning item (list): ${parsedItem._id}`, JSON.stringify(parsedItem));
 					items.push(parsedItem); // Push the potentially modified item
 				} catch (parseError) {
 					console.error(
@@ -154,10 +156,12 @@ export async function handlePostItem(
 			!item.title ||
 			!item.userId ||
 			!item.type ||
-			item.savedAt === undefined
+			item.savedAt === undefined ||
+			!item.content // Essential field check added
 		) {
+			console.warn("Validation failed for item:", item); // Log invalid item
 			return errorResponse(
-				"Invalid article data - missing required fields",
+				"Invalid article data - missing required fields (id, url, title, userId, type, savedAt, content)",
 				400,
 			);
 		}
@@ -171,8 +175,10 @@ export async function handlePostItem(
 		}
 
 		console.log(
-			`Processing article: ${item._id} (Type: ${item.type}) for user: ${userId}`,
+			`Received article POST request for ID: ${item._id}, User: ${userId}`,
 		);
+		// Log the structure of the incoming item for debugging
+		// console.log("Incoming article data:", JSON.stringify(item, null, 2)); // Use stringify for full object view if needed
 
 		const key = createUserItemKey(item.userId, item._id);
 		const itemToSave: WorkerArticle = {
@@ -204,10 +210,27 @@ export async function handlePostItem(
 			...(item._rev && { _rev: item._rev }),
 		};
 
-		const kvPromise = env.SAVED_ITEMS_KV.put(key, JSON.stringify(itemToSave));
-		// Simplify waitUntil - main await handles promise resolution/rejection for the response
-		ctx.waitUntil(kvPromise);
-		await kvPromise; // Wait for completion before responding
+		console.log(`Attempting to save item to KV with key: ${key}`);
+		// Log the structure of the object being saved to KV
+		// console.log("Saving item structure:", JSON.stringify(itemToSave, null, 2)); // Use stringify for full object view if needed
+		const itemString = JSON.stringify(itemToSave);
+		const kvPromise = env.SAVED_ITEMS_KV.put(key, itemString);
+
+		// Using waitUntil correctly
+		ctx.waitUntil(
+			kvPromise.catch((err) => {
+				console.error(`KV put failed for key ${key} in waitUntil:`, err);
+			}),
+		);
+
+		try {
+			await kvPromise; // Wait for completion for the response path
+			console.log(`Successfully saved item to KV: ${key}`);
+		} catch (kvError) {
+			console.error(`KV put failed for key ${key}:`, kvError);
+			// Rethrow or handle appropriately - here we let the outer catch handle it
+			throw kvError;
+		}
 
 		return jsonResponse(
 			{
@@ -247,6 +270,8 @@ export async function handleGetItem(
 		try {
 			// Ensure we parse the value which is confirmed not null here
 			const parsedItem = JSON.parse(value);
+			// Log structure before sending back
+			// console.log(`Returning item (get): ${parsedItem._id}`, JSON.stringify(parsedItem));
 			return jsonResponse(parsedItem);
 		} catch (parseError) {
 			console.error(

@@ -1,121 +1,62 @@
-# Plan: Cloud Sync Deletion Fix (Soft Delete & Reconciliation)
+# Cloud Sync Deletion Error Fix Plan
 
-**Date:** 2025-04-03
+## Problem
 
-**Goal:** Ensure articles deleted locally are correctly removed from the cloud during sync and do not reappear, while handling offline scenarios gracefully.
+The application logs repeated `401 Unauthorized` errors when attempting to delete items via the cloud sync API (`bondwise-sync-api.vikione.workers.dev`). This occurs during the processing of the offline queue (`_processOfflineQueue` in `useArticleSync.ts`) and is caused by a retry loop due to the initial deletion failure.
 
-**Problem:** Articles deleted locally reappear after the automatic cloud synchronization process runs.
+## Root Cause
 
-**Root Cause:**
-1.  **Local Hard Deletes:** `deleteArticle` performs a hard delete (`articlesDb.remove`).
-2.  **One-Way Sync Overwrite:** `useArticleSync` fetches all cloud items and overwrites local state via `bulkSaveArticles`.
-3.  **No Deletion Sync to Cloud:** `deleteItemFromCloud` exists but isn't used in the regular sync loop, so the cloud is unaware of local deletions.
+The functions `deleteItemFromCloud` and `saveItemToCloud` in `src/services/cloudSync.ts` are called from `_processOfflineQueue` in `src/hooks/useArticleSync.ts` without the necessary Clerk authentication token. The token is fetched in the parent function (`_performCloudSync`) but not passed down into the queue processing logic, causing the API calls to fail authentication.
 
-**Strategy:** Implement soft deletes locally, use versioning for conflict resolution, reconcile local and cloud states during sync, and manage offline operations via a queue.
+## Detailed Plan
 
-**Detailed Steps:**
+1.  **Modify `src/services/cloudSync.ts`:**
+    *   Update `deleteItemFromCloud` signature to accept `token: string`.
+    *   Add `Authorization: \`Bearer ${token}\`` header to `deleteItemFromCloud`'s `fetch` call.
+    *   Update `saveItemToCloud` signature to accept `token: string`.
+    *   Add `Authorization: \`Bearer ${token}\`` header to `saveItemToCloud`'s `fetch` call.
 
-1.  **Schema Enhancement (`src/services/db/types.ts`):**
-    *   Modify the `Article` interface:
-        *   Add `deletedAt?: number;` (Timestamp for when soft delete occurred).
-        *   Add `version: number;` (Monotonically increasing number, incremented on every change). Initialize to `1` for new articles.
+2.  **Modify `src/hooks/useArticleSync.ts`:**
+    *   Update `_processOfflineQueue` signature to accept `token: string`.
+    *   Pass the received `token` to `deleteItemFromCloud` call within `_processOfflineQueue`.
+    *   Pass the received `token` to `saveItemToCloud` call within `_processOfflineQueue`.
+    *   In `_performCloudSync`:
+        *   Fetch the token using `getToken()` *before* calling `_processOfflineQueue`.
+        *   Add error handling: If `token` is `null`, log an error and skip calling `_processOfflineQueue`.
+        *   Pass the valid `token` to the `_processOfflineQueue` call.
+        *   Pass the `token` to the `deleteItemFromCloud` call inside the reconciliation loop.
 
-2.  **Offline Queue Setup:**
-    *   Create a new PouchDB instance for queueing offline operations (e.g., `operations_queue`).
-    *   Define an interface for queued operations: `interface QueuedOperation { _id: string; type: 'delete' | 'update'; docId: string; timestamp: number; retryCount: number; data?: Partial<Article> };`.
-
-3.  **Update Local CRUD Operations (`src/services/db/articles.ts`):**
-    *   **`saveArticle` / `updateArticle` / `bulkSaveArticles`:**
-        *   Increment `version` on every save/update. Use cloud version if higher during merge, otherwise increment local.
-        *   Ensure `deletedAt` is unset when creating/updating non-deleted articles.
-        *   *(Optional)*: Queue `update` operations if offline.
-    *   **`deleteArticle`:**
-        *   Fetch the current article.
-        *   Set `deletedAt = Date.now()`.
-        *   Increment `version`.
-        *   Save back using `db.put()`.
-        *   Add a `{ type: 'delete', docId: id, ... }` record to `operations_queue`.
-
-4.  **Update Local Query Logic (`src/services/db/articles.ts`):**
-    *   **`getAllArticles`:**
-        *   Default filter to exclude documents where `deletedAt` has a value.
-        *   Add `includeDeleted: boolean` option (default `false`) to fetch all documents for sync.
-    *   **Indexing:** Create PouchDB index on `deletedAt` and ensure indices exist for `version` and `userId`. `articlesDb.createIndex({ index: { fields: ['deletedAt'] } });`.
-
-5.  **Enhance Sync Logic (`src/hooks/useArticleSync.ts` - `_performCloudSync`):**
-    *   **(A) Process Offline Queue:**
-        *   Query `operations_queue`.
-        *   For `delete` ops: attempt `deleteItemFromCloud`. If success, remove from queue. Implement retry logic.
-        *   For `update` ops: attempt `saveItemToCloud`. If success, remove from queue. Implement retry logic.
-    *   **(B) Fetch Current States:**
-        *   Get all local articles (incl. soft-deleted): `localArticles = await getAllArticles({ includeDeleted: true, userIds: [userId] })`. Map to `Map<id, article>`.
-        *   Get all cloud articles: `cloudArticles = await fetchCloudItems(token, email)`. Map to `Map<id, article>`.
-    *   **(C) Reconcile States:**
-        *   **Local Soft Delete => Sync to Cloud:** For `localArticle` with `deletedAt` (and not yet processed from queue): Attempt `deleteItemFromCloud`. If success, *hard delete* locally (`articlesDb.remove`). Log errors/retries.
-        *   **Cloud Create => Create Locally:** For `cloudArticle` not in `localArticles`: Save locally (`saveArticle`).
-        *   **Cloud Delete => Soft Delete Locally:** For `localArticle` (no `deletedAt`) not in `cloudArticles`: Soft delete locally (set `deletedAt`, inc `version`).
-        *   **Update Conflict Resolution:** For article in both (local not deleted): Compare `version`. If cloud > local, update local. If local > cloud, queue cloud update. If equal, no action.
-    *   **(D) Update UI State:** Fetch non-deleted articles (`getAllArticles()`) and update React state (`setArticles`).
-
-6.  **Garbage Collection (Optional - Future Enhancement):**
-    *   Implement a function (triggered periodically/on load) to query local items with `deletedAt` older than a threshold (e.g., 30 days) and hard delete them (`articlesDb.remove`).
-
-**Mermaid Diagram (Sync Flow):**
+## Plan Summary Diagram
 
 ```mermaid
-sequenceDiagram
-    participant ClientApp as Client App
-    participant OpsQueue as Offline Queue (PouchDB)
-    participant LocalDB as Articles DB (PouchDB)
-    participant CloudAPI as Cloud Sync API
+graph TD
+    A[useArticleSync Hook] --> B(_performCloudSync);
+    B --> C{Get Auth Token};
+    C -- Token OK --> D[_processOfflineQueue(token)];
+    C -- Token Missing --> E[Skip Queue Processing + Log Error];
+    D --> F[deleteItemFromCloud(id, token)];
+    D --> G[saveItemToCloud(article, token)];
+    B --> H[fetchCloudItems(token, email)];
+    B --> I[Reconcile Logic];
+    I -- Cloud Delete Re-attempt --> F;
+    F --> J[API Call w/ Auth Header];
+    G --> J;
+    H --> J;
 
-    alt Offline Deletion
-        ClientApp->>LocalDB: User deletes Article X
-        LocalDB->>LocalDB: Soft delete X (set deletedAt, inc version)
-        LocalDB-->>ClientApp: Confirm Soft Delete
-        ClientApp->>OpsQueue: Add {type: 'delete', docId: X._id}
-        OpsQueue-->>ClientApp: Confirm Queue Add
+    subgraph cloudSync.ts
+        direction LR
+        F;
+        G;
     end
 
-    Note over ClientApp, CloudAPI: Sync Triggered (Online)
-
-    ClientApp->>OpsQueue: Query Pending Operations
-    OpsQueue-->>ClientApp: Return Queued Deletes/Updates
-
-    loop For each Queued Delete (e.g., for X)
-        ClientApp->>CloudAPI: deleteItemFromCloud(X._id)
-        alt Cloud Deletion Successful
-            CloudAPI-->>ClientApp: Success (2xx)
-            ClientApp->>OpsQueue: Remove Delete Op for X
-            OpsQueue-->>ClientApp: Confirm Remove
-        else Cloud Deletion Failed (Network etc)
-            CloudAPI-->>ClientApp: Error
-            ClientApp->>OpsQueue: Increment Retry Count for X Op
-            OpsQueue-->>ClientApp: Confirm Update
-        end
+    subgraph useArticleSync.ts
+        direction TB
+        A; B; C; D; E; H; I;
     end
-    %% Similar loop for queued updates %%
 
-    ClientApp->>LocalDB: getAllArticles({ includeDeleted: true })
-    LocalDB-->>ClientApp: All Local Articles (Map L)
-
-    ClientApp->>CloudAPI: fetchCloudItems()
-    CloudAPI-->>ClientApp: All Cloud Articles (Map C)
-
-    ClientApp->>ClientApp: Start Reconciliation Loop
-
-    Note right of ClientApp: Iterate L & C Maps
-    Note right of ClientApp: - If L(id) has deletedAt & not processed: Try Cloud DELETE -> If success, Local HARD DELETE.
-    Note right of ClientApp: - If C(id) not in L: Local CREATE (from C data).
-    Note right of ClientApp: - If L(id) not deleted & not in C: Local SOFT DELETE.
-    Note right of ClientApp: - If L(id) & C(id) exist: Compare versions -> Local UPDATE or Queue Cloud UPDATE.
-
-    ClientApp->>LocalDB: Perform Creates/Updates/Deletes based on Reconciliation
-    ClientApp->>OpsQueue: Add any required Cloud Updates to Queue
-
-    ClientApp->>ClientApp: Reconciliation Complete
-    ClientApp->>LocalDB: getAllArticles() %% Fetch non-deleted for UI %%
-    LocalDB-->>ClientApp: Return Articles for UI State
+    style J fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
-This plan outlines the necessary steps to implement a robust soft-delete and reconciliation strategy for handling article deletions during cloud synchronization.
+## Next Steps
+
+Switch to Code mode to implement the changes outlined in this plan.

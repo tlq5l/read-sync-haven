@@ -363,6 +363,20 @@ async function _performCloudSync(
 		const cloudDeletesToHardDeleteLocally: Article[] = []; // Store full doc for remove(id, rev)
 		const toUpdateCloudQueue: QueuedOperation[] = []; // Queue updates for cloud
 
+		// Helper to validate essential fields from cloud data
+		const isValidCloudArticle = (
+			article: Article | null | undefined,
+		): article is Article => {
+			if (!article?._id || !article.title || !article.url || !article.content) {
+				console.warn(
+					`Sync Hook: Invalid or incomplete article data received from cloud for ID: ${article?._id || "UNKNOWN"}. Skipping.`,
+					article, // Log the problematic article data
+				);
+				return false;
+			}
+			return true;
+		};
+
 		// --- Iterate Cloud Articles (Check for Creates/Updates) ---
 		for (const [cloudId, cloudArticle] of cloudArticlesMap.entries()) {
 			const localArticle = localArticlesMap.get(cloudId);
@@ -370,7 +384,9 @@ async function _performCloudSync(
 			if (!localArticle) {
 				// Cloud Create => Create Locally
 				console.log(`Sync Hook: Cloud Create detected for ${cloudId}`);
-				toCreateLocally.push(cloudArticle);
+				if (isValidCloudArticle(cloudArticle)) {
+					toCreateLocally.push(cloudArticle);
+				}
 			} else {
 				// Exists locally, check for updates / conflicts / undeletes
 				const localVersion = localArticle.version || 0;
@@ -386,7 +402,12 @@ async function _performCloudSync(
 						// Treat as an update - will overwrite local soft delete marker
 						// Revert: PouchDB generally NEEDS the _rev to update a specific document version,
 						// even if overwriting a deletion marker.
-						toUpdateLocally.push({ ...cloudArticle, _rev: localArticle._rev });
+						if (isValidCloudArticle(cloudArticle)) {
+							toUpdateLocally.push({
+								...cloudArticle,
+								_rev: localArticle._rev,
+							});
+						}
 					} else {
 						// Local delete is newer or same version. Should have been deleted by queue processing.
 						// If it wasn't (e.g., queue failed), try deleting from cloud again.
@@ -421,7 +442,12 @@ async function _performCloudSync(
 						console.log(
 							`Sync Hook: Cloud Update detected for ${cloudId} (CloudV: ${cloudVersion}, LocalV: ${localVersion})`,
 						);
-						toUpdateLocally.push({ ...cloudArticle, _rev: localArticle._rev }); // Need _rev
+						if (isValidCloudArticle(cloudArticle)) {
+							toUpdateLocally.push({
+								...cloudArticle,
+								_rev: localArticle._rev,
+							}); // Need _rev
+						}
 					} else if (localVersion > cloudVersion) {
 						// Local Update => Queue Cloud Update (if not already processed by queue)
 						if (!processedUpdates.has(cloudId)) {
@@ -474,7 +500,6 @@ async function _performCloudSync(
 		}
 
 		// === 4. Apply Changes ===
-		let articlesChanged = false;
 
 		// Perform local creates/updates
 		const articlesToSave = [...toCreateLocally, ...toUpdateLocally];
@@ -484,10 +509,21 @@ async function _performCloudSync(
 			);
 			try {
 				const bulkResponse = await bulkSaveArticles(articlesToSave);
-				articlesChanged = true;
-				const errors = bulkResponse.filter((r) => "error" in r);
-				if (errors.length > 0)
-					console.warn("Sync Hook: Errors during local bulk save:", errors);
+				const errors = bulkResponse.filter(
+					(r): r is PouchDB.Core.Error => "error" in r,
+				);
+				if (errors.length > 0) {
+					const errorDetails = errors.map((e) => ({
+						id: e.id,
+						message: e.message,
+						name: e.name,
+						status: e.status,
+					}));
+					console.warn(
+						`Sync Hook: ${errors.length} errors during local bulk save:`,
+						errorDetails, // Log specific error details including IDs
+					);
+				}
 			} catch (bulkErr) {
 				console.error(
 					"Sync Hook: Critical error during local bulk save:",
@@ -502,7 +538,6 @@ async function _performCloudSync(
 			console.log(
 				`Sync Hook: Soft deleting ${toSoftDeleteLocally.length} articles locally (deleted in cloud)...`,
 			);
-			articlesChanged = true;
 			for (const id of toSoftDeleteLocally) {
 				try {
 					// Use the localSoftDeleteArticle function which handles versioning etc.
@@ -521,7 +556,7 @@ async function _performCloudSync(
 			console.log(
 				`Sync Hook: Hard deleting ${cloudDeletesToHardDeleteLocally.length} articles locally (deleted from cloud)...`,
 			);
-			articlesChanged = true; // Technically changes local state
+
 			const docsToRemove = cloudDeletesToHardDeleteLocally.map((doc) => ({
 				_id: doc._id,
 				_rev: doc._rev, // Need _rev for hard delete
@@ -551,7 +586,14 @@ async function _performCloudSync(
 		}
 
 		// === 5. Update UI State ===
-		if (articlesChanged || !loadedFromCache) {
+		// Only update UI if there were actual changes or this is the initial load
+		if (
+			toCreateLocally.length > 0 ||
+			toUpdateLocally.length > 0 ||
+			toSoftDeleteLocally.length > 0 ||
+			cloudDeletesToHardDeleteLocally.length > 0 ||
+			!loadedFromCache
+		) {
 			// Update state if changes occurred or initial load
 			console.log(
 				"Sync Hook: Refetching non-deleted articles for UI update...",
