@@ -60,11 +60,17 @@ export async function updateMissingMetadata(): Promise<number> {
 					return null; // Return null for documents that cannot be updated
 				}
 
-				let updated = false;
-				const docToUpdate = { ...doc }; // Clone doc to avoid modifying original in case of partial failure
+				// Store initial missing status to ensure we only update if needed
+				const initiallyMissingSiteName = !doc.siteName;
+				const initiallyMissingReadTime = !doc.estimatedReadTime;
+				const initiallyMissingExcerpt = !doc.excerpt || doc.excerpt.trim() === "";
+				const hasContentForExcerpt = !!doc.content && doc.content.trim() !== "";
 
-				// Add siteName if missing
-				if (!docToUpdate.siteName) {
+				let needsUpdate = false; // Use a flag to track if a necessary update occurred
+				const docToUpdate = { ...doc }; // Clone doc
+
+				// Add siteName if initially missing
+				if (initiallyMissingSiteName) {
 					try {
 						// Attempt to derive from URL for web articles
 						if (docToUpdate.type === "article" && docToUpdate.url) {
@@ -78,18 +84,19 @@ export async function updateMissingMetadata(): Promise<number> {
 						} else {
 							docToUpdate.siteName = "Unknown Source"; // Fallback
 						}
-						updated = true;
+						if (docToUpdate.siteName !== doc.siteName) needsUpdate = true;
 					} catch (e) {
 						console.warn(
 							`Failed to parse URL for siteName on ${docToUpdate._id}: ${docToUpdate.url}`,
 						);
 						docToUpdate.siteName = "Unknown Source"; // Fallback on URL parse error
-						updated = true;
+						if (docToUpdate.siteName !== doc.siteName) needsUpdate = true;
 					}
 				}
 
-				// Add estimatedReadTime if missing
-				if (!docToUpdate.estimatedReadTime && docToUpdate.fileSize) {
+				// Calculate estimatedReadTime if initially missing and possible
+				let readTimeCalculated = false;
+				if (initiallyMissingReadTime && docToUpdate.fileSize) {
 					try {
 						if (docToUpdate.type === "pdf") {
 							const { getEstimatedReadingTime: getPdfReadingTime } =
@@ -98,14 +105,20 @@ export async function updateMissingMetadata(): Promise<number> {
 								docToUpdate.fileSize,
 								docToUpdate.pageCount,
 							);
-							updated = true;
+							if (docToUpdate.estimatedReadTime) {
+								readTimeCalculated = true;
+								needsUpdate = true;
+							}
 						} else if (docToUpdate.type === "epub") {
 							const { getEstimatedReadingTime: getEpubReadingTime } =
 								await import("@/services/epub");
 							docToUpdate.estimatedReadTime = getEpubReadingTime(
 								docToUpdate.fileSize,
 							);
-							updated = true;
+							if (docToUpdate.estimatedReadTime) {
+								readTimeCalculated = true;
+								needsUpdate = true;
+							}
 						}
 					} catch (importError) {
 						console.error(
@@ -115,8 +128,8 @@ export async function updateMissingMetadata(): Promise<number> {
 					}
 				}
 
-				// Add default reading time if we couldn't calculate it
-				if (!docToUpdate.estimatedReadTime) {
+				// Add default reading time ONLY if initially missing AND not calculated above
+				if (initiallyMissingReadTime && !readTimeCalculated) {
 					if (docToUpdate.type === "article" && docToUpdate.content) {
 						// Basic estimation for web articles based on content length
 						const words = docToUpdate.content.split(/\s+/).length;
@@ -130,14 +143,11 @@ export async function updateMissingMetadata(): Promise<number> {
 					} else {
 						docToUpdate.estimatedReadTime = 5; // General fallback
 					}
-					updated = true;
+					if (docToUpdate.estimatedReadTime) needsUpdate = true;
 				}
 
-				// Add excerpt if missing and content exists
-				if (
-					(!docToUpdate.excerpt || docToUpdate.excerpt.trim() === "") &&
-					docToUpdate.content
-				) {
+				// Add excerpt if initially missing and content exists
+				if (initiallyMissingExcerpt && hasContentForExcerpt) {
 					// Simple excerpt: first 200 chars, add ellipsis if longer
 					const plainTextContent = docToUpdate.content
 						.replace(/<[^>]+>/g, " ")
@@ -148,15 +158,15 @@ export async function updateMissingMetadata(): Promise<number> {
 							plainTextContent.length > 200
 								? `${plainTextContent.substring(0, 200)}...`
 								: plainTextContent;
-						updated = true;
+						if (docToUpdate.excerpt !== doc.excerpt) needsUpdate = true;
 					} else if (!docToUpdate.excerpt) {
 						// If content was only HTML/empty, set a default placeholder
 						docToUpdate.excerpt = "No excerpt available";
-						updated = true;
+						if (docToUpdate.excerpt !== doc.excerpt) needsUpdate = true;
 					}
 				}
 
-				return updated ? docToUpdate : null; // Return updated doc or null if no changes
+				return needsUpdate ? docToUpdate : null; // Return updated doc only if a necessary change was made
 			});
 
 			// Wait for all updates to process and filter out nulls

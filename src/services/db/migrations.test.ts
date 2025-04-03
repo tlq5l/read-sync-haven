@@ -150,6 +150,7 @@ describe("Database migrations", () => {
 			tags: [],
 			siteName: "Already Set PDF",
 			estimatedReadTime: 30,
+			excerpt: "This document is already complete.", // Add excerpt
 		};
 
 		// Setup the mock response

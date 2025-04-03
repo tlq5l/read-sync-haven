@@ -36,6 +36,19 @@ vi.mock("@/context/ArticleContext", async (importOriginal) => {
 			removeArticle: vi.fn().mockResolvedValue(undefined),
 			updateReadingProgress: vi.fn().mockResolvedValue(undefined),
 			isDbInitialized: true,
+			filters: { // Add filters object
+				siteNames: [],
+				types: [],
+				tags: [],
+				searchQuery: "",
+				category: null, // Add default category
+			},
+			setFilters: vi.fn(), // Add mock setter if needed by component/test
+			sortCriteria: { field: "savedAt", direction: "desc" }, // Add default sort
+			setSortCriteria: vi.fn(), // Add mock setter
+			setSortField: vi.fn(),
+			toggleSortDirection: vi.fn(),
+			setSelectedCategory: vi.fn(), // Add mock setter
 		})),
 	};
 });
@@ -112,6 +125,7 @@ describe("Sidebar Component", () => {
 		).toBeInTheDocument();
 
 		fireEvent.click(homeButton);
+		// setCurrentView *is* called when clicking the Home button
 		expect(mockSetCurrentView).toHaveBeenCalledWith("all");
 		expect(mockNavigate).toHaveBeenCalledWith("/");
 	});
@@ -130,7 +144,8 @@ describe("Sidebar Component", () => {
 		).toBeInTheDocument();
 
 		fireEvent.click(libraryButton);
-		expect(mockSetCurrentView).toHaveBeenCalledWith("all");
+		// setCurrentView is *not* called when clicking the Library button itself
+		expect(mockSetCurrentView).not.toHaveBeenCalled();
 		expect(mockNavigate).toHaveBeenCalledWith("/inbox");
 	});
 

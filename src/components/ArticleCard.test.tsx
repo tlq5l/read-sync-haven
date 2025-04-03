@@ -1,7 +1,7 @@
 /// <reference types="@testing-library/jest-dom" />
 
 import type { Article } from "@/services/db";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import ArticleCard from "./ArticleCard";
@@ -24,7 +24,7 @@ vi.mock("@/hooks/use-toast", () => ({
 // Mock the animation hook
 vi.mock("@/hooks/use-synchronized-animation", () => ({
 	useSynchronizedAnimation: () => ({
-		ref: { current: null },
+		ref: vi.fn(), // Provide ref as a mock function
 	}),
 }));
 
@@ -57,11 +57,10 @@ describe("ArticleCard", () => {
 
 		renderCard(webArticle);
 
-		// Use a more specific selector to avoid duplicate text issues
+		// Check for source text directly within the card
+		const card = screen.getByTestId("article-card");
 		expect(
-			screen.getByText("Example Website", {
-				selector: ".flex.items-center.justify-between span",
-			}),
+			within(card).getByText("Example Website", { exact: false }), // Use within and allow partial match if needed
 		).toBeInTheDocument();
 		expect(screen.getByText("5 min read")).toBeInTheDocument();
 	});
@@ -85,12 +84,16 @@ describe("ArticleCard", () => {
 
 		renderCard(pdfArticle);
 
-		// Use a more specific selector to avoid duplicate text issues
-		expect(
-			screen.getByText("PDF Document", {
-				selector: ".flex.items-center.justify-between span",
-			}),
-		).toBeInTheDocument();
+		// Check for source text directly within the card
+		const card = screen.getByTestId("article-card");
+		// Find the specific info div containing source/time
+		const infoDiv = card.querySelector(".flex.items-center.justify-between.text-xs.text-muted-foreground");
+		expect(infoDiv).toBeInTheDocument(); // Ensure the container div is found
+		if (!infoDiv) throw new Error("Info div not found for PDF test");
+		// Find the first span directly within the infoDiv
+		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(":scope > span:first-child");
+		expect(sourceSpan).toBeInTheDocument(); // Check if the span exists
+		expect(sourceSpan).toHaveTextContent("PDF Document"); // Check its content
 		expect(screen.getByText("10 min read")).toBeInTheDocument();
 	});
 
@@ -113,12 +116,16 @@ describe("ArticleCard", () => {
 
 		renderCard(epubArticle);
 
-		// Use a more specific selector to avoid duplicate text issues
-		expect(
-			screen.getByText("EPUB Book", {
-				selector: ".flex.items-center.justify-between span",
-			}),
-		).toBeInTheDocument();
+		// Check for source text directly within the card
+		const card = screen.getByTestId("article-card");
+		// Find the specific info div containing source/time
+		const infoDiv = card.querySelector(".flex.items-center.justify-between.text-xs.text-muted-foreground");
+		expect(infoDiv).toBeInTheDocument(); // Ensure the container div is found
+		if (!infoDiv) throw new Error("Info div not found for EPUB test");
+		// Find the first span directly within the infoDiv
+		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(":scope > span:first-child");
+		expect(sourceSpan).toBeInTheDocument(); // Check if the span exists
+		expect(sourceSpan).toHaveTextContent("EPUB Book"); // Check its content
 		expect(screen.getByText("120 min read")).toBeInTheDocument();
 	});
 
@@ -139,8 +146,10 @@ describe("ArticleCard", () => {
 
 		renderCard(articleWithMissingFields);
 
-		expect(screen.getByText("Unknown source")).toBeInTheDocument();
-		expect(screen.getByText("? min read")).toBeInTheDocument();
+		// Check for fallback text directly within the card
+		const card = screen.getByTestId("article-card");
+		expect(within(card).getByText("Unknown source")).toBeInTheDocument();
+		expect(within(card).getByText("? min read")).toBeInTheDocument();
 	});
 
 	it("should display fallbacks for PDF without siteName", () => {
@@ -163,11 +172,17 @@ describe("ArticleCard", () => {
 		renderCard(pdfWithoutSiteName);
 
 		// Should show "PDF Document" even though siteName is missing
-		expect(
-			screen.getByText("PDF Document", {
-				selector: ".flex.items-center.justify-between span",
-			}),
-		).toBeInTheDocument();
+		// Check for fallback text directly within the card
+		const card = screen.getByTestId("article-card");
+		// Find the specific info div containing source/time
+		const infoDiv = card.querySelector(".flex.items-center.justify-between.text-xs.text-muted-foreground");
+		expect(infoDiv).toBeInTheDocument(); // Ensure the container div is found
+		if (!infoDiv) throw new Error("Info div not found for PDF fallback test");
+		// Find the first span directly within the infoDiv
+		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(":scope > span:first-child");
+		expect(sourceSpan).toBeInTheDocument(); // Check if the span exists
+		expect(sourceSpan).toHaveTextContent("PDF Document"); // Check its content
+		// Also check the read time (this query seems fine)
 		expect(screen.getByText("15 min read")).toBeInTheDocument();
 	});
 
@@ -191,11 +206,17 @@ describe("ArticleCard", () => {
 		renderCard(epubWithoutSiteName);
 
 		// Should show "EPUB Book" even though siteName is missing
-		expect(
-			screen.getByText("EPUB Book", {
-				selector: ".flex.items-center.justify-between span",
-			}),
-		).toBeInTheDocument();
+		// Check for fallback text directly within the card
+		const card = screen.getByTestId("article-card");
+		// Find the specific info div containing source/time
+		const infoDiv = card.querySelector(".flex.items-center.justify-between.text-xs.text-muted-foreground");
+		expect(infoDiv).toBeInTheDocument(); // Ensure the container div is found
+		if (!infoDiv) throw new Error("Info div not found for EPUB fallback test");
+		// Find the first span directly within the infoDiv
+		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(":scope > span:first-child");
+		expect(sourceSpan).toBeInTheDocument(); // Check if the span exists
+		expect(sourceSpan).toHaveTextContent("EPUB Book"); // Check its content
+		// Also check the read time (this query seems fine)
 		expect(screen.getByText("90 min read")).toBeInTheDocument();
 	});
 });

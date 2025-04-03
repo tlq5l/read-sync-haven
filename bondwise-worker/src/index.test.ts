@@ -335,13 +335,13 @@ describe("Worker Integration Tests", () => {
 
 		it("POST /api/summarize should return 502 if GCF fetch fails", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			// Cannot override MSW handler here due to import constraint.
-			// Relying on global MSW handler for fake URL, which returns success.
-			// This test case might need adjustment based on how GCF failures are handled.
-			// TODO: Revisit mocking strategy for worker tests if needed.
-			console.warn(
-				"[Test Warning] Cannot override MSW handler for 502 failure in index.test.ts due to TS rootDir constraint. Test may not accurately reflect 502 scenario.",
-			);
+
+			// Temporarily mock global fetch for this specific test to simulate GCF failure
+			const fetchSpy = vi.spyOn(globalThis, 'fetch');
+			fetchSpy.mockResolvedValueOnce(new Response("GCF Error", { status: 500 }));
+			// Alternatively, simulate a network error:
+			// fetchSpy.mockRejectedValueOnce(new Error("Network failure"));
+
 			const req = new Request("http://worker/api/summarize", {
 				method: "POST",
 				headers: {
@@ -351,7 +351,9 @@ describe("Worker Integration Tests", () => {
 				body: JSON.stringify(summarizeContent),
 			});
 			const res = await worker.fetch(req, env, ctx);
-			expect(res.status).toBe(502);
+			expect(res.status).toBe(502); // Worker should translate GCF 500 to 502
+
+			fetchSpy.mockRestore(); // Restore original fetch
 		});
 	});
 

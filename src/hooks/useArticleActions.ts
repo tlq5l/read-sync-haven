@@ -28,6 +28,76 @@ import { parseArticle } from "@/services/parser";
 // } from "@/services/pdf";
 import { useAuth } from "@clerk/clerk-react"; // Removed useUser as unused
 import { useCallback, useMemo } from "react"; // Import useMemo
+import { useReadingProgress } from "./useReadingProgress"; // Import the new hook
+// Helper function to process EPUB files
+async function processEpubFile(file: File, userId: string): Promise<Omit<Article, "_id" | "_rev">> {
+    // Dynamically import epub module
+    const epubModule = await import("@/services/epub");
+    if (!epubModule.isValidEpub(file)) {
+        throw new Error("Invalid EPUB file.");
+    }
+    const fileBuffer = await file.arrayBuffer();
+    const metadata = await epubModule.extractEpubMetadata(fileBuffer);
+    const base64Content = epubModule.arrayBufferToBase64(fileBuffer);
+    const estimatedReadingTime = await epubModule.getEstimatedReadingTime(fileBuffer.byteLength);
+
+    return {
+        userId,
+        title: metadata.title || file.name.replace(/\.epub$/i, ""),
+        type: "epub",
+        fileData: base64Content,
+        content: "EPUB content is stored in fileData.",
+        url: `local-epub://${file.name}`,
+        savedAt: Date.now(),
+        status: "inbox",
+        isRead: false,
+        favorite: false,
+        tags: [],
+        author: metadata.author,
+        publishedDate: metadata.publishedDate,
+        excerpt: metadata.description || "EPUB file",
+        readingProgress: 0,
+        siteName: "EPUB Book",
+        estimatedReadTime: estimatedReadingTime,
+        fileName: file.name,
+        fileSize: fileBuffer.byteLength,
+    };
+}
+
+// Helper function to process PDF files
+async function processPdfFile(file: File, userId: string): Promise<Omit<Article, "_id" | "_rev">> {
+    // Dynamically import pdf module
+    const pdfModule = await import("@/services/pdf");
+    if (!pdfModule.isValidPdf(file)) {
+        throw new Error("Invalid PDF file.");
+    }
+    const fileBuffer = await file.arrayBuffer();
+    const metadata = await pdfModule.extractPdfMetadata(file, fileBuffer);
+    const base64Content = pdfModule.arrayBufferToBase64(fileBuffer);
+    const estimatedReadingTime = await pdfModule.getEstimatedReadingTime(fileBuffer.byteLength, metadata.pageCount);
+
+    return {
+        userId,
+        title: metadata.title || file.name.replace(/\.pdf$/i, ""),
+        type: "pdf",
+        content: base64Content, // Store base64 content for PDF
+        url: `local-pdf://${file.name}`,
+        savedAt: Date.now(),
+        status: "inbox",
+        isRead: false,
+        favorite: false,
+        tags: [],
+        author: metadata.author,
+        publishedDate: metadata.publishedDate,
+        excerpt: metadata.description || "PDF file",
+        pageCount: metadata.pageCount,
+        readingProgress: 0,
+        siteName: "PDF Document",
+        estimatedReadTime: estimatedReadingTime,
+        fileName: file.name,
+        fileSize: fileBuffer.byteLength,
+    };
+}
 
 /**
  * Hook providing functions to perform actions on articles (add, update, delete).
@@ -37,29 +107,9 @@ import { useCallback, useMemo } from "react"; // Import useMemo
 export function useArticleActions(refreshArticles: () => Promise<void>) {
 	const { toast } = useToast();
 	const { userId, isSignedIn } = useAuth();
+	const { updateReadingProgress } = useReadingProgress(); // Use the new hook
 
-	// Debounced function for syncing progress updates to the cloud
-	const debouncedSyncProgress = useMemo(
-		() =>
-			debounce((articleToSync: Article) => {
-				saveItemToCloud(articleToSync)
-					.then((status: CloudSyncStatus) => {
-						if (status !== "success") {
-							console.warn(
-								`Debounced sync for progress update ${articleToSync._id} failed with status: ${status}`,
-							);
-						}
-						// No console log on success to reduce noise
-					})
-					.catch((err) => {
-						console.error(
-							`Error syncing progress update for ${articleToSync._id}:`,
-							err,
-						);
-					});
-			}, 1500), // Debounce for 1.5 seconds
-		[], // No dependencies, saveItemToCloud is a stable import
-	);
+	// Removed debouncedSyncProgress logic (moved to useReadingProgress)
 
 	// Add article by URL
 	const addArticleByUrl = useCallback(
@@ -131,88 +181,20 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 			}
 
 			try {
-				let articleToSave: Omit<Article, "_id" | "_rev"> & {
-					_id?: string;
-					_rev?: string;
-				};
-				let fileType: "epub" | "pdf" | null = null;
+				let articleToSave: Omit<Article, "_id" | "_rev">;
+				let fileType: "epub" | "pdf";
 
-				// Dynamically import epub functions first
-				const epubModule = await import("@/services/epub");
-				if (epubModule.isValidEpub(file)) {
+				// Check file type and process using helper functions
+				if (file.name.toLowerCase().endsWith(".epub")) {
+					articleToSave = await processEpubFile(file, userId);
 					fileType = "epub";
-					const fileBuffer = await file.arrayBuffer();
-					const metadata = await epubModule.extractEpubMetadata(fileBuffer);
-					const base64Content = epubModule.arrayBufferToBase64(fileBuffer);
-					const estimatedReadingTime = await epubModule.getEstimatedReadingTime(
-						fileBuffer.byteLength,
-					);
-
-					articleToSave = {
-						userId,
-						title: metadata.title || file.name.replace(/\.epub$/i, ""),
-						type: "epub",
-						fileData: base64Content,
-						content: "EPUB content is stored in fileData.",
-						url: `local-epub://${file.name}`,
-						savedAt: Date.now(),
-						status: "inbox",
-						isRead: false,
-						favorite: false,
-						tags: [],
-						author: metadata.author,
-						publishedDate: metadata.publishedDate,
-						excerpt: metadata.description || "EPUB file",
-						readingProgress: 0,
-						siteName: "EPUB Book",
-						estimatedReadTime: estimatedReadingTime,
-						fileName: file.name,
-						fileSize: fileBuffer.byteLength,
-					};
+				} else if (file.name.toLowerCase().endsWith(".pdf")) {
+					articleToSave = await processPdfFile(file, userId);
+					fileType = "pdf";
 				} else {
-					// Dynamically import pdf functions only if not epub
-					const pdfModule = await import("@/services/pdf");
-					if (pdfModule.isValidPdf(file)) {
-						fileType = "pdf";
-						const fileBuffer = await file.arrayBuffer();
-						const metadata = await pdfModule.extractPdfMetadata(
-							file,
-							fileBuffer,
-						);
-						const base64Content = pdfModule.arrayBufferToBase64(fileBuffer);
-						const estimatedReadingTime =
-							await pdfModule.getEstimatedReadingTime(
-								fileBuffer.byteLength,
-								metadata.pageCount,
-							);
-
-						articleToSave = {
-							userId,
-							title: metadata.title || file.name.replace(/\.pdf$/i, ""),
-							type: "pdf",
-							content: base64Content,
-							url: `local-pdf://${file.name}`,
-							savedAt: Date.now(),
-							status: "inbox",
-							isRead: false,
-							favorite: false,
-							tags: [],
-							author: metadata.author,
-							publishedDate: metadata.publishedDate,
-							excerpt: metadata.description || "PDF file",
-							pageCount: metadata.pageCount,
-							readingProgress: 0,
-							siteName: "PDF Document",
-							estimatedReadTime: estimatedReadingTime,
-							fileName: file.name,
-							fileSize: fileBuffer.byteLength,
-						};
-					} else {
-						// If neither EPUB nor PDF is valid
-						throw new Error(
-							"Invalid file type. Only EPUB and PDF formats are supported.",
-						);
-					}
+					throw new Error(
+						"Invalid file type. Only EPUB and PDF formats are supported.",
+					);
 				}
 
 				// Save the article locally
@@ -240,7 +222,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 
 				// Show success toast
 				toast({
-					title: `${fileType?.toUpperCase()} saved`,
+					title: `${fileType.toUpperCase()} saved`,
 					description: `"${savedArticle.title}" has been saved.`,
 				});
 
@@ -249,7 +231,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 
 				return savedArticle; // Return the saved article on success
 			} catch (err) {
-				// Catch any error during the process (import, validation, save)
+				// Catch any error during the process (validation, processing, save)
 				console.error("Failed to add file:", err);
 				toast({
 					title: "Failed to save file",
@@ -369,61 +351,6 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 			}
 		},
 		[toast, userId, isSignedIn, refreshArticles],
-	);
-
-	// Update reading progress
-	const updateReadingProgress = useCallback(
-		async (id: string, progress: number) => {
-			if (!isSignedIn || !userId) return; // Silently fail if not signed in
-
-			try {
-				const fetchedArticle = await getArticle(id);
-				if (!fetchedArticle || !fetchedArticle._rev) {
-					console.warn(
-						`Could not retrieve article ${id} for progress update. It might have been deleted.`,
-					);
-					return;
-				}
-
-				// Basic permission check
-				if (fetchedArticle.userId !== userId) {
-					console.warn(
-						`Permission denied to update progress for article ${id}.`,
-					);
-					return;
-				}
-
-				// Avoid unnecessary updates if progress hasn't changed significantly
-				const currentProgress = fetchedArticle.readingProgress ?? 0;
-				if (Math.abs(progress - currentProgress) < 1 && progress !== 100) {
-					// Allow explicit 100%
-					return;
-				}
-
-				const updates: Partial<Article> & { _id: string; _rev: string } = {
-					_id: id,
-					_rev: fetchedArticle._rev,
-					readingProgress: progress,
-				};
-
-				if (progress >= 90 && !fetchedArticle.isRead) {
-					updates.isRead = true;
-					updates.readAt = Date.now();
-				}
-
-				const updatedArticle = await updateArticle(updates);
-
-				// Sync progress update to cloud using the debounced function
-				debouncedSyncProgress(updatedArticle);
-
-				// No refresh needed here, UI should update optimistically or via direct state update if required elsewhere
-				// await refreshArticles(); // Avoid refreshing on every progress update
-			} catch (err) {
-				console.error("Failed to update reading progress:", err);
-				// No toast for progress updates
-			}
-		},
-		[userId, isSignedIn, debouncedSyncProgress], // Add stable debounced function
 	);
 
 	// Remove article - Returns true on successful DB delete, false otherwise.
@@ -551,7 +478,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 		addArticleByUrl,
 		addArticleByFile,
 		updateArticleStatus,
-		updateReadingProgress,
+		updateReadingProgress, // Return the function from the imported hook
 		removeArticle,
 		removeDuplicateLocalArticles, // Ensure the function is returned
 	};
