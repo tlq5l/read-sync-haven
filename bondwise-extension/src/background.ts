@@ -2,11 +2,11 @@ import { v4 as uuidv4 } from "uuid"; // For generating unique IDs
 
 // Define the structure for saved items to match Worker's expectations
 interface SavedItem {
-	_id: string;  // Changed from id to _id to match Worker
+	_id: string; // Changed from id to _id to match Worker
 	url: string;
 	title: string;
 	content?: string; // Main content for articles
-	savedAt: number;  // Changed from scrapedAt:string to savedAt:number to match Worker
+	savedAt: number; // Changed from scrapedAt:string to savedAt:number to match Worker
 	type: "article" | "youtube" | "other"; // Add more types later
 	userId: string; // Added userId field
 	isRead?: boolean;
@@ -56,12 +56,17 @@ async function getUserId(): Promise<string | null> {
 // Function to get or generate authentication token
 async function getAuthToken(): Promise<string | null> {
 	// First check if we have a valid stored token
-	const storedToken = await chrome.storage.local.get(["authToken", "authTokenExpiry"]);
+	const storedToken = await chrome.storage.local.get([
+		"authToken",
+		"authTokenExpiry",
+	]);
 
 	// Check if token exists and is not expired (24-hour validity)
-	if (storedToken.authToken &&
+	if (
+		storedToken.authToken &&
 		storedToken.authTokenExpiry &&
-		Date.now() < storedToken.authTokenExpiry) {
+		Date.now() < storedToken.authTokenExpiry
+	) {
 		return storedToken.authToken;
 	}
 
@@ -87,10 +92,10 @@ async function getAuthToken(): Promise<string | null> {
 	const token = btoa(`${email}:${timestamp}:${signature}`);
 
 	// Store token with 24-hour expiry
-	const expiryTime = timestamp + (24 * 60 * 60 * 1000);
+	const expiryTime = timestamp + 24 * 60 * 60 * 1000;
 	await chrome.storage.local.set({
 		authToken: token,
-		authTokenExpiry: expiryTime
+		authTokenExpiry: expiryTime,
 	});
 
 	console.log("Generated new authentication token with 24-hour validity");
@@ -147,15 +152,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 							}
 
 							const newItem: SavedItem = {
-								_id: uuidv4(),  // Changed from id to _id
+								_id: uuidv4(), // Changed from id to _id
 								url: scrapeResponse.data.url,
 								title: scrapeResponse.data.title,
 								content: scrapeResponse.data.content,
-								savedAt: Date.now(),  // Changed from scrapedAt (ISO string) to savedAt (timestamp)
+								savedAt: Date.now(), // Changed from scrapedAt (ISO string) to savedAt (timestamp)
 								type: scrapeResponse.data.type || "other",
 								userId: userId, // Include user ID
-								isRead: false,  // Added required fields
-								favorite: false
+								isRead: false, // Added required fields
+								favorite: false,
 							};
 							const workerUrl =
 								"https://bondwise-sync-api.vikione.workers.dev/items";
@@ -180,7 +185,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 									method: "POST",
 									headers: {
 										"Content-Type": "application/json",
-										"Authorization": `Bearer ${token}`  // Add token to request
+										Authorization: `Bearer ${token}`, // Add token to request
 									},
 									body: JSON.stringify(newItem),
 								});
