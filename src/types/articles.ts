@@ -1,4 +1,4 @@
-import type { Article } from "@/services/db";
+import type { Article, ArticleCategory } from "@/services/db"; // Import Article and ArticleCategory
 
 // Sorting
 export type ArticleSortField =
@@ -19,6 +19,7 @@ export interface ArticleFilters {
 	types: Article["type"][];
 	tags: string[]; // Array of tag IDs
 	searchQuery: string;
+	category?: ArticleCategory | null; // Optional category filter
 }
 
 // Context Value Extension (Illustrative - will be merged into ArticleContextType)

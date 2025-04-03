@@ -1,6 +1,5 @@
 // Removed unused React import
 import { Button } from "@/components/ui/button";
-import {} from "@/components/ui/dropdown-menu"; // Removed DropdownMenu related imports
 import {
 	Select,
 	SelectContent,
@@ -10,7 +9,7 @@ import {
 } from "@/components/ui/select";
 import { useArticles } from "@/context/ArticleContext";
 import type { ArticleSortField } from "@/types/articles";
-import { ArrowDownUp } from "lucide-react"; // Removed ChevronDown, Library
+import { ArrowDownUp } from "lucide-react"; // Removed Library icon
 import { Link, useLocation } from "react-router-dom";
 
 // Removed unused getSortLabel function
@@ -24,7 +23,6 @@ export default function TopBar() {
 		toggleSortDirection,
 	} = useArticles();
 	const location = useLocation();
-
 	const isActive = (path: string) => location.pathname === path;
 
 	return (

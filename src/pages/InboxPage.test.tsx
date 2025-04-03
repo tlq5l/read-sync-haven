@@ -409,6 +409,7 @@ const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			direction: prev.direction === "asc" ? "desc" : "asc",
 		}));
 	}, []);
+	const setSelectedCategory = vi.fn(); // Mock category setter
 
 	const value: MockArticleContextType = useMemo(
 		() => ({
@@ -428,6 +429,7 @@ const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			setSortCriteria, // Provide direct setter
 			setSortField, // Provide stable helper
 			toggleSortDirection, // Provide stable helper
+			setSelectedCategory, // Add mock setter
 			// Mock potentially needed action functions simply
 			refreshArticles: vi.fn().mockResolvedValue(mockRawArticles),
 			retryLoading: vi.fn(),
@@ -443,6 +445,7 @@ const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			sortCriteria,
 			// setSortCriteria is stable
 			setSortField, // Stable helper reference
+			setSelectedCategory, // Add stable mock function reference
 			toggleSortDirection, // Stable helper reference
 		],
 	);

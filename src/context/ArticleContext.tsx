@@ -4,7 +4,12 @@ import { useArticleSync } from "@/hooks/useArticleSync";
 import { type ArticleView, useArticleView } from "@/hooks/useArticleView";
 import { useDatabaseInit } from "@/hooks/useDatabaseInit";
 import { filterArticles, sortArticles } from "@/lib/articleUtils"; // Import utils
-import { type Article, type Tag, getAllTags } from "@/services/db"; // Import Tag and getAllTags
+import {
+	type Article,
+	type ArticleCategory,
+	type Tag,
+	getAllTags,
+} from "@/services/db"; // Import Tag, getAllTags, and ArticleCategory
 import type {
 	ArticleFilters,
 	ArticleSortField,
@@ -40,6 +45,7 @@ interface ArticleContextType {
 	setFilters: React.Dispatch<React.SetStateAction<ArticleFilters>>; // Allow direct setting
 	setSearchQuery: (query: string) => void;
 	// Add specific filter setters if needed (e.g., addSiteFilter, removeTagFilter)
+	setSelectedCategory: (category: ArticleCategory | null) => void; // New setter for category
 	sortCriteria: SortCriteria;
 	setSortCriteria: (criteria: SortCriteria) => void;
 	setSortField: (field: ArticleSortField) => void;
@@ -96,6 +102,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		types: [],
 		tags: [],
 		searchQuery: "",
+		category: null, // Initialize category filter
 	});
 
 	// 6. Sorting State
@@ -167,6 +174,13 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		setSortCriteria((prev) => ({ ...prev, field }));
 	}, []); // setSortCriteria is stable
 
+	const setSelectedCategory = useCallback(
+		(category: ArticleCategory | null) => {
+			setFilters((prev) => ({ ...prev, category }));
+		},
+		[],
+	); // setFilters is stable
+
 	// Optimistic remove function
 	const optimisticRemoveArticle = useCallback(
 		async (id: string) => {
@@ -235,6 +249,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			filters,
 			setFilters, // Expose direct setter
 			setSearchQuery, // Stable helper
+			setSelectedCategory, // Add category setter
 			sortCriteria,
 			setSortCriteria, // Expose direct setter
 			setSortField, // Stable helper
@@ -261,6 +276,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			filters,
 			// setFilters is stable
 			setSearchQuery, // Stable helper reference
+			setSelectedCategory, // Add category setter reference
 			sortCriteria,
 			// setSortCriteria is stable
 			setSortField, // Stable helper reference

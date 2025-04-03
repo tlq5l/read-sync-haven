@@ -11,7 +11,7 @@ export function filterArticles(
 	articles: Article[],
 	filters: ArticleFilters,
 ): Article[] {
-	const { siteNames, types, tags, searchQuery } = filters;
+	const { siteNames, types, tags, searchQuery, category } = filters; // Add category
 	const query = searchQuery.toLowerCase().trim();
 
 	return articles.filter((article) => {
@@ -40,6 +40,10 @@ export function filterArticles(
 			tags.length > 0 &&
 			!tags.some((tagId) => article.tags?.includes(tagId))
 		) {
+			return false;
+		}
+		// Filter by category
+		if (category && article.category !== category) {
 			return false;
 		}
 

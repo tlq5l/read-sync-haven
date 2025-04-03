@@ -2,8 +2,23 @@
 
 import { v4 as uuidv4 } from "uuid";
 import { articlesDb } from "./config"; // Import the initialized DB instance
-import type { Article } from "./types";
+import type { Article, ArticleCategory } from "./types"; // Import ArticleCategory
 import { executeWithRetry } from "./utils";
+
+// Helper to infer category from type
+const inferCategoryFromType = (type: Article["type"]): ArticleCategory => {
+	switch (type) {
+		case "pdf":
+			return "pdf";
+		case "epub":
+			return "book"; // Assuming EPUBs are books
+		case "article":
+			return "article";
+		// 'note' type falls through to default
+		default:
+			return "other";
+	}
+};
 
 /**
  * Saves a new article or updates an existing one.
@@ -35,6 +50,9 @@ export async function saveArticle(
 			type: article.type || "article",
 			// Ensure _rev is only included if it's an update attempt
 			...(isUpdate && article._rev ? { _rev: article._rev } : {}),
+			// Set category: prioritize explicit, then infer, then default to 'other'
+			category:
+				article.category ?? inferCategoryFromType(article.type || "article"),
 		};
 
 		// Validate essential fields before saving
@@ -118,6 +136,11 @@ export async function saveArticle(
 						fileName: article.fileName ?? latestArticle.fileName,
 						fileSize: article.fileSize ?? latestArticle.fileSize,
 						pageCount: article.pageCount ?? latestArticle.pageCount,
+						// Merge category: prioritize incoming explicit, then inferred from incoming type, then existing
+						category:
+							article.category ??
+							inferCategoryFromType(article.type ?? latestArticle.type) ??
+							latestArticle.category,
 					};
 					const retryResponse = await articlesDb.put(docToRetry);
 					if (retryResponse.ok) {
@@ -194,6 +217,8 @@ export async function bulkSaveArticles(
 				favorite: article.favorite ?? false,
 				tags: article.tags || [],
 				type: article.type || "article",
+				category:
+					article.category ?? inferCategoryFromType(article.type || "article"),
 				// _rev will be added later if it's an update
 			};
 			docsToProcess.push(preparedDoc);
@@ -267,6 +292,11 @@ export async function bulkSaveArticles(
 					fileName: doc.fileName ?? existingDoc.fileName,
 					fileSize: doc.fileSize ?? existingDoc.fileSize,
 					pageCount: doc.pageCount ?? existingDoc.pageCount,
+					// Merge category: prioritize incoming explicit, then inferred from incoming type, then existing
+					category:
+						doc.category ??
+						inferCategoryFromType(doc.type ?? existingDoc.type) ??
+						existingDoc.category,
 				};
 				return mergedDoc;
 			}
@@ -365,6 +395,13 @@ export async function updateArticle(
 				// Ensure _id and _rev from the update object are used for the put operation
 				_id: articleUpdate._id,
 				_rev: articleUpdate._rev,
+				// Update category: Use explicit if provided, infer if type changed, else keep existing
+				category:
+					articleUpdate.category !== undefined
+						? articleUpdate.category
+						: articleUpdate.type !== undefined
+							? inferCategoryFromType(articleUpdate.type)
+							: existingArticle.category,
 			};
 
 			const response = await articlesDb.put(updatedArticle);

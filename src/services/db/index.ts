@@ -9,7 +9,7 @@ export {
 } from "./config";
 
 // --- Types ---
-export type { Article, Highlight, Tag } from "./types";
+export type { Article, ArticleCategory, Highlight, Tag } from "./types"; // Add ArticleCategory
 
 // --- Utilities ---
 export {

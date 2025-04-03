@@ -8,33 +8,64 @@ import { useArticles } from "@/context/ArticleContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
+import type { ArticleCategory } from "@/services/db"; // Import ArticleCategory
 import { useAuth } from "@clerk/clerk-react"; // Removed unused useUser and UserButton
 import {
-	// Bookmark, // Removed unused icon
-	ChevronLeft,
+	BookOpen, // Icon for Books
+	ChevronsUpDown, // Icon for Library collapse
+	// ChevronLeft, // Removed old icon
+	// ChevronRight, // Removed old icon
 	// Clock, // Removed unused icon
+	FileText, // Icon for PDFs
 	Home,
 	Library,
 	LogIn,
-	MenuIcon,
+	// MenuIcon, // Removed old icon
 	Moon,
+	Newspaper, // Icon for Articles
+	// PanelLeftClose, // Removed old icon
+	// PanelLeftOpen, // Removed old icon
 	Plus,
 	Settings,
+	Shapes, // Icon for Other
+	SidebarClose, // New icon for sidebar collapse
+	SidebarOpen, // New icon for sidebar expand
 	Sun,
+	Video, // Icon for Videos
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react"; // Add React default import
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
 	const [collapsed, setCollapsed] = useState(false);
+	const [isLibraryOpen, setIsLibraryOpen] = useState(true); // State for library collapse
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { setCurrentView } = useArticles(); // Removed unused currentView
+	const { setCurrentView, setSelectedCategory, filters } = useArticles(); // Add category filter state and setter
+	const currentCategory = filters.category; // Extract current category
 	const { theme, setTheme } = useTheme();
 	const { synchronizeAnimations } = useAnimation();
 	const { isSignedIn } = useAuth();
 	// const { user } = useUser(); // Removed as unused
 	const [isDarkMode, setIsDarkMode] = useState(false);
+
+	// Define categories for the dropdown (excluding "All")
+	const categories: ArticleCategory[] = [
+		"article",
+		"book",
+		"pdf",
+		"video",
+		"other",
+	];
+
+	// Map categories to icons
+	const categoryIcons: Record<ArticleCategory, React.ElementType> = {
+		article: Newspaper,
+		book: BookOpen,
+		pdf: FileText,
+		video: Video,
+		other: Shapes,
+	};
 
 	// Create synchronized animations for the sidebar
 	const sidebarAnimation = useSynchronizedAnimation({
@@ -143,7 +174,7 @@ export default function Sidebar() {
 							// Removed conditional margin, parent div handles centering/alignment
 						)}
 					>
-						{collapsed ? <MenuIcon size={20} /> : <ChevronLeft size={20} />}
+						{collapsed ? <SidebarOpen size={20} /> : <SidebarClose size={20} />}
 					</Button>
 				</div>
 			</div>
@@ -178,20 +209,59 @@ export default function Sidebar() {
 
 					<TransitionItem showFrom="left" className="w-full">
 						{/* Library Button */}
+						{/* Collapsible Library Trigger */}
 						<Button
 							variant="ghost"
 							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
 							onClick={() => {
-								setCurrentView("all"); // Reset view similar to Home
-								navigate("/inbox");
+								setIsLibraryOpen(!isLibraryOpen);
+								setSelectedCategory(null); // Clear category filter
+								navigate("/inbox"); // Navigate to the main library view
 							}}
-							style={isActive("/inbox") ? styles.activeLink : styles.link}
+							style={styles.link} // Use base link style for the trigger
 						>
-							<Library size={20} />
+							<ChevronsUpDown size={16} /> {/* Use single icon */}
+							<Library size={20} className="ml-1" /> {/* Adjust icon spacing */}
 							{!collapsed && (
-								<span className="transition-opacity duration-200">Library</span>
+								<span className="transition-opacity duration-200 font-medium">
+									Library
+								</span>
 							)}
 						</Button>
+						{/* Collapsible Category List - Render directly below trigger if open */}
+						{isLibraryOpen && !collapsed && (
+							<div className="w-full pl-6 mt-1 space-y-1">
+								{categories.map((cat) => {
+									// Handle PDF capitalization specifically
+									const label =
+										cat === "pdf"
+											? "PDFs"
+											: `${cat.charAt(0).toUpperCase() + cat.slice(1)}s`;
+									const isActiveCategory = currentCategory === cat;
+									return (
+										<Button
+											key={cat ?? "all"}
+											variant="ghost"
+											size="sm"
+											className="w-full flex items-center justify-start gap-2 py-1 h-8 text-sm"
+											onClick={() => {
+												setSelectedCategory(cat);
+												// Optional: navigate to a base view if needed
+												// navigate("/inbox");
+											}}
+											style={isActiveCategory ? styles.activeLink : styles.link}
+										>
+											{/* Render the icon */}
+											{React.createElement(categoryIcons[cat], {
+												size: 16,
+												className: "mr-2",
+											})}
+											<span>{label}</span>
+										</Button>
+									);
+								})}
+							</div>
+						)}
 					</TransitionItem>
 
 					{/* Removed Unread and Favorites buttons - handled by TopBar */}

@@ -134,7 +134,10 @@ export async function updateMissingMetadata(): Promise<number> {
 				}
 
 				// Add excerpt if missing and content exists
-				if ((!docToUpdate.excerpt || docToUpdate.excerpt.trim() === "") && docToUpdate.content) {
+				if (
+					(!docToUpdate.excerpt || docToUpdate.excerpt.trim() === "") &&
+					docToUpdate.content
+				) {
 					// Simple excerpt: first 200 chars, add ellipsis if longer
 					const plainTextContent = docToUpdate.content
 						.replace(/<[^>]+>/g, " ")

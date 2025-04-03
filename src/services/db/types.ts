@@ -1,5 +1,8 @@
 // src/services/db/types.ts
 
+// Define the possible categories
+export type ArticleCategory = "article" | "book" | "pdf" | "video" | "other";
+
 /**
  * Represents a saved article, PDF, EPUB, or note.
  */
@@ -29,6 +32,7 @@ export interface Article {
 	userId?: string; // User ID associated with this article (e.g., from Clerk)
 	status: "inbox" | "later" | "archived"; // Article status
 
+	category?: ArticleCategory; // Broad classification of the content
 	// Optional fields added based on usage elsewhere
 	htmlContent?: string; // Raw HTML content, if available
 	scrollPosition?: number; // Last reading scroll position (e.g., pixel value)
