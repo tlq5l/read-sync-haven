@@ -127,7 +127,12 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 						{/* Make inner div grow, remove justify-between */}
 						{article.isRead ? (
 							<div className="flex justify-between items-start mb-2">
-								<span className="text-xs text-muted-foreground" data-testid="read-status">Read</span>
+								<span
+									className="text-xs text-muted-foreground"
+									data-testid="read-status"
+								>
+									Read
+								</span>
 								<div className="flex items-center gap-1">
 									{/* Move to Later Button */}
 									<Button
@@ -203,7 +208,10 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 							</div>
 						) : (
 							<div className="flex justify-between items-start mb-2">
-								<span className="text-xs font-medium text-bondwise-500" data-testid="unread-status">
+								<span
+									className="text-xs font-medium text-bondwise-500"
+									data-testid="unread-status"
+								>
 									Unread
 								</span>
 								<div className="flex items-center gap-1">

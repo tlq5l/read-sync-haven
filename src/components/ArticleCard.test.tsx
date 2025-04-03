@@ -308,7 +308,8 @@ describe("ArticleCard", () => {
 	it("should apply line-clamp-2 to title and excerpt", () => {
 		const webArticle: Article = {
 			_id: "article-clamp-test",
-			title: "Very Long Title That Should Definitely Be Clamped After Two Lines",
+			title:
+				"Very Long Title That Should Definitely Be Clamped After Two Lines",
 			url: "https://example.com/clamp",
 			content: "<p>Content</p>",
 			excerpt:
