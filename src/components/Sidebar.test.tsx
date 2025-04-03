@@ -7,12 +7,17 @@ import Sidebar from "./Sidebar";
 
 // --- Mocks ---
 
-// Mock Clerk hooks
-vi.mock("@clerk/clerk-react", () => ({
-	useAuth: () => ({ isSignedIn: true }),
-	useUser: () => ({ user: { firstName: "Test" } }),
-	UserButton: () => <div data-testid="user-button">User Button</div>,
-}));
+// Mock Clerk hooks - Provide a flexible mock setup
+const mockUseAuth = vi.fn(() => ({ isSignedIn: true })); // Default to signed in
+vi.mock("@clerk/clerk-react", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@clerk/clerk-react")>();
+	return {
+		...actual, // Keep original exports not explicitly mocked
+		useAuth: () => mockUseAuth(), // Call the mock function defined outside (simplified)
+		useUser: () => ({ user: { firstName: "Test" } }),
+		UserButton: () => <div data-testid="user-button">User Button</div>,
+	};
+});
 
 // Mock useArticles hook
 const mockSetCurrentView = vi.fn();
@@ -110,6 +115,8 @@ describe("Sidebar Component", () => {
 	beforeEach(() => {
 		// Reset mocks before each test
 		vi.clearAllMocks();
+		// Reset useAuth mock to default (signed in) before each test
+		mockUseAuth.mockReturnValue({ isSignedIn: true });
 	});
 
 	it("renders the Home button with Home icon and navigates to '/' on click", () => {
@@ -150,28 +157,31 @@ describe("Sidebar Component", () => {
 		expect(mockNavigate).toHaveBeenCalledWith("/inbox");
 	});
 
-	it("renders other expected navigation links like Settings", () => {
+	it("renders the Settings link visibly", () => {
 		render(
 			<MockProviders>
 				<Sidebar />
 			</MockProviders>,
 		);
-		expect(screen.getByRole("link", { name: /settings/i })).toBeInTheDocument();
+		// Assert visibility
+		expect(screen.getByRole("link", { name: /settings/i })).toBeVisible();
 		// Check for Settings icon
-		expect(screen.getByTestId("icon-Settings")).toBeInTheDocument();
+		expect(screen.getByTestId("icon-Settings")).toBeVisible();
 	});
 
-	it("renders theme toggle button", () => {
+	it("renders the theme toggle button visibly", () => {
 		render(
 			<MockProviders>
 				<Sidebar />
 			</MockProviders>,
 		);
-		// Check for either Sun or Moon icon depending on default theme mock if needed
-		// Or just check for the button role
-		expect(
-			screen.getByRole("button", { name: /light mode|dark mode/i }),
-		).toBeInTheDocument();
+		// Assert visibility
+		const themeButton = screen.getByRole("button", {
+			name: /light mode|dark mode/i,
+		});
+		expect(themeButton).toBeVisible();
+		// Check for appropriate icon based on default theme (system->light initially)
+		expect(themeButton.querySelector('[data-testid="icon-Sun"]')).toBeVisible();
 	});
 
 	it("renders Add Content button when signed in", () => {
@@ -186,5 +196,24 @@ describe("Sidebar Component", () => {
 		expect(screen.getByTestId("icon-Plus")).toBeInTheDocument();
 	});
 
-	// Add more tests as needed for collapse/expand, sign-in state etc.
+	it("renders Sign In link visibly when signed out", () => {
+		// Arrange: Mock signed out state
+		mockUseAuth.mockReturnValue({ isSignedIn: false });
+
+		render(
+			<MockProviders>
+				<Sidebar />
+			</MockProviders>,
+		);
+
+		// Assert visibility
+		expect(screen.getByRole("link", { name: /sign in/i })).toBeVisible();
+		expect(screen.getByTestId("icon-LogIn")).toBeVisible();
+		// Ensure Add Content is NOT visible
+		expect(
+			screen.queryByRole("link", { name: /add content/i }),
+		).not.toBeInTheDocument();
+	});
+
+	// Add more tests as needed for collapse/expand etc.
 });
