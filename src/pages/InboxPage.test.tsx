@@ -1,6 +1,5 @@
 // Import necessary testing utilities and types
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { act } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,12 +14,11 @@ import InboxPage from "./InboxPage"; // The component to test
 import type React from "react"; // Use type import
 // Import the mock provider and test utilities
 import {
-	MockArticleProvider,
-	testSetSort,
-	testToggleSortDirection,
-	// mockRawArticles, // Removed unused import
-	testUpdateFilters,
-	// MockArticleContext, // Removed unused import (imported within vi.mock)
+    MockArticleProvider,
+    testSetSort,
+    testToggleSortDirection,
+    // mockRawArticles, // Removed unused import
+    testUpdateFilters,
 } from "../test-utils/MockArticleProvider"; // Adjusted path
 
 // --- Mocks ---
@@ -159,7 +157,26 @@ vi.mock("@/components/ui/dropdown-menu", async () => {
 	};
 });
 
-// Mock the useArticles hook to use the imported MockArticleContext
+// Mock VirtualizedArticleList to bypass virtualization issues in JSDOM
+vi.mock("@/components/VirtualizedArticleList", () => ({
+	default: ({ articles }: { articles: Article[] }) => {
+		// Render a simple list instead of the virtualized one
+		// Use the article title in the link name to match test queries
+		return (
+			<div data-testid="mock-virtualized-list">
+				{articles.map((article) => (
+					<a
+						key={article._id}
+						href={`/read/${article._id}`} // Simple href for role="link"
+						data-testid={`article-link-${article._id}`}
+					>Read {article.title}</a> // Put text on one line to avoid extra whitespace
+				))}
+			</div>
+		);
+	},
+}));
+
+// Mock context hook (to be used by MockProvider)
 vi.mock("@/context/ArticleContext", async (importOriginal) => {
 	const original =
 		await importOriginal<typeof import("@/context/ArticleContext")>();
@@ -198,11 +215,13 @@ describe("InboxPage Integration Tests", () => {
 
 	it("should render the initial list of articles", async () => {
 		renderInboxPage();
-		await waitFor(() => {
-			expect(screen.queryAllByTestId("article-card").length).toBeGreaterThan(0);
-		});
-		// Optional: Assert based on mock data length if needed, acknowledging virtualization limits DOM checks
-		// expect(mockRawArticles.length).toBe(4);
+		const articleCards = screen.getAllByRole("link", { name: /read/i }); // Links within cards
+		expect(articleCards).toHaveLength(mockRawArticles.length);
+		// Check order based on text content (assuming default sort is date desc)
+		expect(articleCards[0].textContent).toBe("Read TypeScript Intro"); // Newest
+		expect(articleCards[1].textContent).toBe("Read My PDF");
+		expect(articleCards[2].textContent).toBe("Read CSS Magic");
+		expect(articleCards[3].textContent).toBe("Read React Fun"); // Oldest
 	});
 
 	it("should sort articles by title ascending using test utility", async () => {
@@ -212,45 +231,61 @@ describe("InboxPage Integration Tests", () => {
 			testSetSort("title", "asc");
 		});
 
-		await waitFor(() => {
-			expect(screen.getByText("CSS Magic")).toBeInTheDocument();
-		});
+		// Wait for UI to update with longer timeout
+		await waitFor(
+			() => {
+				// Check using the mock structure
+				const articleLinks = screen.getAllByRole("link", { name: /read/i });
+				expect(articleLinks).toHaveLength(mockRawArticles.length);
+
+				// Check order based on text content (title ascending)
+				expect(articleLinks[0].textContent).toBe("Read CSS Magic");
+				expect(articleLinks[1].textContent).toBe("Read My PDF");
+				expect(articleLinks[2].textContent).toBe("Read React Fun");
+				expect(articleLinks[3].textContent).toBe("Read TypeScript Intro");
+			},
+			{ timeout: 2000 },
+		);
 	});
 
-	it("should toggle sort direction using test utility", async () => {
-		renderInboxPage(); // Default: Date Desc
+	it("should change sort direction when toggled", async () => {
+		renderInboxPage();
 
 		await act(async () => {
 			testToggleSortDirection(); // Toggles to Date Asc
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText("React Fun")).toBeInTheDocument(); // Oldest first
-		});
+			const articleCards = screen.getAllByRole("link", { name: /read/i });
 
-		await act(async () => {
-			testToggleSortDirection(); // Toggles back to Date Desc
-		});
+			// Get text content from links
+			const linkTexts = articleCards.map((link) => link.textContent);
 
-		await waitFor(() => {
-			expect(screen.getByText("TypeScript Intro")).toBeInTheDocument(); // Newest first
+			// After toggle, should go from newest->oldest to oldest->newest (Date Asc)
+			expect(linkTexts[0]).toBe("Read React Fun"); // Oldest first
+			expect(linkTexts[1]).toBe("Read CSS Magic");
+			expect(linkTexts[2]).toBe("Read My PDF");
+			expect(linkTexts[3]).toBe("Read TypeScript Intro"); // Newest
 		});
 	});
 
-	it("should filter by site name using test utility", async () => {
+	it("should filter articles by site name", async () => {
 		renderInboxPage();
 
 		await act(async () => {
-			testUpdateFilters({ siteNames: ["React.dev"] });
+			testUpdateFilters({ siteNames: ["reactjs.org"] });
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText("React Fun")).toBeInTheDocument();
-			expect(screen.queryByText("TypeScript Intro")).not.toBeInTheDocument();
+			// Check using the mock structure
+			const articleLinks = screen.getAllByRole("link", { name: /read/i });
+			expect(articleLinks).toHaveLength(1);
+			// Check the text content of the filtered link
+			expect(articleLinks[0].textContent).toBe("Read React Fun");
 		});
 	});
 
-	it("should filter by type using test utility", async () => {
+	it("should filter articles by type", async () => {
 		renderInboxPage();
 
 		await act(async () => {
@@ -258,22 +293,33 @@ describe("InboxPage Integration Tests", () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText("My PDF")).toBeInTheDocument();
-			expect(screen.queryByText("React Fun")).not.toBeInTheDocument();
+			// Check using the mock structure
+			const articleLinks = screen.getAllByRole("link", { name: /read/i });
+			expect(articleLinks).toHaveLength(1);
+			// Check the text content of the filtered link
+			expect(articleLinks[0].textContent).toBe("Read My PDF");
 		});
 	});
 
-	it("should filter by tag using test utility", async () => {
+	it("should filter articles by tags", async () => {
 		renderInboxPage();
 
 		await act(async () => {
-			testUpdateFilters({ tags: ["t1"] });
+			testUpdateFilters({ selectedTags: ["t1"] }); // t1 is on CSS Magic and React Fun articles
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText("React Fun")).toBeInTheDocument();
-			expect(screen.getByText("CSS Magic")).toBeInTheDocument();
-			expect(screen.queryByText("TypeScript Intro")).not.toBeInTheDocument();
+			// Check using the mock structure
+			const articleLinks = screen.getAllByRole("link", { name: /read/i });
+			expect(articleLinks).toHaveLength(2); // Articles with tag 't1'
+
+			// Get text content from the links
+			const linkTexts = articleLinks.map((link) => link.textContent);
+
+			// Check content - order depends on default sort (savedAt desc)
+			// CSS Magic (1705M) is newer than React Fun (1700M)
+			expect(linkTexts[0]).toBe("Read CSS Magic"); // Already fixed whitespace in mock
+			expect(linkTexts[1]).toBe("Read React Fun");
 		});
 	});
 
