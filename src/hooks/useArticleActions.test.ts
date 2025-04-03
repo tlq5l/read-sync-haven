@@ -65,6 +65,7 @@ vi.mock("@clerk/clerk-react", () => ({
 	useAuth: () => ({
 		userId: "test-user-id",
 		isSignedIn: true,
+		getToken: vi.fn().mockResolvedValue("mock-test-token"), // Add mock getToken
 	}),
 }));
 

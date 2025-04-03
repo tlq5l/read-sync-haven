@@ -407,7 +407,7 @@ describe("useArticleSync", () => {
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
-		expect(mockDeleteItemFromCloud).toHaveBeenCalledWith("1");
+		expect(mockDeleteItemFromCloud).toHaveBeenCalledWith("1", "test-token"); // Expect token
 		expect(mockArticlesDbBulkDocs).toHaveBeenCalledWith(
 			expect.arrayContaining([
 				expect.objectContaining({ _id: "1", _rev: "rev-1-2", _deleted: true }),
@@ -464,7 +464,7 @@ describe("useArticleSync", () => {
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
 		expect(mockOperationsQueueDbAllDocs).toHaveBeenCalled();
-		expect(mockDeleteItemFromCloud).toHaveBeenCalledWith("1");
+		expect(mockDeleteItemFromCloud).toHaveBeenCalledWith("1", "test-token"); // Expect token
 		expect(mockOperationsQueueDbBulkDocs).toHaveBeenCalledWith(
 			expect.arrayContaining([
 				expect.objectContaining({ _id: "qdel-1", _deleted: true }),
@@ -649,7 +649,7 @@ describe("useArticleSync", () => {
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
 		expect(mockOperationsQueueDbAllDocs).toHaveBeenCalled();
-		expect(mockSaveItemToCloud).toHaveBeenCalledWith(localUpdatedArticle);
+		expect(mockSaveItemToCloud).toHaveBeenCalledWith(localUpdatedArticle, "test-token"); // Expect token
 		expect(mockOperationsQueueDbBulkDocs).toHaveBeenCalledWith(
 			expect.arrayContaining([
 				expect.objectContaining({ _id: "qupd-1", _deleted: true }),

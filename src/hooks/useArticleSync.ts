@@ -89,7 +89,8 @@ async function _loadArticlesFromCache(
 }
 
 // --- Processes the offline operations queue ---
-async function _processOfflineQueue(): Promise<{
+async function _processOfflineQueue(token: string): Promise<{
+	// Add token parameter
 	processedDeletes: Set<string>;
 	processedUpdates: Set<string>;
 	failedOps: number;
@@ -125,7 +126,7 @@ async function _processOfflineQueue(): Promise<{
 				let success = false;
 				if (op.type === "delete") {
 					console.log(`Sync Hook: Processing queued delete for ${op.docId}`);
-					const deleteStatus = await deleteItemFromCloud(op.docId);
+					const deleteStatus = await deleteItemFromCloud(op.docId, token); // Pass token
 					// Consider 404 (not_found) as success for deletes, as the item is gone
 					if (deleteStatus === "success" || deleteStatus === "not_found") {
 						success = true;
@@ -142,7 +143,7 @@ async function _processOfflineQueue(): Promise<{
 					if (latestLocal && !latestLocal.deletedAt) {
 						console.log(`Sync Hook: Processing queued update for ${op.docId}`);
 						// Send the LATEST local state, not potentially stale op.data
-						const updateStatus = await saveItemToCloud(latestLocal);
+						const updateStatus = await saveItemToCloud(latestLocal, token); // Pass token
 						if (updateStatus === "success") {
 							success = true;
 							processedUpdates.add(op.docId);
@@ -281,22 +282,53 @@ async function _performCloudSync(
 
 	try {
 		console.log("Sync Hook: Starting enhanced sync with reconciliation...");
-		const token = await getToken();
+		const token = await getToken(); // Moved token fetch earlier
 		const userEmail = user?.primaryEmailAddress?.emailAddress;
 
-		if (!token)
-			throw new Error("Could not retrieve authentication token for sync.");
+		// Initialize queue results defaults
+		let processedDeletes = new Set<string>();
+		let processedUpdates = new Set<string>();
+		let failedOps = 0;
 
-		// === 1. Process Offline Queue ===
-		const { processedDeletes, processedUpdates, failedOps } =
-			await _processOfflineQueue();
-		if (failedOps < 0) {
-			// General queue processing error, maybe notify user?
+		// === 1. Process Offline Queue (Conditionally) ===
+		if (!token) {
+			console.error(
+				"Sync Hook: Cannot process offline queue, authentication token is missing.",
+			);
+			// Skip queue processing if no token
 			toast({
 				title: "Sync Warning",
-				description: "Could not process all offline changes.",
+				description:
+					"Could not process offline changes: Authentication missing.",
 				variant: "default",
 			});
+			// Setting failedOps to indicate skip might be useful, but not strictly necessary
+			// failedOps = -1; // Or some other indicator if needed downstream
+		} else {
+			console.log("Sync Hook: Processing offline queue with token...");
+			// Call queue processor ONLY if token exists
+			const queueResult = await _processOfflineQueue(token); // Pass token
+			processedDeletes = queueResult.processedDeletes;
+			processedUpdates = queueResult.processedUpdates;
+			failedOps = queueResult.failedOps;
+			if (failedOps < 0) {
+				// General queue processing error from within _processOfflineQueue
+				toast({
+					title: "Sync Warning",
+					description: "Error processing offline changes.", // Simplified message
+					variant: "default",
+				});
+			}
+		}
+		// Continue sync logic regardless of queue processing success/skip,
+		// unless no token is a fatal error for the whole sync.
+
+		// Ensure token is still valid for subsequent operations
+		if (!token) {
+			console.error(
+				"Sync Hook: Cannot proceed with cloud fetch, token missing.",
+			);
+			throw new Error("Authentication token missing, cannot sync."); // Make it fatal here
 		}
 
 		// === 2. Fetch Current States ===
@@ -363,7 +395,7 @@ async function _performCloudSync(
 								`Sync Hook: Re-attempting cloud delete for locally deleted ${cloudId}`,
 							);
 							try {
-								const delStatus = await deleteItemFromCloud(cloudId);
+								const delStatus = await deleteItemFromCloud(cloudId, token); // Pass token
 								if (delStatus === "success" || delStatus === "not_found") {
 									cloudDeletesToHardDeleteLocally.push(localArticle); // Mark for local cleanup
 								} else {

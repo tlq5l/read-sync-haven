@@ -120,7 +120,7 @@ async function processPdfFile(
  */
 export function useArticleActions(refreshArticles: () => Promise<void>) {
 	const { toast } = useToast();
-	const { userId, isSignedIn } = useAuth();
+	const { userId, isSignedIn, getToken } = useAuth(); // Add getToken
 	const { updateReadingProgress } = useReadingProgress(); // Use the new hook
 
 	// Removed debouncedSyncProgress logic (moved to useReadingProgress)
@@ -167,23 +167,34 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				await refreshArticles();
 
 				// Sync to Cloud (fire and forget)
-				saveItemToCloud(savedArticle)
-					.then((status: CloudSyncStatus) => {
-						if (status === "success") {
-							console.log(
-								`Successfully synced article ${savedArticle._id} to cloud.`,
-							);
-						} else {
-							console.warn(
-								`Sync for article ${savedArticle._id} failed with status: ${status}`,
-							);
+				getToken() // Get token before syncing
+					.then((token) => {
+						if (!token) {
+							console.error("Cannot sync saved article: No token available.");
+							return; // Don't attempt sync without token
 						}
+						saveItemToCloud(savedArticle, token) // Pass token
+							.then((status: CloudSyncStatus) => {
+								if (status === "success") {
+									console.log(
+										`Successfully synced article ${savedArticle._id} to cloud.`,
+									);
+								} else {
+									console.warn(
+										`Sync for article ${savedArticle._id} failed with status: ${status}`,
+									);
+								}
+							})
+							.catch((err) => {
+								console.error(
+									`Error syncing article ${savedArticle._id} to cloud:`,
+									err,
+								);
+							});
 					})
 					.catch((err) => {
-						console.error(
-							`Error syncing article ${savedArticle._id} to cloud:`,
-							err,
-						);
+						// Error fetching token
+						console.error("Error fetching token for cloud sync:", err);
 					});
 
 				return savedArticle;
@@ -200,7 +211,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				return null;
 			}
 		},
-		[toast, userId, isSignedIn, refreshArticles],
+		[toast, userId, isSignedIn, getToken, refreshArticles], // Add getToken
 	);
 
 	// Add article by file (EPUB or PDF)
@@ -236,23 +247,34 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				const savedArticle = await saveArticle(articleToSave);
 
 				// Sync to Cloud (fire and forget)
-				saveItemToCloud(savedArticle)
-					.then((status: CloudSyncStatus) => {
-						if (status === "success") {
-							console.log(
-								`Successfully synced ${fileType} ${savedArticle._id} to cloud.`,
-							);
-						} else {
-							console.warn(
-								`Sync for ${fileType} ${savedArticle._id} failed with status: ${status}`,
-							);
+				getToken() // Get token before syncing
+					.then((token) => {
+						if (!token) {
+							console.error("Cannot sync saved file: No token available.");
+							return; // Don't attempt sync without token
 						}
+						saveItemToCloud(savedArticle, token) // Pass token
+							.then((status: CloudSyncStatus) => {
+								if (status === "success") {
+									console.log(
+										`Successfully synced ${fileType} ${savedArticle._id} to cloud.`,
+									);
+								} else {
+									console.warn(
+										`Sync for ${fileType} ${savedArticle._id} failed with status: ${status}`,
+									);
+								}
+							})
+							.catch((err) => {
+								console.error(
+									`Error syncing ${fileType} ${savedArticle._id} to cloud:`,
+									err,
+								);
+							});
 					})
 					.catch((err) => {
-						console.error(
-							`Error syncing ${fileType} ${savedArticle._id} to cloud:`,
-							err,
-						);
+						// Error fetching token
+						console.error("Error fetching token for cloud sync:", err);
 					});
 
 				// Show success toast
@@ -279,7 +301,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				return null; // Return null on failure
 			}
 		}, // End of async function passed to useCallback
-		[toast, userId, isSignedIn, refreshArticles], // Dependencies for useCallback
+		[toast, userId, isSignedIn, getToken, refreshArticles], // Add getToken
 	); // End of useCallback
 
 	// Update article status (isRead, favorite, status)
@@ -350,20 +372,31 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				const updatedArticle = await updateArticle(updatePayload);
 
 				// Sync update to cloud (fire and forget)
-				saveItemToCloud(updatedArticle)
-					.then((status: CloudSyncStatus) => {
-						if (status === "success") {
-							console.log(
-								`Successfully synced status update for ${id} to cloud.`,
-							);
-						} else {
-							console.warn(
-								`Sync for status update ${id} failed with status: ${status}`,
-							);
+				getToken() // Get token before syncing
+					.then((token) => {
+						if (!token) {
+							console.error("Cannot sync status update: No token available.");
+							return; // Don't attempt sync without token
 						}
+						saveItemToCloud(updatedArticle, token) // Pass token
+							.then((status: CloudSyncStatus) => {
+								if (status === "success") {
+									console.log(
+										`Successfully synced status update for ${id} to cloud.`,
+									);
+								} else {
+									console.warn(
+										`Sync for status update ${id} failed with status: ${status}`,
+									);
+								}
+							})
+							.catch((err) => {
+								console.error(`Error syncing status update for ${id}:`, err);
+							});
 					})
 					.catch((err) => {
-						console.error(`Error syncing status update for ${id}:`, err);
+						// Error fetching token
+						console.error("Error fetching token for cloud sync:", err);
 					});
 
 				toast({
@@ -385,7 +418,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				});
 			}
 		},
-		[toast, userId, isSignedIn, refreshArticles],
+		[toast, userId, isSignedIn, getToken, refreshArticles], // Add getToken
 	);
 
 	// Removed updateReadingProgress logic (moved to useReadingProgress hook)
@@ -434,24 +467,40 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				});
 
 				// Trigger cloud deletion (fire and forget, but log errors)
-				deleteItemFromCloud(id)
-					.then((status: CloudSyncStatus) => {
-						if (status === "success") {
-							console.log(`Successfully triggered cloud deletion for ${id}.`);
-						} else if (status === "not_found") {
-							console.log(
-								`Item ${id} already deleted or not found in cloud during deletion trigger.`,
-							);
-						} else {
-							// Log other failures but don't block UI return, as local delete succeeded
-							console.warn(
-								`Cloud deletion trigger for ${id} failed with status: ${status}`,
-							);
+				getToken() // Get token before triggering delete
+					.then((token) => {
+						if (!token) {
+							console.error("Cannot trigger cloud delete: No token available.");
+							return; // Don't attempt delete without token
 						}
+						deleteItemFromCloud(id, token) // Pass token
+							.then((status: CloudSyncStatus) => {
+								if (status === "success") {
+									console.log(
+										`Successfully triggered cloud deletion for ${id}.`,
+									);
+								} else if (status === "not_found") {
+									console.log(
+										`Item ${id} already deleted or not found in cloud during deletion trigger.`,
+									);
+								} else {
+									// Log other failures but don't block UI return, as local delete succeeded
+									console.warn(
+										`Cloud deletion trigger for ${id} failed with status: ${status}`,
+									);
+								}
+							})
+							.catch((err) => {
+								// Log error but don't block UI return, as local delete succeeded
+								console.error(
+									`Error triggering cloud deletion for ${id}:`,
+									err,
+								);
+							});
 					})
 					.catch((err) => {
-						// Log error but don't block UI return, as local delete succeeded
-						console.error(`Error triggering cloud deletion for ${id}:`, err);
+						// Error fetching token
+						console.error("Error fetching token for cloud deletion:", err);
 					});
 
 				// No refresh here - handled optimistically by caller.
@@ -469,7 +518,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				return false; // Indicate failure
 			}
 		},
-		[toast, userId, isSignedIn], // Removed refreshArticles dependency
+		[toast, userId, isSignedIn, getToken], // Add getToken, removed refreshArticles
 	);
 
 	// Remove duplicate articles locally
