@@ -1,5 +1,6 @@
-import ArticleCard from "@/components/ArticleCard";
+// Removed unused ArticleCard import
 import TopBar from "@/components/TopBar"; // Import the new TopBar component
+import VirtualizedArticleGrid from "@/components/VirtualizedArticleGrid"; // Import the new component
 import { Button } from "@/components/ui/button";
 // Removed unused Checkbox import
 // Removed unused DropdownMenu imports
@@ -109,6 +110,11 @@ export default function InboxPage() {
 		processedArticles.length === 0 &&
 		(articles.length > 0 || hasActiveFilters); // Show if filters resulted in no matches
 
+	// Filter articles specifically for the inbox view *before* passing to the virtualizer
+	const inboxArticles = processedArticles.filter(
+		(article) => article.status === "inbox",
+	);
+
 	return (
 		<div className="h-full flex flex-col bg-background">
 			{" "}
@@ -185,18 +191,7 @@ export default function InboxPage() {
 						</TransitionItem>
 					</TransitionGroup>
 				) : (
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-						{/* Filter processedArticles to show only 'inbox' status */}
-						{processedArticles
-							.filter((article) => article.status === "inbox")
-							.map((article, index) => (
-								<ArticleCard
-									key={article._id}
-									article={article}
-									index={index}
-								/>
-							))}
-					</div>
+					<VirtualizedArticleGrid articles={inboxArticles} />
 				)}
 			</div>
 		</div>

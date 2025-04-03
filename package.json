@@ -81,6 +81,7 @@
 		"react-hook-form": "^7.55.0",
 		"react-resizable-panels": "^2.1.7",
 		"react-router-dom": "^6.30.0",
+		"react-virtuoso": "^4.12.6",
 		"readability": "^0.1.0",
 		"recharts": "^2.15.1",
 		"sonner": "^1.7.4",

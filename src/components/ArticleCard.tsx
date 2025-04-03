@@ -19,9 +19,7 @@ import {
 	MoreHorizontal,
 	Trash2,
 } from "lucide-react";
-import type React from "react";
-// Removed duplicate React import
-import { useState } from "react";
+import React, { useState } from "react"; // Import React directly
 import { Link } from "react-router-dom";
 
 interface ArticleCardProps {
@@ -29,7 +27,11 @@ interface ArticleCardProps {
 	index?: number;
 }
 
-export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
+// Define the component function
+const ArticleCardComponent: React.FC<ArticleCardProps> = ({
+	article,
+	index = 0,
+}) => {
 	const { updateArticleStatus, optimisticRemoveArticle } = useArticles(); // Use optimistic remove
 	const { toast } = useToast();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -297,7 +299,13 @@ export default function ArticleCard({ article, index = 0 }: ArticleCardProps) {
 			</Link>
 		</Card>
 	);
-}
+};
+
+// Wrap the component with React.memo for performance optimization
+const ArticleCard = React.memo(ArticleCardComponent);
+
+// Export the memoized component as default
+export default ArticleCard;
 
 // Add keyframe animation for consistent card fade-in
 const cardAnimation = `
