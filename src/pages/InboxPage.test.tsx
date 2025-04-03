@@ -1,23 +1,25 @@
-// Import necessary testing utilities and types
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+// Import necessary types and utils used in the mock provider
+import type { Article } from "@/services/db";
+// Removed unused import: filterArticles, sortArticles
+import {
+    act,
+    cleanup,
+    render,
+    screen,
+    waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import InboxPage from "./InboxPage"; // The component to test
 
-// import type { Article, Tag } from "@/services/db"; // Removed unused type imports
-// import type {
-// 	ArticleFilters,
-// 	ArticleSortField,
-// 	SortCriteria,
-// } from "@/types/articles"; // Removed unused type imports
 import type React from "react"; // Use type import
 // Import the mock provider and test utilities
 import {
     MockArticleProvider,
+    mockRawArticles,
     testSetSort,
     testToggleSortDirection,
-    // mockRawArticles, // Removed unused import
     testUpdateFilters,
 } from "../test-utils/MockArticleProvider"; // Adjusted path
 
@@ -169,7 +171,9 @@ vi.mock("@/components/VirtualizedArticleList", () => ({
 						key={article._id}
 						href={`/read/${article._id}`} // Simple href for role="link"
 						data-testid={`article-link-${article._id}`}
-					>Read {article.title}</a> // Put text on one line to avoid extra whitespace
+					>
+						Read {article.title}
+					</a> // Put text on one line to avoid extra whitespace
 				))}
 			</div>
 		);
