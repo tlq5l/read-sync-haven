@@ -24,7 +24,8 @@ vi.mock("@/hooks/use-toast", () => ({
 // Mock the animation hook
 vi.mock("@/hooks/use-synchronized-animation", () => ({
 	useSynchronizedAnimation: () => ({
-		ref: vi.fn(), // Provide ref as a mock function
+		ref: vi.fn(), // Provide a mock function for the callback ref
+		// playAnimation: vi.fn() // Optionally mock other returned properties if needed
 	}),
 }));
 

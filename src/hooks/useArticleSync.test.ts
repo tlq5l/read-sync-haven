@@ -24,6 +24,7 @@ vi.mock("@clerk/clerk-react", () => ({
 vi.mock("@/services/db", () => ({
 	getAllArticles: vi.fn(),
 	saveArticle: vi.fn((article) => Promise.resolve(article)),
+	bulkSaveArticles: vi.fn((articles) => Promise.resolve(articles)), // Add mock
 }));
 
 vi.mock("@/services/cloudSync", () => ({
