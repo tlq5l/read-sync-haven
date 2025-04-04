@@ -7,6 +7,7 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
+// import { useTheme } from "@/context/ThemeContext"; // Removed as unused (dark mode handled by Tailwind class)
 import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 
@@ -25,6 +26,7 @@ export default function PdfReader({
 	onTextExtracted,
 }: PdfReaderProps) {
 	// Destructure callback
+	// const { theme } = useTheme(); // Removed as unused (dark mode handled by Tailwind class)
 	const [isLoading, setIsLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -135,7 +137,8 @@ export default function PdfReader({
 					<iframe
 						ref={iframeRef}
 						src={objectUrl}
-						className="w-full h-full border-0"
+						// Apply filter in dark mode for better readability
+						className="w-full h-full border-0 dark:invert dark:hue-rotate-180"
 						title={fileName || "PDF Document"}
 						onLoad={handleIframeLoad}
 						onError={handleIframeError}

@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useTheme } from "@/context/ThemeContext"; // Import useTheme
 // Removed static import: import { base64ToArrayBuffer } from "@/services/epub";
 import type { Book, Rendition } from "epubjs";
 import ePub from "epubjs";
@@ -47,6 +48,7 @@ export default function EpubReader({
 	fileName,
 	onTextExtracted, // Destructure the callback
 }: EpubReaderProps) {
+	const { theme } = useTheme(); // Get the current theme
 	const [book, setBook] = useState<ExtendedBook | null>(null); // Use ExtendedBook
 	const [rendition, setRendition] = useState<ExtendedRendition | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -133,6 +135,17 @@ export default function EpubReader({
 								console.log("EPUB location changed:", loc.start.cfi);
 							}
 						});
+
+						// Define and register themes for epubjs
+						epubRendition.themes.register("light", {
+							body: { color: "#000", "background-color": "#fff" }, // Standard light theme
+						});
+						epubRendition.themes.register("dark", {
+							body: { color: "#fff", "background-color": "#121212" }, // Dark theme with white text
+						});
+
+						// Select initial theme based on app theme
+						epubRendition.themes.select(theme === "dark" ? "dark" : "light");
 
 						// Add rendering error handler
 						epubRendition.on("rendered", (section) => {
@@ -232,7 +245,7 @@ export default function EpubReader({
 				}
 			}
 		};
-	}, [fileData, onTextExtracted]); // Add onTextExtracted to dependency array
+	}, [fileData, onTextExtracted, theme]); // Add theme dependency for initial selection
 
 	// Navigation handlers
 	const handlePrevPage = () => {
@@ -271,6 +284,15 @@ export default function EpubReader({
 			window.removeEventListener("keydown", handleKeyDown);
 		};
 	}, [rendition]);
+
+	// Effect to update EPUB theme when app theme changes
+	useEffect(() => {
+		if (rendition) {
+			const epubTheme = theme === "dark" ? "dark" : "light";
+			rendition.themes.select(epubTheme);
+			console.log(`EPUB theme set to: ${epubTheme}`);
+		}
+	}, [theme, rendition]); // Run when theme or rendition changes
 
 	if (error) {
 		return (
