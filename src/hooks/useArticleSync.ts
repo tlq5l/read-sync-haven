@@ -95,6 +95,7 @@ async function _performCloudSync(
 	setIsRefreshing: React.Dispatch<React.SetStateAction<boolean>>,
 	setError: React.Dispatch<React.SetStateAction<Error | null>>,
 	fetchLockRef: React.MutableRefObject<boolean>, // Pass ref to manage lock
+	hidingArticleIds: Set<string>, // Add hidingArticleIds parameter
 ) {
 	if (!isSignedIn || !userId) return;
 
@@ -223,8 +224,18 @@ async function _performCloudSync(
 			(a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0),
 		);
 
+		// Filter out articles being optimistically hidden *before* setting state
+		const articlesToSet = sortedArticlesAfterSync.filter(
+			(doc) => !hidingArticleIds.has(doc._id),
+		);
+		if (articlesToSet.length < sortedArticlesAfterSync.length) {
+			console.log(
+				`Sync Hook: Filtered out ${sortedArticlesAfterSync.length - articlesToSet.length} articles currently hidden optimistically before setting state.`,
+			);
+		}
+
 		if (isMounted) {
-			setArticles(sortedArticlesAfterSync);
+			setArticles(articlesToSet); // Set the filtered list
 			setError(null); // Clear error on successful sync
 		}
 	} catch (syncErr) {
@@ -257,8 +268,12 @@ async function _performCloudSync(
 }
 
 // --- Main Hook ---
+// Add hidingArticleIds as parameter
 
-export function useArticleSync(isInitialized: boolean) {
+export function useArticleSync(
+	isInitialized: boolean,
+	hidingArticleIds: Set<string>, // Add parameter to the hook itself
+) {
 	const [articles, setArticles] = useState<Article[]>([]);
 	const [isLoading, setIsLoading] = useState<boolean>(true);
 	const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -301,12 +316,14 @@ export function useArticleSync(isInitialized: boolean) {
 				setIsRefreshing,
 				setError,
 				fetchLockRef, // Pass the ref
+				hidingArticleIds, // Pass hidingArticleIds down
 			);
 		},
-		[isSignedIn, userId, getToken, user, toast], // Dependencies for the useCallback wrapper
+		[isSignedIn, userId, getToken, user, toast, hidingArticleIds], // Add hidingArticleIds dependency
 	);
 
 	// --- Main Load and Sync Effect ---
+	// biome-ignore lint/correctness/useExhaustiveDependencies: hidingArticleIds is used indirectly by performCloudSync for filtering
 	useEffect(() => {
 		let isMounted = true;
 
@@ -373,6 +390,7 @@ export function useArticleSync(isInitialized: boolean) {
 		loadArticlesFromCache, // Now depends on the stable useCallback reference
 		performCloudSync, // Now depends on the stable useCallback reference
 		isRefreshing,
+		hidingArticleIds, // Add hidingArticleIds dependency to main useEffect
 	]);
 
 	// --- Refresh Function ---
@@ -412,7 +430,7 @@ export function useArticleSync(isInitialized: boolean) {
 			// Call the standalone sync function directly
 			await _performCloudSync(
 				isMounted,
-				true,
+				true, // Assume cache is loaded when manually refreshing
 				isSignedIn,
 				userId,
 				getToken,
@@ -423,6 +441,7 @@ export function useArticleSync(isInitialized: boolean) {
 				setIsRefreshing,
 				setError,
 				fetchLockRef,
+				hidingArticleIds, // Pass hidingArticleIds down
 			);
 			cleanup();
 			return articles; // Return state before async call, UI updates via state setters
@@ -443,6 +462,7 @@ export function useArticleSync(isInitialized: boolean) {
 		user,
 		toast,
 		articles, // Include articles for return value consistency
+		hidingArticleIds, // Add hidingArticleIds dependency
 		// No need to depend on performCloudSync useCallback wrapper here, call helper directly
 	]);
 

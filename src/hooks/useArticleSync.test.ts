@@ -114,7 +114,9 @@ describe("useArticleSync", () => {
 		vi.mocked(db.getAllArticles).mockResolvedValue(duplicateArticles);
 
 		// Render the hook
-		const { result } = renderHook(() => useArticleSync(true)); // Removed "all" argument
+		const { result } = renderHook(
+			() => useArticleSync(true, new Set<string>()), // Pass empty set for hidingArticleIds
+		);
 
 		// Wait for initial load to complete
 		await waitFor(() => {
@@ -190,7 +192,9 @@ describe("useArticleSync", () => {
 		getAllArticlesMock.mockResolvedValue(combinedArticles);
 
 		// Render the hook
-		const { result } = renderHook(() => useArticleSync(true)); // Removed "all" argument
+		const { result } = renderHook(
+			() => useArticleSync(true, new Set<string>()), // Pass empty set for hidingArticleIds
+		);
 
 		// Wait for sync to complete
 		await waitFor(() => {

@@ -1,4 +1,4 @@
-import type { useArticles } from "@/context/ArticleContext";
+// Removed unused import: import type { useArticles } from "@/context/ArticleContext";
 import type { ArticleView } from "@/hooks/useArticleView";
 import type { Article, ArticleCategory, Tag } from "@/services/db"; // Import ArticleCategory from db
 import type {
@@ -80,6 +80,10 @@ export const mockTags: Tag[] = [
 ];
 
 // --- Mock Context Setup ---
+// Revert to using Omit with the original type name
+// Need to import useArticles again for ReturnType
+import type { useArticles } from "@/context/ArticleContext";
+
 export type MockArticleContextType = Omit<
 	ReturnType<typeof useArticles>,
 	| "refreshArticles"
@@ -87,9 +91,9 @@ export type MockArticleContextType = Omit<
 	| "addArticleByUrl"
 	| "addArticleByFile"
 	| "updateArticleStatus"
-	| "removeArticle"
+	| "removeArticle" // Ensure this is omitted if not mocked
 	| "updateReadingProgress"
-	| "optimisticRemoveArticle"
+	| "optimisticRemoveArticle" // Revert omitted property name
 > & {
 	setFilters: React.Dispatch<React.SetStateAction<ArticleFilters>>;
 	setSortCriteria: React.Dispatch<React.SetStateAction<SortCriteria>>;
@@ -108,7 +112,7 @@ let _mockSetSortCriteria: React.Dispatch<
 > | null = null;
 
 // Create mock functions at module level to allow importing into tests
-export const mockOptimisticRemoveArticle = vi.fn().mockResolvedValue(undefined);
+export const mockOptimisticRemoveArticle = vi.fn().mockResolvedValue(undefined); // Revert mock function name
 export const mockRefreshArticles = vi.fn().mockResolvedValue(mockRawArticles);
 export const mockRetryLoading = vi.fn();
 // Add other action mocks here if needed for other tests
@@ -222,7 +226,7 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			// Use the exported mock functions in the context value
 			refreshArticles: mockRefreshArticles,
 			retryLoading: mockRetryLoading,
-			optimisticRemoveArticle: mockOptimisticRemoveArticle,
+			optimisticRemoveArticle: mockOptimisticRemoveArticle, // Revert provided function
 		}),
 		[
 			// Only include values that actually change and affect the output

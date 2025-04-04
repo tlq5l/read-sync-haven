@@ -1,150 +1,164 @@
-// Removed static import: import { base64ToArrayBuffer } from "@/services/pdf";
-import {
-	ChevronLeft,
-	ChevronRight,
-	Loader2,
-	Search,
-	ZoomIn,
-	ZoomOut,
-} from "lucide-react";
-// import { useTheme } from "@/context/ThemeContext"; // Removed as unused (dark mode handled by Tailwind class)
-import { useEffect, useRef, useState } from "react";
-import { Button } from "./ui/button";
+import { base64ToArrayBuffer } from "@/services/pdf"; // Assuming this service exists
+import { Loader2 } from "lucide-react";
+import * as pdfjsLib from "pdfjs-dist";
+import type {
+	PDFDocumentProxy,
+	TextItem,
+} from "pdfjs-dist/types/src/display/api"; // Import necessary types
+import { useEffect, useState } from "react";
 
-// Note: In a real implementation, you would use a PDF library like react-pdf
-// For now, we'll create a simple viewer that displays the PDF using browser's built-in PDF viewer
-
-interface PdfReaderProps {
-	fileData: string;
-	fileName?: string;
-	onTextExtracted: (text: string | null) => void; // Add callback prop
+// Configure the worker source for pdfjs-dist
+// Note: This path might need adjustment depending on your build setup and how static assets are served.
+// It expects the worker file to be available relative to the final built output.
+// Common setup: copy the worker from node_modules/pdfjs-dist/build/pdf.worker.mjs to your public/static folder.
+try {
+	pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+		"pdfjs-dist/build/pdf.worker.mjs",
+		import.meta.url,
+	).toString();
+	// For Vite/dev environments, using import.meta.url works well.
+	// For other bundlers/production, you might need a different approach:
+	// pdfjsLib.GlobalWorkerOptions.workerSrc = `/pdf.worker.mjs`; // If copied to public root
+} catch (e) {
+	console.error(
+		"Failed to set pdfjs worker source dynamically. Ensure pdf.worker.mjs is available.",
+		e,
+	);
+	// Fallback path - adjust if needed
+	pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.mjs";
 }
 
-export default function PdfReader({
+interface PdfProcessorProps {
+	fileData: string;
+	fileName?: string;
+	onContentProcessed: (processedHtml: string | null) => void; // Consistent callback name
+}
+
+/**
+ * Processes a PDF file from base64 data, extracts text content,
+ * formats it as simple HTML, and calls back with the result.
+ * This component does not render the PDF content itself visually.
+ */
+export default function PdfProcessor({
 	fileData,
 	fileName,
-	onTextExtracted,
-}: PdfReaderProps) {
-	// Destructure callback
-	// const { theme } = useTheme(); // Removed as unused (dark mode handled by Tailwind class)
-	const [isLoading, setIsLoading] = useState(true);
+	onContentProcessed,
+}: PdfProcessorProps) {
+	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const iframeRef = useRef<HTMLIFrameElement>(null);
-	const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
 	useEffect(() => {
-		const loadPdf = async () => {
-			if (!fileData) {
-				setError("No PDF data provided");
-				setIsLoading(false);
-				return;
-			}
+		if (!fileData) {
+			setError("No PDF data provided");
+			onContentProcessed(null);
+			setLoading(false);
+			return;
+		}
 
+		let pdfDoc: PDFDocumentProxy | null = null;
+
+		const processPdf = async () => {
 			try {
-				// Dynamically import and convert base64 to ArrayBuffer
-				const { base64ToArrayBuffer } = await import("@/services/pdf");
+				setLoading(true);
+				setError(null);
+
+				// const { base64ToArrayBuffer } = await import("@/services/pdf"); // Statically imported
 				const arrayBuffer = base64ToArrayBuffer(fileData);
 
-				// Create a Blob from the ArrayBuffer
-				const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+				// Load the PDF document
+				const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+				pdfDoc = await loadingTask.promise;
 
-				// Create an object URL for the Blob
-				const url = URL.createObjectURL(blob);
-				setObjectUrl(url);
-				setIsLoading(false);
+				let fullTextContent = "";
+				const numPages = pdfDoc.numPages;
 
-				// Clean up the URL when the component unmounts
-				return () => {
-					if (url) URL.revokeObjectURL(url);
-				};
-			} catch (err) {
+				// Extract text from each page
+				for (let i = 1; i <= numPages; i++) {
+					const page = await pdfDoc.getPage(i);
+					const textContent = await page.getTextContent();
+					// Join text items
+					let pageText = "";
+					for (const item of textContent.items) {
+						// Ensure item is a TextItem before accessing str
+						if ("str" in item) {
+							pageText = `${pageText}${(item as TextItem).str} `; // Use template literal and add space
+						}
+					}
+					// Replace multiple spaces/newlines possibly introduced
+					pageText = pageText.replace(/\s+/g, " ").trim(); // Keep this cleanup
+					// Add text with paragraph breaks between pages
+					fullTextContent = `${fullTextContent}${pageText}\n\n`; // Use template literal
+					page.cleanup(); // Clean up page resources
+				}
+
+				// Format the extracted text as simple HTML
+				const paragraphs = fullTextContent
+					.split(/\n\s*\n/) // Split into paragraphs based on double newlines
+					.map((p) => p.trim())
+					.filter((p) => p.length > 0); // Remove empty paragraphs
+
+				const simpleHtml = paragraphs.map((p) => `<p>${p}</p>`).join("");
+
+				console.log("PDF text extracted and formatted to HTML.");
+				onContentProcessed(simpleHtml);
+				setLoading(false);
+			} catch (err: any) {
 				console.error("Error processing PDF:", err);
-				setError("Failed to load PDF file");
-				setIsLoading(false);
-				onTextExtracted(null); // Signal text extraction failure/unsupported
-				return undefined;
+				let errorMessage = `Failed to process PDF file ${
+					fileName || ""
+				}. It might be corrupted or password-protected.`;
+				// Check for specific PDF.js errors
+				if (err.name === "PasswordException") {
+					errorMessage = `PDF file ${
+						fileName || ""
+					} is password-protected and cannot be processed.`;
+				} else if (err.name === "InvalidPDFException") {
+					errorMessage = `The file ${
+						fileName || ""
+					} is not a valid PDF or is corrupted.`;
+				}
+				setError(errorMessage);
+				setLoading(false);
+				onContentProcessed(null);
+			} finally {
+				// Ensure PDF document is destroyed if it exists
+				if (pdfDoc) {
+					pdfDoc.destroy().catch((destroyError) => {
+						console.error("Error destroying PDF document:", destroyError);
+					});
+				}
 			}
 		};
 
-		loadPdf();
-	}, [fileData, onTextExtracted]); // Add callback to dependencies
+		processPdf();
 
-	// Handle iframe load event - Signal that text extraction is not supported here
-	const handleIframeLoad = () => {
-		setIsLoading(false);
-		// Since we can't easily extract text from the iframe's sandboxed PDF viewer,
-		// we signal that text is unavailable.
-		onTextExtracted(null);
-		console.log(
-			"PDF iframe loaded, but text extraction is not supported with this viewer.",
-		);
-	};
+		// Cleanup function (though destruction is now in finally block)
+		return () => {
+			// Cleanup is handled in the finally block of processPdf
+			// We can remove this potentially redundant check
+		};
+	}, [fileData, fileName, onContentProcessed]);
 
-	// Handle iframe error event
-	const handleIframeError = () => {
-		setError("Failed to load PDF viewer");
-		setIsLoading(false);
-	};
-
-	if (isLoading) {
+	// Render loading/error states
+	if (loading) {
 		return (
-			<div className="flex items-center justify-center h-full">
+			<div className="flex items-center justify-center h-full p-4">
 				<Loader2 className="h-8 w-8 animate-spin text-bondwise-500" />
-				<span className="ml-2">Loading PDF...</span>
+				<span className="ml-2">Processing {fileName || "PDF file"}...</span>
 			</div>
 		);
 	}
 
 	if (error) {
 		return (
-			<div className="flex flex-col items-center justify-center h-full">
-				<div className="text-red-500 mb-4">{error}</div>
-				<p className="text-muted-foreground mb-4">
-					There was a problem loading this PDF file.
-				</p>
+			<div className="flex flex-col items-center justify-center h-full p-4">
+				<div className="text-destructive mb-4 text-center">{error}</div>
+				<div className="text-sm text-muted-foreground">
+					Please try uploading the file again or use a different file.
+				</div>
 			</div>
 		);
 	}
 
-	return (
-		<div className="flex flex-col h-full">
-			{/* PDF viewer controls */}
-			<div className="flex items-center justify-between p-2 border-b bg-muted/30">
-				<div className="flex items-center space-x-2">
-					<Button variant="ghost" size="icon" title="Previous page">
-						<ChevronLeft className="h-4 w-4" />
-					</Button>
-					<Button variant="ghost" size="icon" title="Next page">
-						<ChevronRight className="h-4 w-4" />
-					</Button>
-				</div>
-				<div className="flex items-center space-x-2">
-					<Button variant="ghost" size="icon" title="Zoom out">
-						<ZoomOut className="h-4 w-4" />
-					</Button>
-					<Button variant="ghost" size="icon" title="Zoom in">
-						<ZoomIn className="h-4 w-4" />
-					</Button>
-					<Button variant="ghost" size="icon" title="Search">
-						<Search className="h-4 w-4" />
-					</Button>
-				</div>
-			</div>
-
-			{/* PDF content */}
-			<div className="flex-1 overflow-hidden">
-				{objectUrl && (
-					<iframe
-						ref={iframeRef}
-						src={objectUrl}
-						// Apply filter in dark mode for better readability
-						className="w-full h-full border-0 dark:invert dark:hue-rotate-180"
-						title={fileName || "PDF Document"}
-						onLoad={handleIframeLoad}
-						onError={handleIframeError}
-					/>
-				)}
-			</div>
-		</div>
-	);
+	return null; // Component only processes, doesn't render content
 }

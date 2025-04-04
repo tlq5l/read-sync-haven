@@ -169,20 +169,7 @@ describe("Sidebar Component", () => {
 		expect(screen.getByTestId("icon-Settings")).toBeVisible();
 	});
 
-	it("renders the theme toggle button visibly", () => {
-		render(
-			<MockProviders>
-				<Sidebar />
-			</MockProviders>,
-		);
-		// Assert visibility
-		const themeButton = screen.getByRole("button", {
-			name: /light mode|dark mode/i,
-		});
-		expect(themeButton).toBeVisible();
-		// Check for appropriate icon based on default theme (system->light initially)
-		expect(themeButton.querySelector('[data-testid="icon-Sun"]')).toBeVisible();
-	});
+	// Test case for theme toggle button removed as the button was moved to Settings/Appearance page.
 
 	it("renders Add Content button when signed in", () => {
 		render(

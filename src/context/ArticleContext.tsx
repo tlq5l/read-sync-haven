@@ -64,7 +64,7 @@ interface ArticleContextType {
 			status?: "inbox" | "later" | "archived";
 		},
 	) => Promise<void>;
-	optimisticRemoveArticle: (id: string) => Promise<void>; // Renamed for clarity
+	optimisticRemoveArticle: (id: string) => Promise<void>; // Revert rename
 	updateReadingProgress: (id: string, progress: number) => Promise<void>;
 }
 
@@ -83,7 +83,13 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	// 2. Manage View State
 	const { currentView, setCurrentView } = useArticleView("all");
 
-	// 3. Sync Articles (depends on DB initialization and view)
+	// State to track articles being optimistically removed
+	// Moved declaration before useArticleSync
+	const [hidingArticleIds, setHidingArticleIds] = useState<Set<string>>(
+		new Set(),
+	);
+
+	// 3. Sync Articles (depends on DB initialization, view, and hidden IDs)
 	const {
 		articles,
 		isLoading: isSyncLoading,
@@ -91,8 +97,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		error: syncError,
 		refreshArticles: syncRefreshArticles, // Rename to avoid conflict
 		retryLoading: syncRetryLoading, // Rename to avoid conflict
-	} = useArticleSync(isDbInitialized); // Removed currentView argument
-
+	} = useArticleSync(isDbInitialized, hidingArticleIds); // Pass hidingArticleIds state
 	// 4. Tags State
 	const [allTags, setAllTags] = useState<Tag[]>([]);
 
@@ -110,10 +115,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		field: "savedAt",
 		direction: "desc",
 	});
-	// State to track articles being optimistically removed
-	const [hidingArticleIds, setHidingArticleIds] = useState<Set<string>>(
-		new Set(),
-	);
+	// Declaration moved up
 
 	// 7. Article Actions (depends on refresh function from sync)
 
@@ -161,7 +163,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		const filtered = filterArticles(visibleArticles, filters);
 		// Then apply sorting
 		return sortArticles(filtered, sortCriteria);
-	}, [articles, filters, sortCriteria, hidingArticleIds]); // Add hidingArticleIds dependency
+	}, [articles, filters, sortCriteria, hidingArticleIds]); // Revert dependencies
 
 	// --- Context Value & Helper Functions ---
 
@@ -181,12 +183,9 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		[],
 	); // setFilters is stable
 
-	// Optimistic remove function
+	// Revert to original Optimistic remove function
 	const optimisticRemoveArticle = useCallback(
 		async (id: string) => {
-			// Find the article first in case we need to revert - Removed as unused for now
-			// const articleToRemove = articles.find((a) => a._id === id);
-
 			// Optimistically hide the article
 			setHidingArticleIds((prev) => new Set(prev).add(id));
 
@@ -224,7 +223,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				});
 			}
 		},
-		[removeArticle, toast], // Removed 'articles' dependency
+		[removeArticle, toast], // Revert dependencies
 	);
 
 	const toggleSortDirection = useCallback(() => {
@@ -259,7 +258,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			addArticleByUrl,
 			addArticleByFile,
 			updateArticleStatus,
-			optimisticRemoveArticle, // Provide the optimistic remove function
+			optimisticRemoveArticle, // Revert context value
 			updateReadingProgress,
 		}),
 		[
@@ -286,7 +285,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			addArticleByUrl, // Stable function reference
 			addArticleByFile, // Stable function reference
 			updateArticleStatus, // Stable function reference
-			optimisticRemoveArticle, // Add optimistic function to dependencies
+			optimisticRemoveArticle, // Revert dependency
 			updateReadingProgress, // Stable function reference
 		],
 	);

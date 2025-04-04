@@ -32,7 +32,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 	article,
 	index = 0,
 }) => {
-	const { updateArticleStatus, optimisticRemoveArticle } = useArticles(); // Use optimistic remove
+	const { updateArticleStatus, optimisticRemoveArticle } = useArticles(); // Revert to optimisticRemoveArticle
 	const { toast } = useToast();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -50,7 +50,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 		e.stopPropagation();
 		try {
 			// No need to check _rev for optimistic remove
-			await optimisticRemoveArticle(article._id);
+			await optimisticRemoveArticle(article._id); // Revert function call
 		} catch (error) {
 			console.error("Error deleting article:", error);
 			toast({
@@ -93,7 +93,9 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 			e.preventDefault();
 			e.stopPropagation();
 			// Call optimistic remove directly, similar to handleDelete but for keyboard event
-			optimisticRemoveArticle(article._id).catch((error) => {
+			optimisticRemoveArticle(article._id).catch((error: any) => {
+				// Revert function call
+				// Reverted handler
 				console.error("Error deleting article via keyboard:", error);
 				toast({
 					title: "Error",
