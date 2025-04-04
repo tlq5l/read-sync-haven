@@ -137,7 +137,64 @@ export async function handleListItems(
 }
 
 /**
+ * Finds an existing article with the same URL for a user.
+ * @param env - The environment with KV namespace access.
+ * @param userId - The user's ID.
+ * @param url - The URL to check for duplicates.
+ * @returns The existing article if found, null otherwise.
+ */
+async function findExistingArticleByUrl(
+	env: Env,
+	userId: string,
+	url: string,
+): Promise<WorkerArticle | null> {
+	try {
+		// List all items for this user
+		const listResult = await env.SAVED_ITEMS_KV.list({ prefix: `${userId}:` });
+
+		if (!listResult?.keys || listResult.keys.length === 0) {
+			return null; // No items for this user
+		}
+
+		// Normalize the URL for comparison (remove trailing slashes, etc.)
+		const normalizedUrl = url.trim().toLowerCase().replace(/\/$/, "");
+
+		// Check each item to see if it has the same URL
+		for (const key of listResult.keys) {
+			const value = await env.SAVED_ITEMS_KV.get(key.name);
+			if (value) {
+				try {
+					const article = JSON.parse(value) as WorkerArticle;
+					const articleNormalizedUrl = article.url
+						.trim()
+						.toLowerCase()
+						.replace(/\/$/, "");
+
+					if (articleNormalizedUrl === normalizedUrl) {
+						console.log(
+							`Found existing article with the same URL: ${article._id}`,
+						);
+						return article;
+					}
+				} catch (parseError) {
+					console.error(
+						`Failed to parse item with key ${key.name}:`,
+						parseError,
+					);
+				}
+			}
+		}
+
+		return null; // No matching article found
+	} catch (error) {
+		console.error("Error finding existing article by URL:", error);
+		return null; // Return null on error
+	}
+}
+
+/**
  * Handles POST /items requests. Creates or updates an item for the authenticated user.
+ * Implements URL-based deduplication to prevent duplicate articles.
  */
 export async function handlePostItem(
 	request: Request,
@@ -173,6 +230,33 @@ export async function handlePostItem(
 		console.log(
 			`Processing article: ${item._id} (Type: ${item.type}) for user: ${userId}`,
 		);
+
+		// Check if an article with the same URL already exists for this user
+		const existingArticle = await findExistingArticleByUrl(
+			env,
+			userId,
+			item.url,
+		);
+
+		if (existingArticle) {
+			console.log(`Found duplicate article with URL: ${item.url}`);
+
+			// If the existing article is the same as the one being saved (same ID), proceed with update
+			if (existingArticle._id === item._id) {
+				console.log(`Updating existing article with ID: ${item._id}`);
+			} else {
+				// Return success without saving a duplicate
+				console.log(
+					`Preventing duplicate save. Using existing article ID: ${existingArticle._id}`,
+				);
+				return jsonResponse({
+					status: "success",
+					message: "Article already exists",
+					item: existingArticle,
+					duplicatePrevented: true,
+				});
+			}
+		}
 
 		const key = createUserItemKey(item.userId, item._id);
 		const itemToSave: WorkerArticle = {

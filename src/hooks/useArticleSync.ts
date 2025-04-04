@@ -24,6 +24,26 @@ const deduplicateArticlesById = (articlesToDedup: Article[]): Article[] => {
 	return Array.from(articleMap.values());
 };
 
+// Deduplicates articles based on URL, keeping the one with the latest savedAt timestamp.
+const deduplicateArticlesByUrl = (articlesToDedup: Article[]): Article[] => {
+	const articlesByUrl = new Map<string, Article>();
+	for (const article of articlesToDedup) {
+		if (!article.url) {
+			console.warn("Deduplicating article without a URL:", article);
+			continue;
+		}
+		// Normalize URL for comparison (lowercase, trim, remove trailing slash)
+		const normalizedUrl = article.url.toLowerCase().trim().replace(/\/$/, "");
+		const existingArticle = articlesByUrl.get(normalizedUrl);
+		const currentSavedAt = article.savedAt ?? 0;
+		const existingSavedAt = existingArticle?.savedAt ?? 0;
+		if (!existingArticle || currentSavedAt > existingSavedAt) {
+			articlesByUrl.set(normalizedUrl, article);
+		}
+	}
+	return Array.from(articlesByUrl.values());
+};
+
 // Loads articles from the local cache (PouchDB)
 async function _loadArticlesFromCache(
 	isMounted: boolean,
@@ -140,6 +160,7 @@ async function _performCloudSync(
 			`Sync Hook: Synced ${fetchedArticles.length} articles from cloud for user ${userId} / ${userEmail}`,
 		);
 
+		// Filter out articles with missing essential fields
 		const completeArticles = fetchedArticles.filter((article) => {
 			const hasEssentialFields =
 				article.title && article.url && article.content;
@@ -150,7 +171,15 @@ async function _performCloudSync(
 			return hasEssentialFields;
 		});
 
-		const articlesToBulkSave = completeArticles.map((article) => {
+		// Deduplicate articles by URL to prevent duplicate content
+		const dedupedArticles = deduplicateArticlesByUrl(completeArticles);
+		if (dedupedArticles.length < completeArticles.length) {
+			console.log(
+				`Sync Hook: Removed ${completeArticles.length - dedupedArticles.length} duplicate articles by URL during cloud sync.`,
+			);
+		}
+
+		const articlesToBulkSave = dedupedArticles.map((article) => {
 			const articleToSave = { ...article, userId };
 			if (articleToSave.type === "epub") {
 				if (

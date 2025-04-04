@@ -6,6 +6,9 @@ import { removeDuplicateArticles } from "./duplicates"; // Import from new file
 import type { Article, ArticleCategory } from "./types"; // Import ArticleCategory
 import { executeWithRetry } from "./utils";
 
+// Re-export removeDuplicateArticles to maintain API
+export { removeDuplicateArticles };
+
 // Helper to infer category from type
 const inferCategoryFromType = (type: Article["type"]): ArticleCategory => {
 	switch (type) {
@@ -179,6 +182,7 @@ export async function saveArticle(
 /**
  * Saves multiple articles in bulk. Handles both creating new articles and updating existing ones.
  * Fetches existing documents first to handle conflicts and merge data.
+ * Checks for existing articles with the same URL to prevent duplicates.
  *
  * @param articlesToSave - An array of article objects to save.
  * @returns A promise resolving to an array of results, one for each input article.
@@ -198,6 +202,7 @@ export async function bulkSaveArticles(
 		// 1. Prepare documents and identify potential updates
 		const docsToProcess: (Article & { _id: string })[] = [];
 		const potentialUpdateIds: string[] = [];
+		const urlsToCheck: string[] = [];
 
 		for (const article of articlesToSave) {
 			const docId = article._id || `article_${uuidv4()}`;
@@ -227,9 +232,14 @@ export async function bulkSaveArticles(
 			if (article._id) {
 				potentialUpdateIds.push(article._id);
 			}
+
+			// Add URL to the list of URLs to check for duplicates
+			if (article.url) {
+				urlsToCheck.push(article.url);
+			}
 		}
 
-		// 2. Fetch existing documents for potential updates
+		// 2. Fetch existing documents for potential updates by ID
 		const existingDocsMap = new Map<string, Article>();
 		if (potentialUpdateIds.length > 0) {
 			try {
@@ -248,7 +258,7 @@ export async function bulkSaveArticles(
 					}
 				}
 				console.log(
-					`Fetched ${existingDocsMap.size} existing documents for merging.`,
+					`Fetched ${existingDocsMap.size} existing documents for merging by ID.`,
 				);
 			} catch (fetchError) {
 				console.error(
@@ -260,52 +270,155 @@ export async function bulkSaveArticles(
 			}
 		}
 
-		// 3. Merge and prepare final documents for bulkDocs
-		const finalDocsToSave: Article[] = docsToProcess.map((doc) => {
-			const existingDoc = existingDocsMap.get(doc._id);
-			if (existingDoc) {
-				// Merge logic (similar to saveArticle conflict resolution)
-				const mergedDoc: Article = {
-					_id: existingDoc._id,
-					_rev: existingDoc._rev, // Use existing revision for update
-					userId: doc.userId ?? existingDoc.userId, // Prioritize incoming userId if available
-					title: doc.title ?? existingDoc.title,
-					url: doc.url ?? existingDoc.url,
-					content: doc.content ?? existingDoc.content,
-					excerpt: doc.excerpt ?? existingDoc.excerpt,
-					htmlContent: doc.htmlContent ?? existingDoc.htmlContent,
-					type: doc.type ?? existingDoc.type,
-					savedAt: doc.savedAt ?? existingDoc.savedAt,
-					status: doc.status ?? existingDoc.status ?? "inbox",
-					isRead: doc.isRead ?? existingDoc.isRead,
-					favorite: doc.favorite ?? existingDoc.favorite,
-					tags: doc.tags ?? existingDoc.tags,
-					readAt: doc.readAt ?? existingDoc.readAt,
-					scrollPosition: doc.scrollPosition ?? existingDoc.scrollPosition,
-					siteName: doc.siteName ?? existingDoc.siteName,
-					author: doc.author ?? existingDoc.author,
-					publishedDate: doc.publishedDate ?? existingDoc.publishedDate,
+		// 3. Check for existing articles with the same URL to prevent duplicates
+		const existingDocsByUrl = new Map<string, Article>();
+		try {
+			// Fetch all articles to check for URL duplicates
+			const allDocsResponse = await articlesDb.allDocs<Article>({
+				include_docs: true,
+			});
+
+			const allArticles: Article[] = allDocsResponse.rows
+				.filter((row) => !!row.doc && row.id.startsWith("article_")) // Ensure doc exists and is an article
+				.map((row) => row.doc as Article);
+
+			// Create a map of URL to article for quick lookup
+			for (const article of allArticles) {
+				if (article.url) {
+					// Normalize URL for comparison
+					const normalizedUrl = article.url
+						.toLowerCase()
+						.trim()
+						.replace(/\/$/, "");
+					existingDocsByUrl.set(normalizedUrl, article);
+				}
+			}
+
+			console.log(
+				`Checked ${allArticles.length} articles for URL duplicates, found ${existingDocsByUrl.size} unique URLs.`,
+			);
+		} catch (fetchError) {
+			console.error(
+				"Error fetching articles for URL duplicate check:",
+				fetchError,
+			);
+			// Continue without URL duplicate checking if this fails
+		}
+
+		// 4. Merge and prepare final documents for bulkDocs, checking for URL duplicates
+		const finalDocsToSave: Article[] = [];
+		const processedUrls = new Set<string>(); // Track URLs we've already processed
+
+		for (const doc of docsToProcess) {
+			// Check if we already have an existing document with this ID
+			const existingDocById = existingDocsMap.get(doc._id);
+
+			// Normalize URL for comparison
+			const normalizedUrl = doc.url.toLowerCase().trim().replace(/\/$/, "");
+
+			// Check if we've already processed this URL in this batch
+			if (processedUrls.has(normalizedUrl)) {
+				console.log(
+					`Skipping duplicate URL in batch: ${doc.url} (ID: ${doc._id})`,
+				);
+				continue;
+			}
+
+			// Check if we already have an existing document with this URL
+			const existingDocByUrl = existingDocsByUrl.get(normalizedUrl);
+
+			let finalDoc: Article;
+
+			if (existingDocById) {
+				// If we have an existing doc with the same ID, update it
+				console.log(`Updating existing article with ID: ${doc._id}`);
+				finalDoc = {
+					_id: existingDocById._id,
+					_rev: existingDocById._rev, // Use existing revision for update
+					userId: doc.userId ?? existingDocById.userId,
+					title: doc.title ?? existingDocById.title,
+					url: doc.url ?? existingDocById.url,
+					content: doc.content ?? existingDocById.content,
+					excerpt: doc.excerpt ?? existingDocById.excerpt,
+					htmlContent: doc.htmlContent ?? existingDocById.htmlContent,
+					type: doc.type ?? existingDocById.type,
+					savedAt: doc.savedAt ?? existingDocById.savedAt,
+					status: doc.status ?? existingDocById.status ?? "inbox",
+					isRead: doc.isRead ?? existingDocById.isRead,
+					favorite: doc.favorite ?? existingDocById.favorite,
+					tags: doc.tags ?? existingDocById.tags,
+					readAt: doc.readAt ?? existingDocById.readAt,
+					scrollPosition: doc.scrollPosition ?? existingDocById.scrollPosition,
+					siteName: doc.siteName ?? existingDocById.siteName,
+					author: doc.author ?? existingDocById.author,
+					publishedDate: doc.publishedDate ?? existingDocById.publishedDate,
 					estimatedReadTime:
-						doc.estimatedReadTime ?? existingDoc.estimatedReadTime,
-					coverImage: doc.coverImage ?? existingDoc.coverImage,
-					language: doc.language ?? existingDoc.language,
-					fileData: doc.fileData ?? existingDoc.fileData,
-					fileName: doc.fileName ?? existingDoc.fileName,
-					fileSize: doc.fileSize ?? existingDoc.fileSize,
-					pageCount: doc.pageCount ?? existingDoc.pageCount,
-					// Merge category: prioritize incoming explicit, then inferred from incoming type, then existing
+						doc.estimatedReadTime ?? existingDocById.estimatedReadTime,
+					coverImage: doc.coverImage ?? existingDocById.coverImage,
+					language: doc.language ?? existingDocById.language,
+					fileData: doc.fileData ?? existingDocById.fileData,
+					fileName: doc.fileName ?? existingDocById.fileName,
+					fileSize: doc.fileSize ?? existingDocById.fileSize,
+					pageCount: doc.pageCount ?? existingDocById.pageCount,
 					category:
 						doc.category ??
-						inferCategoryFromType(doc.type ?? existingDoc.type) ??
-						existingDoc.category,
+						inferCategoryFromType(doc.type ?? existingDocById.type) ??
+						existingDocById.category,
 				};
-				return mergedDoc;
+			} else if (existingDocByUrl && existingDocByUrl._id !== doc._id) {
+				// If we have an existing doc with the same URL but different ID, update that instead
+				console.log(`Found existing article with same URL: ${doc.url}`);
+				console.log(
+					`Using existing article ID: ${existingDocByUrl._id} instead of ${doc._id}`,
+				);
+
+				// Update the existing article with the new content
+				finalDoc = {
+					_id: existingDocByUrl._id,
+					_rev: existingDocByUrl._rev,
+					userId: doc.userId ?? existingDocByUrl.userId,
+					title: doc.title ?? existingDocByUrl.title,
+					url: doc.url ?? existingDocByUrl.url,
+					content: doc.content ?? existingDocByUrl.content,
+					excerpt: doc.excerpt ?? existingDocByUrl.excerpt,
+					htmlContent: doc.htmlContent ?? existingDocByUrl.htmlContent,
+					type: doc.type ?? existingDocByUrl.type,
+					// Use the newer savedAt timestamp
+					savedAt: Math.max(doc.savedAt || 0, existingDocByUrl.savedAt || 0),
+					status: doc.status ?? existingDocByUrl.status ?? "inbox",
+					// Prefer the new document's read status if it's explicitly set
+					isRead:
+						doc.isRead !== undefined ? doc.isRead : existingDocByUrl.isRead,
+					favorite: doc.favorite ?? existingDocByUrl.favorite,
+					tags: doc.tags ?? existingDocByUrl.tags,
+					readAt: doc.readAt ?? existingDocByUrl.readAt,
+					scrollPosition: doc.scrollPosition ?? existingDocByUrl.scrollPosition,
+					siteName: doc.siteName ?? existingDocByUrl.siteName,
+					author: doc.author ?? existingDocByUrl.author,
+					publishedDate: doc.publishedDate ?? existingDocByUrl.publishedDate,
+					estimatedReadTime:
+						doc.estimatedReadTime ?? existingDocByUrl.estimatedReadTime,
+					coverImage: doc.coverImage ?? existingDocByUrl.coverImage,
+					language: doc.language ?? existingDocByUrl.language,
+					fileData: doc.fileData ?? existingDocByUrl.fileData,
+					fileName: doc.fileName ?? existingDocByUrl.fileName,
+					fileSize: doc.fileSize ?? existingDocByUrl.fileSize,
+					pageCount: doc.pageCount ?? existingDocByUrl.pageCount,
+					category:
+						doc.category ??
+						inferCategoryFromType(doc.type ?? existingDocByUrl.type) ??
+						existingDocByUrl.category,
+				};
+			} else {
+				// No existing doc with this ID or URL, use as-is
+				// Remove potential _rev if it somehow exists
+				const { _rev, ...newDoc } = doc;
+				finalDoc = newDoc as Article;
 			}
-			// It's a new document (no 'else' needed as 'if' returns)
-			// Remove potential _rev if it somehow exists
-			const { _rev, ...newDoc } = doc;
-			return newDoc as Article; // Cast needed as _rev is removed
-		});
+
+			finalDocsToSave.push(finalDoc);
+			processedUrls.add(normalizedUrl); // Mark this URL as processed
+		}
 
 		// 4. Execute bulkDocs
 		if (finalDocsToSave.length === 0) {
@@ -597,5 +710,4 @@ export async function getAllArticles(options?: {
 }
 
 // removeDuplicateArticles function moved to ./duplicates.ts
-// Re-export it to maintain the API
-export { removeDuplicateArticles };
+// We import it at the top of the file and re-export it there
