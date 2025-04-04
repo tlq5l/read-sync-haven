@@ -1,48 +1,26 @@
 import { base64ToArrayBuffer } from "@/services/epub";
 import type { Book } from "epubjs";
 import ePub from "epubjs";
-// import JSZip from "jszip"; // No longer needed for image extraction
+import JSZip from "jszip"; // Re-import JSZip
 import { Loader2 } from "lucide-react";
 import parse from "node-html-parser"; // Import parser
 import { dirname, join, normalize } from "path-browserify"; // Keep for path logic
 import { useEffect, useState } from "react";
 
 // --- Interfaces ---
-// Minimal type for the object returned by resources.get
-interface EpubResource {
-	url: () => Promise<string>; // It returns a promise resolving to the blob URL
-	// Add other known properties if needed, e.g., type, href
-}
-
-// Minimal type for the resources object itself
-interface EpubResources {
-	get: (href: string) => EpubResource | undefined; // Define the get method
-	// Add other known methods if needed, e.g., add, load
-}
+// EpubResource and EpubResources interfaces removed as they are no longer needed
 
 interface EpubArchive {
 	getText: (url: string) => Promise<string | undefined>;
 }
 interface ExtendedBook extends Book {
 	archive?: EpubArchive;
-	resources: EpubResources; // Make non-optional to match base Book type for TS
+	// resources property removed from ExtendedBook
 	// packaging?: any; // Avoid relying on internal structure if possible
 }
 // --- End Interfaces ---
 
-// Function to convert ArrayBuffer to Base64
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-	let binary = "";
-	const bytes = new Uint8Array(buffer);
-	const len = bytes.byteLength;
-	for (let i = 0; i < len; i++) {
-		binary += String.fromCharCode(bytes[i]);
-	}
-	// Use window.btoa for browser environment, fallback for Node (though less likely here)
-	return typeof window !== "undefined"
-		? window.btoa(binary)
-		: Buffer.from(binary, "binary").toString("base64");
-}
+// Removed unused arrayBufferToBase64 function
 
 // --- Helper Functions ---
 function getMimeType(filename: string): string | null {
@@ -98,8 +76,8 @@ export default function EpubProcessor({
 				const arrayBuffer = base64ToArrayBuffer(fileData);
 				// Load with both libraries
 				epubBook = ePub(arrayBuffer) as ExtendedBook;
-				// zip variable removed as it's unused
-				console.log("[EpubProcessor] Epub book initialized (epubjs).");
+				const zip = await JSZip.loadAsync(arrayBuffer); // Reload zip instance
+				console.log("[EpubProcessor] Epub book initialized (epubjs & jszip).");
 
 				await epubBook.ready;
 				console.log("[EpubProcessor] Epub book ready.");
@@ -149,83 +127,54 @@ export default function EpubProcessor({
 							if (originalSrc && !originalSrc.startsWith("data:")) {
 								let imagePath: string | undefined;
 								try {
-									imagePath = normalize(join(sectionDir, originalSrc));
-									// console.log(`\t[Epub Img] Attempting to load image path: "${imagePath}" using epubjs resources`);
+									// Improved path resolution for JSZip
+									if (originalSrc.startsWith("/")) {
+										// Path is absolute from EPUB root
+										imagePath = normalize(originalSrc.substring(1));
+										// console.log(`\t[Epub Img DEBUG] Calculated absolute image path: "${imagePath}"`);
+									} else {
+										// Path is relative to the section directory
+										imagePath = normalize(join(sectionDir, originalSrc));
+										// console.log(`\t[Epub Img DEBUG] Calculated relative image path: "${imagePath}" (from sectionDir: "${sectionDir}", originalSrc: "${originalSrc}")`);
+									}
 
-									// Ensure resources exist and try getting the resource URL via epubjs
-									if (epubBook?.resources) {
-										// epubjs >= 0.3.88 uses .url() which returns a Promise<string> (often blob URL)
-										const resource = epubBook.resources.get(imagePath);
-										if (!resource) {
-											console.warn(
-												`\t[Epub Img] FAIL: Resource not found via epubjs resources.get for "${imagePath}"`,
-											);
-											img.removeAttribute("src");
-											continue; // Skip to next image
-										}
+									// console.log(`\t[Epub Img] Attempting to load image path: "${imagePath}" using JSZip`);
+									const imageFile = zip.file(imagePath); // Find file using JSZip
 
-										const resourceUrl = await resource.url(); // Get blob URL
-										// console.log(`\t[Epub Img DEBUG] epubjs resource.url() result for "${imagePath}":`, resourceUrl);
-
-										if (resourceUrl) {
-											// Fetch the resource content as ArrayBuffer using the URL
-											const resourceResponse = await fetch(resourceUrl);
-											if (resourceResponse.ok) {
-												const imageBuffer =
-													await resourceResponse.arrayBuffer();
-												// console.log(`\t[Epub Img DEBUG] Fetched ArrayBuffer size: ${imageBuffer?.byteLength ?? 'undefined'} for "${imagePath}"`);
-
-												if (imageBuffer && imageBuffer.byteLength > 0) {
-													const base64Data = arrayBufferToBase64(imageBuffer); // Convert buffer to base64
-													// console.log(`\t[Epub Img DEBUG] Converted Base64 length: ${base64Data?.length ?? 'undefined'} for "${imagePath}"`);
-													if (base64Data) {
-														const mimeType = getMimeType(imagePath); // Determine MIME from path
-														// console.log(`\t[Epub Img DEBUG] Determined MIME type: "${mimeType}" for "${imagePath}"`);
-														if (mimeType) {
-															img.setAttribute(
-																"src",
-																`data:${mimeType};base64,${base64Data}`,
-															);
-															// console.log(`\t[Epub Img] SUCCESS: Embedded image "${imagePath}" using epubjs resources`);
-														} else {
-															console.warn(
-																`\t[Epub Img] FAIL: Could not determine MIME type for "${imagePath}"`,
-															);
-															img.removeAttribute("src");
-														}
-													} else {
-														console.warn(
-															`\t[Epub Img] FAIL: Base64 conversion yielded no data for "${imagePath}"`,
-														);
-														img.removeAttribute("src");
-													}
-												} else {
-													console.warn(
-														`\t[Epub Img] FAIL: Fetched resource ArrayBuffer was empty for "${imagePath}"`,
-													);
-													img.removeAttribute("src");
-												}
+									if (imageFile) {
+										// console.log(`\t[Epub Img DEBUG] Found file in JSZip for path: "${imagePath}"`);
+										const base64Data = await imageFile.async("base64"); // Get base64 from JSZip
+										// console.log(`\t[Epub Img DEBUG] JSZip base64 result length: ${base64Data?.length ?? 'undefined'} for "${imagePath}"`);
+										if (base64Data) {
+											const mimeType = getMimeType(imagePath); // Determine MIME from path
+											// console.log(`\t[Epub Img DEBUG] Determined MIME type: "${mimeType}" for "${imagePath}"`);
+											if (mimeType) {
+												img.setAttribute(
+													"src",
+													`data:${mimeType};base64,${base64Data}`,
+												);
+												// console.log(`\t[Epub Img] SUCCESS: Embedded image "${imagePath}" using JSZip`);
 											} else {
 												console.warn(
-													`\t[Epub Img] FAIL: Failed to fetch resource URL "${resourceUrl}" for path "${imagePath}" (Status: ${resourceResponse.status})`,
+													`\t[Epub Img] FAIL: Could not determine MIME type for "${imagePath}"`,
 												);
 												img.removeAttribute("src");
 											}
 										} else {
 											console.warn(
-												`\t[Epub Img] FAIL: Resource URL promise resolved to null/empty for "${imagePath}"`,
+												`\t[Epub Img] FAIL: JSZip returned no data for "${imagePath}"`,
 											);
 											img.removeAttribute("src");
 										}
 									} else {
 										console.warn(
-											"\t[Epub Img] FAIL: epubBook.resources is not available.",
+											`\t[Epub Img] FAIL: Image file not found in JSZip archive at "${imagePath}"`,
 										);
-										img.removeAttribute("src"); // Cannot proceed without resources
+										img.removeAttribute("src");
 									}
 								} catch (imgErr) {
 									console.error(
-										`\t[Epub Img] FAIL: Error processing image src "${originalSrc}" (resolved: "${imagePath}") using epubjs resources:`,
+										`\t[Epub Img] FAIL: Error processing image src "${originalSrc}" (resolved: "${imagePath}") with JSZip:`,
 										imgErr,
 									);
 									img.removeAttribute("src");
@@ -237,10 +186,11 @@ export default function EpubProcessor({
 						const body = root.querySelector("body");
 						return body ? body.innerHTML : root.toString();
 						// --- End image embedding ---
-					} catch (sectionErr) {
+					} catch (sectionErr: any) {
+						// Add type 'any' for detailed logging
 						console.error(
 							`[EpubProcessor] Error processing section (href: ${item.href || sectionPath}):`,
-							sectionErr,
+							sectionErr, // Reverted logging
 						);
 						return ""; // Return empty string on error
 					}
@@ -250,6 +200,7 @@ export default function EpubProcessor({
 					(err) => {
 						// Catch errors specifically from Promise.all, often epubjs internal errors
 						console.error(
+							// Reverted logging
 							"[EpubProcessor] Error during Promise.all execution:",
 							err,
 						);
@@ -284,12 +235,14 @@ export default function EpubProcessor({
 
 				// Check if ALL sections failed (resulted in empty strings)
 				if (!combinedHtml && sectionHtmlArray.every((s) => s === "")) {
-					// If all sections failed, it's likely due to the epubjs incompatibility or section errors
+					// If all sections failed (likely caught by individual section catch blocks, but logs might be missing)
+					// Removed specific "CONDITION MET" log
 					setError(
 						"Error processing EPUB: Could not extract content from any section. The file might be corrupted or incompatible.",
 					);
 					console.error(
-						"[EpubProcessor] Failed to extract content from any spine section, likely due to internal errors during processing.",
+						// Keep original log too
+						"[EpubProcessor] Details: Failed to extract content from any spine section, likely due to internal errors during processing.",
 					);
 					onContentProcessed(null);
 					setLoading(false);
@@ -314,6 +267,7 @@ export default function EpubProcessor({
 				setLoading(false);
 			} catch (err: any) {
 				console.error(
+					// Reverted logging
 					"Detailed error during hybrid epubjs/jszip processing:",
 					err,
 				);
