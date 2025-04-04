@@ -26,6 +26,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t1"],
 		estimatedReadTime: 5,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "2",
@@ -41,6 +42,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t2"],
 		estimatedReadTime: 15,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "3",
@@ -56,6 +58,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t1", "t2"],
 		estimatedReadTime: 10,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "4",
@@ -71,6 +74,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t3"],
 		estimatedReadTime: 20,
 		type: "pdf",
+		version: 1, // Added version
 	},
 ];
 export const mockTags: Tag[] = [
@@ -91,9 +95,9 @@ export type MockArticleContextType = Omit<
 	| "addArticleByUrl"
 	| "addArticleByFile"
 	| "updateArticleStatus"
-	| "removeArticle" // Ensure this is omitted if not mocked
+	| "removeArticle"
 	| "updateReadingProgress"
-	| "optimisticRemoveArticle" // Revert omitted property name
+	| "optimisticRemoveArticle"
 > & {
 	setFilters: React.Dispatch<React.SetStateAction<ArticleFilters>>;
 	setSortCriteria: React.Dispatch<React.SetStateAction<SortCriteria>>;
@@ -112,7 +116,7 @@ let _mockSetSortCriteria: React.Dispatch<
 > | null = null;
 
 // Create mock functions at module level to allow importing into tests
-export const mockOptimisticRemoveArticle = vi.fn().mockResolvedValue(undefined); // Revert mock function name
+export const mockOptimisticRemoveArticle = vi.fn().mockResolvedValue(undefined);
 export const mockRefreshArticles = vi.fn().mockResolvedValue(mockRawArticles);
 export const mockRetryLoading = vi.fn();
 // Add other action mocks here if needed for other tests
@@ -144,7 +148,7 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				(a) =>
 					a.title.toLowerCase().includes(query) ||
 					a.excerpt?.toLowerCase().includes(query),
-			); // Optional chaining for excerpt
+			);
 		}
 		if (filters.siteNames.length > 0)
 			filtered = filtered.filter((a) =>
@@ -155,7 +159,7 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		if (filters.tags.length > 0)
 			filtered = filtered.filter((a) =>
 				a.tags?.some((tag) => filters.tags.includes(tag)),
-			); // Optional chaining for tags
+			);
 		if (filters.category)
 			filtered = filtered.filter((a) => a.category === filters.category);
 
@@ -202,12 +206,12 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		(category: ArticleCategory | null) =>
 			setFilters((prev) => ({ ...prev, category })),
 		[],
-	); // Correct type for category
+	);
 
 	const value: MockArticleContextType = useMemo(
 		() => ({
-			articles: mockRawArticles, // Raw articles
-			processedArticles, // Use derived articles
+			articles: mockRawArticles,
+			processedArticles,
 			isLoading: false,
 			isRefreshing: false,
 			error: null,
@@ -216,30 +220,26 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			currentView,
 			setCurrentView,
 			filters,
-			setFilters, // Provide direct setter
-			setSearchQuery, // Provide stable helper
+			setFilters,
+			setSearchQuery,
 			sortCriteria,
-			setSortCriteria, // Provide direct setter
-			setSortField, // Provide stable helper
-			toggleSortDirection, // Provide stable helper
-			setSelectedCategory, // Added mock setter
-			// Use the exported mock functions in the context value
+			setSortCriteria,
+			setSortField,
+			toggleSortDirection,
+			setSelectedCategory,
 			refreshArticles: mockRefreshArticles,
 			retryLoading: mockRetryLoading,
-			optimisticRemoveArticle: mockOptimisticRemoveArticle, // Revert provided function
+			optimisticRemoveArticle: mockOptimisticRemoveArticle,
 		}),
 		[
-			// Only include values that actually change and affect the output
 			processedArticles,
 			currentView,
 			filters,
-			// setFilters is stable
-			setSearchQuery, // Stable helper reference
+			setSearchQuery,
 			sortCriteria,
-			// setSortCriteria is stable
-			setSortField, // Stable helper reference
-			setSelectedCategory, // Add stable mock function reference
-			toggleSortDirection, // Stable helper reference
+			setSortField,
+			setSelectedCategory,
+			toggleSortDirection,
 		],
 	);
 
@@ -250,18 +250,12 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	);
 };
 
-// Test utility functions
+// Export test helper functions
 export function testUpdateFilters(newFilters: Partial<ArticleFilters>) {
 	if (!_mockSetFilters) {
-		console.error(
-			"Mock provider not initialized for filters. Ensure MockArticleProvider is rendered.",
-		);
-		return; // Or throw error
+		throw new Error("Cannot update filters - provider not mounted");
 	}
-	const setFilters = _mockSetFilters; // Assign after check
-	act(() => {
-		setFilters((prev) => ({ ...prev, ...newFilters }));
-	});
+	_mockSetFilters((prev) => ({ ...prev, ...newFilters }));
 }
 
 export function testSetSort(
@@ -269,29 +263,17 @@ export function testSetSort(
 	direction: "asc" | "desc",
 ) {
 	if (!_mockSetSortCriteria) {
-		console.error(
-			"Mock provider not initialized for sort criteria. Ensure MockArticleProvider is rendered.",
-		);
-		return; // Or throw error
+		throw new Error("Cannot update sort - provider not mounted");
 	}
-	const setSortCriteria = _mockSetSortCriteria; // Assign after check
-	act(() => {
-		setSortCriteria({ field, direction });
-	});
+	_mockSetSortCriteria({ field, direction });
 }
 
 export function testToggleSortDirection() {
 	if (!_mockSetSortCriteria) {
-		console.error(
-			"Mock provider not initialized for sort criteria. Ensure MockArticleProvider is rendered.",
-		);
-		return; // Or throw error
+		throw new Error("Cannot toggle sort direction - provider not mounted");
 	}
-	const setSortCriteria = _mockSetSortCriteria; // Assign after check
-	act(() => {
-		setSortCriteria((prev) => ({
-			...prev,
-			direction: prev.direction === "asc" ? "desc" : "asc",
-		}));
-	});
+	_mockSetSortCriteria((prev) => ({
+		...prev,
+		direction: prev.direction === "asc" ? "desc" : "asc",
+	}));
 }

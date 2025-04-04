@@ -38,6 +38,8 @@ export interface Article {
 	scrollPosition?: number; // Last reading scroll position (e.g., pixel value)
 	coverImage?: string; // URL or base64 data for a cover image
 	language?: string; // Detected language code (e.g., 'en', 'vi')
+	deletedAt?: number; // Timestamp (ms since epoch) when soft deleted locally
+	version: number; // Monotonically increasing version number for sync conflict resolution
 }
 
 /**
@@ -74,4 +76,20 @@ export interface Tag {
 	color: string; // Color associated with the tag (e.g., hex code '#3B82F6')
 	createdAt: number; // Timestamp (ms since epoch) when created
 	userId?: string; // Optional: User ID if tags are user-specific
+}
+
+/**
+ * Represents an operation (update/delete) to be synced to the cloud,
+ * queued for when the application is offline.
+ */
+export interface QueuedOperation {
+	_id: string; // PouchDB document ID (e.g., 'queue_delete_article_uuid_timestamp')
+	_rev?: string; // PouchDB document revision
+	type: "delete" | "update"; // Type of operation
+	docId: string; // The _id of the Article document this operation applies to
+	timestamp: number; // Timestamp (ms since epoch) when the operation was queued
+	retryCount: number; // Number of times sync has been attempted for this operation
+	// Include the full or partial article data for 'update' operations
+	// This allows the sync process to send the correct state to the cloud
+	data?: Partial<Article>;
 }

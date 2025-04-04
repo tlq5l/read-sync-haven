@@ -4,7 +4,7 @@ import PouchDBAdapterMemory from "pouchdb-adapter-memory"; // Import memory adap
 import PouchDB from "pouchdb-browser";
 import PouchDBFind from "pouchdb-find";
 import { updateMissingMetadata } from "./migrations"; // Import the migration function
-import type { Article, Highlight, Tag } from "./types";
+import type { Article, Highlight, QueuedOperation, Tag } from "./types"; // Added QueuedOperation
 import { executeWithRetry } from "./utils";
 
 // Register PouchDB plugins
@@ -30,6 +30,7 @@ const DB_PREFIX = "readsync_"; // Using a more specific prefix
 const ARTICLES_DB_NAME = `${DB_PREFIX}articles`;
 const HIGHLIGHTS_DB_NAME = `${DB_PREFIX}highlights`;
 const TAGS_DB_NAME = `${DB_PREFIX}tags`;
+const OPERATIONS_QUEUE_DB_NAME = `${DB_PREFIX}operations_queue`; // Added
 
 // Default options for PouchDB instances
 const defaultDbOptions: PouchDB.Configuration.DatabaseConfiguration = {
@@ -103,6 +104,9 @@ function createDbInstance<T extends object>(
 export let articlesDb = createDbInstance<Article>(ARTICLES_DB_NAME);
 export let highlightsDb = createDbInstance<Highlight>(HIGHLIGHTS_DB_NAME);
 export let tagsDb = createDbInstance<Tag>(TAGS_DB_NAME);
+export let operationsQueueDb = createDbInstance<QueuedOperation>(
+	OPERATIONS_QUEUE_DB_NAME,
+); // Added
 
 // Re-assign exported variables for the test environment *after* declaration
 // This ensures PouchDB uses the memory adapter specifically for tests.
@@ -111,6 +115,9 @@ if (import.meta.vitest) {
 	articlesDb = createDbInstance<Article>(ARTICLES_DB_NAME);
 	highlightsDb = createDbInstance<Highlight>(HIGHLIGHTS_DB_NAME);
 	tagsDb = createDbInstance<Tag>(TAGS_DB_NAME);
+	operationsQueueDb = createDbInstance<QueuedOperation>(
+		OPERATIONS_QUEUE_DB_NAME,
+	); // Added for test env
 }
 
 // --- Index Management ---
@@ -174,6 +181,12 @@ async function createDbIndexes(): Promise<void> {
 	// Tag Indexes
 	indexPromises.push(createIndex(tagsDb, ["name"], "name")); // Assuming tag names are unique per user
 
+	// Queue Indexes
+	indexPromises.push(
+		createIndex(operationsQueueDb, ["timestamp"], "queueTimestamp"),
+	); // For processing order
+	indexPromises.push(createIndex(operationsQueueDb, ["type"], "queueType")); // For filtering by type
+
 	try {
 		await Promise.all(indexPromises);
 		indexesCreated = true;
@@ -222,6 +235,7 @@ export async function initializeDatabase(): Promise<boolean> {
 				articlesDb.info(),
 				highlightsDb.info(),
 				tagsDb.info(),
+				operationsQueueDb.info(), // Added queue DB test
 			]);
 			console.log("Primary database connections successful.");
 		} catch (dbError) {
@@ -238,12 +252,18 @@ export async function initializeDatabase(): Promise<boolean> {
 					adapter: "memory",
 				});
 				tagsDb = new PouchDB<Tag>(TAGS_DB_NAME, { adapter: "memory" });
+				operationsQueueDb = new PouchDB<QueuedOperation>(
+					// Added queue fallback
+					OPERATIONS_QUEUE_DB_NAME,
+					{ adapter: "memory" },
+				);
 
 				// Test memory connections
 				await Promise.all([
 					articlesDb.info(),
 					highlightsDb.info(),
 					tagsDb.info(),
+					operationsQueueDb.info(), // Added queue test
 				]);
 				console.log("Memory database fallback connections successful.");
 				success = true; // Fallback succeeded

@@ -75,16 +75,15 @@ export default function EpubProcessor({
 			try {
 				const arrayBuffer = base64ToArrayBuffer(fileData);
 				// Load with both libraries
-				epubBook = ePub(arrayBuffer) as ExtendedBook;
+				epubBook = ePub(arrayBuffer) as ExtendedBook; // Keep epubjs for structure
 				const zip = await JSZip.loadAsync(arrayBuffer); // Reload zip instance
 				console.log("[EpubProcessor] Epub book initialized (epubjs & jszip).");
 
 				await epubBook.ready;
 				console.log("[EpubProcessor] Epub book ready.");
-				if (!epubBook?.spine?.items || !epubBook?.archive) {
-					throw new Error(
-						"Failed to load EPUB structure (spine/archive missing).",
-					);
+				// We only need spine, not necessarily archive if we extract text with JSZip
+				if (!epubBook?.spine?.items) {
+					throw new Error("Failed to load EPUB structure (spine missing).");
 				}
 
 				console.log(
@@ -97,14 +96,24 @@ export default function EpubProcessor({
 					try {
 						// Use item.href directly (usually synchronous) instead of awaiting item.url
 						sectionPath = item.href ? normalize(item.href) : "";
-						if (!sectionPath || !epubBook?.archive) {
+						if (!sectionPath) {
+							// Removed archive check
 							console.warn(
-								`[EpubProcessor] Missing section path or archive for item ${item.idref}.`,
+								`[EpubProcessor] Missing section path for item ${item.idref}.`,
 							);
 							return "";
 						}
 
-						const sectionHtml = await epubBook.archive.getText(sectionPath);
+						// --- Use JSZip to get raw section HTML instead of epubjs ---
+						const sectionFile = zip.file(sectionPath);
+						if (!sectionFile) {
+							console.warn(
+								`[EpubProcessor] Section file not found in zip: ${sectionPath}`,
+							);
+							return ""; // Skip section if file not found
+						}
+						const sectionHtml = await sectionFile.async("string");
+						// --- End JSZip HTML extraction ---
 						if (typeof sectionHtml !== "string" || sectionHtml.length === 0) {
 							console.warn(
 								`[EpubProcessor] Section ${sectionPath} content is not a string or empty.`,
@@ -127,27 +136,46 @@ export default function EpubProcessor({
 							if (originalSrc && !originalSrc.startsWith("data:")) {
 								let imagePath: string | undefined;
 								try {
+									console.log(
+										`\t[Epub Img DEBUG] -> Start processing src: "${originalSrc}" (Section: "${sectionPath}")`,
+									);
 									// Improved path resolution for JSZip
-									if (originalSrc.startsWith("/")) {
+									const isAbsolutePath = originalSrc.startsWith("/");
+									console.log(
+										`\t[Epub Img DEBUG]    Is absolute path? ${isAbsolutePath}`,
+									);
+									if (isAbsolutePath) {
 										// Path is absolute from EPUB root
-										imagePath = normalize(originalSrc.substring(1));
-										// console.log(`\t[Epub Img DEBUG] Calculated absolute image path: "${imagePath}"`);
+										imagePath = normalize(originalSrc.substring(1)); // Remove leading '/'
+										console.log(
+											`\t[Epub Img DEBUG]    Calculated absolute image path: "${imagePath}"`,
+										);
 									} else {
 										// Path is relative to the section directory
 										imagePath = normalize(join(sectionDir, originalSrc));
-										// console.log(`\t[Epub Img DEBUG] Calculated relative image path: "${imagePath}" (from sectionDir: "${sectionDir}", originalSrc: "${originalSrc}")`);
+										console.log(
+											`\t[Epub Img DEBUG]    Calculated relative image path: "${imagePath}" (Section dir: "${sectionDir}")`,
+										);
 									}
 
 									// console.log(`\t[Epub Img] Attempting to load image path: "${imagePath}" using JSZip`);
-									const imageFile = zip.file(imagePath); // Find file using JSZip
+									console.log(
+										`\t[Epub Img DEBUG]    Attempting zip.file("${imagePath}")`,
+									);
+									const imageFile = imagePath ? zip.file(imagePath) : null; // Find file using JSZip, handle undefined path
+									console.log(
+										`\t[Epub Img DEBUG]    JSZip found file? ${!!imageFile}`,
+									); // Log if file was found by JSZip
 
 									if (imageFile) {
 										// console.log(`\t[Epub Img DEBUG] Found file in JSZip for path: "${imagePath}"`);
 										const base64Data = await imageFile.async("base64"); // Get base64 from JSZip
 										// console.log(`\t[Epub Img DEBUG] JSZip base64 result length: ${base64Data?.length ?? 'undefined'} for "${imagePath}"`);
-										if (base64Data) {
-											const mimeType = getMimeType(imagePath); // Determine MIME from path
-											// console.log(`\t[Epub Img DEBUG] Determined MIME type: "${mimeType}" for "${imagePath}"`);
+										if (base64Data && imagePath) {
+											const mimeType = getMimeType(imagePath);
+											console.log(
+												`\t[Epub Img DEBUG]    Determined MIME type: "${mimeType}"`,
+											); // Log MIME type
 											if (mimeType) {
 												img.setAttribute(
 													"src",
@@ -172,10 +200,13 @@ export default function EpubProcessor({
 										);
 										img.removeAttribute("src");
 									}
-								} catch (imgErr) {
+								} catch (imgErr: any) {
+									// Explicitly type imgErr as any
 									console.error(
-										`\t[Epub Img] FAIL: Error processing image src "${originalSrc}" (resolved: "${imagePath}") with JSZip:`,
-										imgErr,
+										// Log detailed error
+										`\t[Epub Img DEBUG] <- FAIL: Error during JSZip processing for src "${originalSrc}" (resolved path: "${imagePath}"):`,
+										imgErr?.message || imgErr, // Log message first
+										imgErr, // Log full error object
 									);
 									img.removeAttribute("src");
 								}
