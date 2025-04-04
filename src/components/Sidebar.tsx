@@ -5,7 +5,7 @@ import {
 } from "@/components/ui/transition-group";
 import { useAnimation } from "@/context/AnimationContext";
 import { useArticles } from "@/context/ArticleContext";
-import { useTheme } from "@/context/ThemeContext";
+// import { useTheme } from "@/context/ThemeContext"; // Removed as unused after theme toggle moved
 import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
 import type { ArticleCategory } from "@/services/db"; // Import ArticleCategory
@@ -22,7 +22,7 @@ import {
 	Library,
 	LogIn,
 	// MenuIcon, // Removed old icon
-	Moon,
+	// Moon, // Removed as unused after theme toggle moved
 	Newspaper, // Icon for Articles
 	// PanelLeftClose, // Removed old icon
 	// PanelLeftOpen, // Removed old icon
@@ -31,7 +31,7 @@ import {
 	Shapes, // Icon for Other
 	SidebarClose, // New icon for sidebar collapse
 	SidebarOpen, // New icon for sidebar expand
-	Sun,
+	// Sun, // Removed as unused after theme toggle moved
 	Video, // Icon for Videos
 } from "lucide-react";
 import React, { useState } from "react"; // Add React default import, removed unused useEffect
@@ -44,7 +44,7 @@ export default function Sidebar() {
 	const navigate = useNavigate();
 	const { setCurrentView, setSelectedCategory, filters } = useArticles(); // Add category filter state and setter
 	const currentCategory = filters.category; // Extract current category
-	const { theme, setTheme } = useTheme();
+	// const { theme, setTheme } = useTheme(); // Removed as unused after theme toggle moved
 	const { synchronizeAnimations } = useAnimation();
 	const { isSignedIn } = useAuth();
 	// const { user } = useUser(); // Removed as unused
@@ -81,9 +81,9 @@ export default function Sidebar() {
 	// const isViewActive = (view: "all" | "unread" | "favorites") =>
 	// 	currentView === view; // Removed unused function
 
-	const toggleTheme = () => {
-		setTheme(theme === "dark" ? "light" : "dark");
-	};
+	// const toggleTheme = () => { // Removed as unused after theme toggle moved
+	// 	setTheme(theme === "dark" ? "light" : "dark");
+	// };
 
 	const toggleCollapsed = () => {
 		// Use synchronizeAnimations to ensure smooth transitions
@@ -293,23 +293,7 @@ export default function Sidebar() {
 								)}
 							</Link>
 						</Button>
-						{/* Theme Toggle Button */}
-						<Button
-							variant="ghost"
-							className={cn(
-								"w-full flex items-center gap-3 py-2 transition-all duration-200",
-								collapsed ? "justify-center" : "justify-start",
-								"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
-							)}
-							onClick={toggleTheme}
-						>
-							{theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
-							{!collapsed && (
-								<span className="transition-opacity duration-200">
-									{theme === "dark" ? "Dark Mode" : "Light Mode"}
-								</span>
-							)}
-						</Button>
+						{/* Theme Toggle Button - Removed, moved to Settings/Appearance */}
 						{/* Sign In Link (Conditional) */}
 						{!isSignedIn && (
 							<Button

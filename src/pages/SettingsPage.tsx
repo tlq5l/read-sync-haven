@@ -9,9 +9,10 @@ import { Slider } from "@/components/ui/slider";
 
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Removed ThemeToggle import as we'll use a Switch directly
 import type { TextSize } from "@/context/ThemeContext"; // Import TextSize type
 
-import { useTheme } from "@/context/ThemeContext";
+import { useTheme } from "@/context/ThemeContext"; // Re-added useTheme import
 import { useToast } from "@/hooks/use-toast";
 import { useArticleActions } from "@/hooks/useArticleActions";
 import {
@@ -38,7 +39,7 @@ import { Link } from "react-router-dom";
 
 export default function SettingsPage() {
 	const { toast } = useToast();
-	const { theme, textSize, setTextSize } = useTheme(); // Get theme, textSize, setTextSize
+	const { theme, textSize, setTextSize, setTheme } = useTheme(); // Get theme, textSize, setTextSize, and setTheme
 	const [isExportingData, setIsExportingData] = useState(false);
 	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
 	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false); // Add state for metadata update button
@@ -260,6 +261,35 @@ export default function SettingsPage() {
 											<span>Smallest</span>
 											<span>Default</span>
 											<span>Largest</span>
+										</div>
+									</div>
+									<Separator /> {/* Add separator */}
+									<div className="space-y-3">
+										<Label>Theme</Label>
+										<p className="text-sm text-muted-foreground">
+											Select the application theme.
+										</p>
+										{/* Replace ThemeToggle with Switch and labels */}
+										<div className="flex items-center space-x-2">
+											<Label
+												htmlFor="theme-switch"
+												className="text-sm font-normal"
+											>
+												Light
+											</Label>
+											<Switch
+												id="theme-switch"
+												checked={theme === "dark"}
+												onCheckedChange={(checked) =>
+													setTheme(checked ? "dark" : "light")
+												}
+											/>
+											<Label
+												htmlFor="theme-switch"
+												className="text-sm font-normal"
+											>
+												Dark
+											</Label>
 										</div>
 									</div>
 								</CardContent>
