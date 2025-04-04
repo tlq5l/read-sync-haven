@@ -86,7 +86,7 @@ export default function EpubReader({
 							viewerRef.current as HTMLElement,
 							{
 								width: "100%",
-								height: "100%",
+								// height: "100%", // Remove explicit height, rely on flow manager
 								flow: "scrolled-doc", // Use scrolled-doc flow
 								ignoreClass: "annotator-hl",
 								spread: "none",
@@ -117,7 +117,7 @@ export default function EpubReader({
 									for (const iframe of Array.from(iframes)) {
 										iframe.style.border = "0";
 										iframe.style.width = "100%";
-										iframe.style.height = "100%";
+										// iframe.style.height = "100%"; // Remove explicit height on iframe
 										iframe.style.overflow = "auto";
 									}
 								}
