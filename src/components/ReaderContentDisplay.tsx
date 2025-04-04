@@ -40,9 +40,7 @@ export function ReaderContentDisplay({
 		// Render EPUB Reader
 		return (
 			<div
-				className="flex-1 overflow-hidden flex flex-col"
-				// Use a fixed height calculation or rely on flex-grow
-				style={{ height: "calc(100vh - 64px - 5rem)" }} // Adjust height based on toolbar/header
+				className="flex-1 overflow-hidden flex flex-col" // Removed inline style for height calculation
 			>
 				<div className={`px-4 md:px-8 py-4 border-b ${textColorClass}`}>
 					<h1 className="text-2xl font-bold mb-2">{article.title}</h1>
@@ -71,8 +69,7 @@ export function ReaderContentDisplay({
 		// Render PDF Reader
 		return (
 			<div
-				className="flex-1 overflow-hidden flex flex-col"
-				style={{ height: "calc(100vh - 64px - 5rem)" }} // Adjust height
+				className="flex-1 overflow-hidden flex flex-col" // Removed inline style for height calculation
 			>
 				<div className={`px-4 md:px-8 py-4 border-b ${textColorClass}`}>
 					<h1 className="text-2xl font-bold mb-2">{article.title}</h1>
