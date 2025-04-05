@@ -1,4 +1,7 @@
 /* eslint-disable */
+// Sentry initialization should be imported first!
+import "./instrument.js";
+
 import JSZip from "jszip";
 import * as React from "react";
 import { createRoot } from "react-dom/client";

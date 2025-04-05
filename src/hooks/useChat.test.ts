@@ -1,5 +1,15 @@
 import { useAuth } from "@clerk/clerk-react";
-import { act, renderHook } from "@testing-library/react"; // Removed waitFor
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react";
+import { renderHook } from "@testing-library/react-hooks";
+// Removed waitFor
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server } from "../mocks/server"; // MSW server

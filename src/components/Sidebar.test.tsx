@@ -1,6 +1,15 @@
 import { AnimationProvider } from "@/context/AnimationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react";
+import { renderHook } from "@testing-library/react-hooks";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Sidebar from "./Sidebar";

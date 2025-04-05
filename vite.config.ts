@@ -1,7 +1,8 @@
 import path from "node:path";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import react from "@vitejs/plugin-react-swc";
-import { GoogleAuth } from "google-auth-library"; // Import GoogleAuth
-import { type Plugin, defineConfig, loadEnv } from "vite"; // Moved vite import down
+import { GoogleAuth } from "google-auth-library";
+import { type Plugin, defineConfig, loadEnv } from "vite";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // // Custom plugin to provide GCF token during development
@@ -103,6 +104,12 @@ export default defineConfig(({ mode }) => ({
 			// Removed 'include' array to polyfill all supported modules by default
 			protocolImports: true,
 		}),
+		// Put the Sentry vite plugin after all other plugins
+		sentryVitePlugin({
+			authToken: process.env.SENTRY_AUTH_TOKEN,
+			org: "vinc-2u",
+			project: "javascript-react",
+		}),
 	],
 	resolve: {
 		alias: {
@@ -116,6 +123,7 @@ export default defineConfig(({ mode }) => ({
 	build: {
 		target: "es2020",
 		outDir: "dist",
+		sourcemap: true, // Source map generation must be turned on
 		// Increase warning limit to avoid seeing the warning
 		chunkSizeWarningLimit: 1500,
 		rollupOptions: {

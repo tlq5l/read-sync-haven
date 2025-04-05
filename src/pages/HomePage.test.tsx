@@ -1,7 +1,16 @@
 import { TooltipProvider } from "@/components/ui/tooltip"; // Import TooltipProvider
 import { ThemeProvider } from "@/context/ThemeContext"; // Import ThemeProvider
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"; // Import QueryClientProvider
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react";
+import { renderHook } from "@testing-library/react-hooks";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "./HomePage";

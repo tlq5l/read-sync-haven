@@ -1,10 +1,20 @@
 /// <reference types="@testing-library/jest-dom" />
+import {
+	act,
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+	within,
+} from "@testing-library/react";
+import { renderHook } from "@testing-library/react-hooks";
 
 // src/pages/SettingsPage.test.tsx
 
 import { ThemeProvider } from "@/context/ThemeContext"; // Import real ThemeProvider
 import SettingsPage from "@/pages/SettingsPage";
-import { cleanup, render, screen } from "@testing-library/react"; // Removed unused fireEvent
+// Removed unused fireEvent
 // Removed unused imports: waitFor, within, PropsWithChildren
 import { BrowserRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

@@ -35,3 +35,6 @@ bun-path.ps1
 .aider*
 node_modules/
 bondwise-worker/.dev.vars
+
+# Sentry Config File
+.env.sentry-build-plugin

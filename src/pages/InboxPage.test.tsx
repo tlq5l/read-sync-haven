@@ -1,14 +1,16 @@
 // Import necessary types and utils used in the mock provider
 import type { Article } from "@/services/db";
-// Removed unused import: filterArticles, sortArticles
 import {
 	act,
 	cleanup,
+	fireEvent,
 	render,
 	screen,
 	waitFor,
 	within,
 } from "@testing-library/react";
+import { renderHook } from "@testing-library/react-hooks";
+// Removed unused import: filterArticles, sortArticles
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
