@@ -6,7 +6,7 @@ import type {
 	ArticleSortField,
 	SortCriteria,
 } from "@/types/articles";
-import { act } from "@testing-library/react"; // Import act (keep only one)
+// Removed unused act import
 import React, { useCallback, useMemo, useState } from "react";
 import { vi } from "vitest"; // Import vi
 

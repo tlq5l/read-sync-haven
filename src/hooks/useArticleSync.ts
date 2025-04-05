@@ -680,7 +680,7 @@ export function useArticleSync(
 		[isSignedIn, userId],
 	);
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: `user` and `toast` omitted to prevent re-renders from potentially unstable refs (esp. in tests); closure ensures latest values are used on execution. The main effect depends on this callback; its core deps (isSignedIn, userId, getToken) are stable and capture necessary triggers.
+	// Unused suppression comment removed
 	const performCloudSync = useCallback(
 		async (isMounted: boolean, loadedFromCache: boolean) => {
 			// Call the refactored _performCloudSync
@@ -829,12 +829,12 @@ export function useArticleSync(
 		getToken,
 		user,
 		toast,
-		articles,
-		setArticles,
-		setIsLoading,
-		setIsRefreshing,
-		setError,
-		fetchLockRef,
+		articles, // Added missing dependency
+		// setArticles, // State setters are stable
+		// setIsLoading, // State setters are stable
+		// setIsRefreshing, // State setters are stable
+		// setError, // State setters are stable
+		// fetchLockRef, // Refs are stable
 		hidingArticleIds,
 		// No need to depend on performCloudSync useCallback wrapper here, call helper directly
 	]);

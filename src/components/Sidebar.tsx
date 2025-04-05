@@ -34,7 +34,8 @@ import {
 	// Sun, // Removed as unused after theme toggle moved
 	Video, // Icon for Videos
 } from "lucide-react";
-import React, { useState } from "react"; // Add React default import, removed unused useEffect
+import React, { useState } from "react";
+import { useTranslation } from "react-i18next"; // Added useTranslation
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
@@ -42,7 +43,8 @@ export default function Sidebar() {
 	const [isLibraryOpen, setIsLibraryOpen] = useState(true); // State for library collapse
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { setCurrentView, setSelectedCategory, filters } = useArticles(); // Add category filter state and setter
+	const { setCurrentView, setSelectedCategory, filters } = useArticles();
+	const { t } = useTranslation(); // Added translation hook
 	const currentCategory = filters.category; // Extract current category
 	// const { theme, setTheme } = useTheme(); // Removed as unused after theme toggle moved
 	const { synchronizeAnimations } = useAnimation();
@@ -114,7 +116,7 @@ export default function Sidebar() {
 						className="text-xl font-bold transition-opacity duration-200 text-gray-900 dark:text-white" // Corrected: Single className with merged styles
 						// style={styles.header} // Style prop correctly removed
 					>
-						Read Sync Haven
+						{t("appTitle")}
 					</h1>
 				)}
 				<div
@@ -167,44 +169,59 @@ export default function Sidebar() {
 						>
 							<Home size={20} />
 							{!collapsed && (
-								<span className="transition-opacity duration-200">Home</span>
+								<span className="transition-opacity duration-200">
+									{t("sidebar.home")}
+								</span>
 							)}
 						</Button>
 					</TransitionItem>
 
 					<TransitionItem showFrom="left" className="w-full">
 						{/* Library Button */}
-						{/* Collapsible Library Trigger */}
-						<Button
-							variant="ghost"
-							className={cn(
-								"w-full flex items-center gap-3 py-2 transition-all duration-200", // Original cn()
-								collapsed ? "justify-center" : "justify-start", // Original cn() arg
-								"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100", // Merged base styles
-							)}
-							onClick={() => {
-								if (!collapsed) {
-									setIsLibraryOpen(!isLibraryOpen); // Only toggle if not collapsed
-								}
-								setSelectedCategory(null); // Clear category filter
-								navigate("/inbox"); // Navigate to the main library view
-							}}
-							// style={styles.link} // Style prop correctly removed
-						>
-							{!collapsed && // Only show chevron when not collapsed
-								(isLibraryOpen ? (
-									<ChevronDown size={16} />
-								) : (
-									<ChevronRight size={16} />
-								))}
-							<Library size={20} className={cn(!collapsed && "ml-1")} />{" "}
-							{/* Adjust icon spacing only when not collapsed */}
+						{/* Collapsible Library Trigger - Restructured to separate chevron and main button */}
+						<div className="flex items-center w-full">
+							{/* Chevron Button - Only for toggling dropdown */}
 							{!collapsed && (
-								<span className="transition-opacity duration-200 font-medium">
-									Library
-								</span>
+								<Button
+									variant="ghost"
+									size="sm"
+									className="p-0 h-8 w-8 mr-1"
+									onClick={(e) => {
+										e.stopPropagation(); // Prevent event bubbling
+										setIsLibraryOpen(!isLibraryOpen);
+									}}
+								>
+									{isLibraryOpen ? (
+										<ChevronDown size={16} />
+									) : (
+										<ChevronRight size={16} />
+									)}
+								</Button>
 							)}
-						</Button>
+							{/* Main Library Button - Only for navigation */}
+							<Button
+								variant="ghost"
+								className={cn(
+									"flex items-center gap-3 py-2 transition-all duration-200", // Original cn()
+									collapsed
+										? "justify-center w-full"
+										: "justify-start flex-grow", // Adjusted width
+									"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100", // Merged base styles
+								)}
+								onClick={() => {
+									setSelectedCategory(null); // Clear category filter
+									navigate("/inbox"); // Navigate to the main library view
+								}}
+								// style={styles.link} // Style prop correctly removed
+							>
+								<Library size={20} />{" "}
+								{!collapsed && (
+									<span className="transition-opacity duration-200 font-medium">
+										{t("sidebar.library")}
+									</span>
+								)}
+							</Button>
+						</div>
 						{/* Collapsible Category List - Render directly below trigger if open */}
 						{isLibraryOpen && !collapsed && (
 							<div className="w-full pl-6 mt-1 space-y-1">
@@ -288,7 +305,7 @@ export default function Sidebar() {
 								<Settings size={20} />
 								{!collapsed && (
 									<span className="transition-opacity duration-200">
-										Settings
+										{t("settings.title")}
 									</span>
 								)}
 							</Link>
@@ -316,7 +333,7 @@ export default function Sidebar() {
 									<LogIn size={20} />
 									{!collapsed && (
 										<span className="transition-opacity duration-200">
-											Sign In
+											{t("sidebar.signIn")}
 										</span>
 									)}
 								</Link>
@@ -337,7 +354,7 @@ export default function Sidebar() {
 							<Plus size={18} />
 							{!collapsed ? (
 								<span className="transition-opacity duration-200">
-									Add Content
+									{t("sidebar.addContent")}
 								</span>
 							) : null}
 						</Link>

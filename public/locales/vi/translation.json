@@ -1,0 +1,54 @@
+{
+	"appTitle": "Read Sync Haven",
+	"sidebar": {
+		"inbox": "Inbox",
+		"later": "Later",
+		"archive": "Archive",
+		"addContent": "Add Content",
+		"home": "Home",
+		"library": "Library",
+		"signIn": "Sign In"
+	},
+	"settings": {
+		"title": "Settings",
+		"appearance": {
+			"title": "Appearance",
+			"language": "Language",
+			"theme": "Theme",
+			"themeDescription": "Select the application theme.",
+			"light": "Light",
+			"dark": "Dark",
+			"system": "System",
+			"languageDescription": "Choose the application's display language."
+		},
+		"shortcuts": {
+			"title": "Shortcuts"
+		},
+		"account": {
+			"title": "Account"
+		},
+		"sync": {
+			"title": "Sync"
+		}
+	},
+	"articleCard": {
+		"archive": "Archive",
+		"readLater": "Read Later",
+		"delete": "Delete",
+		"read": "Read",
+		"unread": "Unread",
+		"moveToInbox": "Move to Inbox"
+	},
+	"topBar": {
+		"searchPlaceholder": "Search articles...",
+		"sort": {
+			"placeholder": "Sort by...",
+			"dateSaved": "Date Saved",
+			"title": "Title",
+			"source": "Source",
+			"readTime": "Read Time",
+			"ariaLabelAsc": "Sort direction: Ascending",
+			"ariaLabelDesc": "Sort direction: Descending"
+		}
+	}
+}

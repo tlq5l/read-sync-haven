@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import "./lib/polyfills";
+import "./lib/i18n"; // Import i18next configuration
 
 // Ensure JSZip is available globally for EPUB.js
 declare global {
@@ -30,7 +31,11 @@ window.React = React;
 // Load scripts in the correct order
 const rootElement = document.getElementById("root");
 if (rootElement) {
-	createRoot(rootElement).render(<App />);
+	createRoot(rootElement).render(
+		<React.Suspense fallback="Loading...">
+			<App />
+		</React.Suspense>,
+	);
 } else {
 	console.error("Root element not found");
 }

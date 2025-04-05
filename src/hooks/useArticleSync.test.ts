@@ -1,6 +1,8 @@
+// import React from "react"; // Removed unused React import
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useArticleSync } from "./useArticleSync";
+// import { MockArticleProvider } from "@/test-utils/MockArticleProvider"; // Commented out unused import
 
 // Import types needed for mocks and tests
 import type { Article, QueuedOperation } from "@/services/db";
@@ -286,7 +288,9 @@ describe("useArticleSync", () => {
 		];
 		mockGetAllArticles.mockResolvedValue(duplicateArticles); // Initial cache load has duplicates
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 
 		expect(result.current.isLoading).toBe(false);
 		expect(result.current.articles.length).toBe(2);
@@ -341,7 +345,9 @@ describe("useArticleSync", () => {
 			return finalState;
 		});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 
 		// Wait for the hook to finish loading and refreshing, and for the articles
 		// count to become 3.
@@ -401,7 +407,9 @@ describe("useArticleSync", () => {
 			rows: [],
 		});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
@@ -457,7 +465,9 @@ describe("useArticleSync", () => {
 		});
 		mockFetchCloudItems.mockResolvedValue([cloudArticle]);
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
@@ -503,7 +513,9 @@ describe("useArticleSync", () => {
 			rows: [],
 		});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
@@ -549,7 +561,9 @@ describe("useArticleSync", () => {
 			];
 		});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 
 		// Wait for sync to complete and check final state
 		await waitFor(
@@ -595,7 +609,9 @@ describe("useArticleSync", () => {
 			rows: [],
 		});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false), {
 			timeout: 2000,
@@ -642,7 +658,9 @@ describe("useArticleSync", () => {
 		mockGetAllArticles.mockResolvedValue([localUpdatedArticle]);
 		mockFetchCloudItems.mockResolvedValue([cloudOldArticle]);
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
@@ -699,7 +717,9 @@ describe("useArticleSync", () => {
 			.spyOn(console, "error")
 			.mockImplementation(() => {});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 
 		// Wait for the sync process to potentially throw or complete
 		await waitFor(() => {
@@ -757,7 +777,9 @@ describe("useArticleSync", () => {
 			.spyOn(console, "warn")
 			.mockImplementation(() => {});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
@@ -801,7 +823,9 @@ describe("useArticleSync", () => {
 			rows: [],
 		}); // Empty queue
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
@@ -822,6 +846,10 @@ describe("useArticleSync", () => {
 		);
 	});
 
+	// Define the wrapper component using a standard function declaration
+	// function WrapperComponent(props: { children: React.ReactNode }) {
+	// 	return <MockArticleProvider>{props.children}</MockArticleProvider>;
+	// }
 	it("should handle duplicate articles correctly", async () => {
 		const duplicateArticles: Article[] = [
 			...mockArticles,
@@ -845,11 +873,9 @@ describe("useArticleSync", () => {
 
 		mockGetAllArticles.mockResolvedValueOnce(duplicateArticles);
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()), {
-			wrapper: ({ children }) => (
-				<MockArticleProvider>{children}</MockArticleProvider>
-			),
-		});
+		const { result } = renderHook(
+			() => useArticleSync(true, new Set<string>()), // Removed the options object with the wrapper
+		);
 
 		await waitFor(() => {
 			expect(result.current.articles).toHaveLength(mockArticles.length);
@@ -877,7 +903,9 @@ describe("Handling Invalid Cloud Data", () => {
 			.spyOn(console, "warn")
 			.mockImplementation(() => {});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
@@ -909,7 +937,9 @@ describe("Handling Invalid Cloud Data", () => {
 			.spyOn(console, "warn")
 			.mockImplementation(() => {});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
@@ -938,7 +968,9 @@ describe("Handling Invalid Cloud Data", () => {
 			.spyOn(console, "warn")
 			.mockImplementation(() => {});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
@@ -978,7 +1010,9 @@ describe("Handling Invalid Cloud Data", () => {
 			.spyOn(console, "warn")
 			.mockImplementation(() => {});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
@@ -1033,7 +1067,9 @@ describe("Handling Invalid Cloud Data", () => {
 			.spyOn(console, "warn")
 			.mockImplementation(() => {});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
 		expect(consoleWarnSpy).toHaveBeenCalledWith(
@@ -1081,7 +1117,9 @@ describe("Handling Invalid Cloud Data", () => {
 			.spyOn(console, "warn")
 			.mockImplementation(() => {});
 
-		const { result } = renderHook(() => useArticleSync(true, new Set<string>()));
+		const { result } = renderHook(() =>
+			useArticleSync(true, new Set<string>()),
+		);
 		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
 
 		expect(consoleWarnSpy).toHaveBeenCalledWith(

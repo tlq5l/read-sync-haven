@@ -4,17 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select"; // Added Select components
 import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
-
+// Removed Slider import as the feature is removed
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // Removed ThemeToggle import as we'll use a Switch directly
-import type { TextSize } from "@/context/ThemeContext"; // Import TextSize type
+// import type { TextSize } from "@/context/ThemeContext"; // Removed unused TextSize type
 
-import { useTheme } from "@/context/ThemeContext"; // Re-added useTheme import
+import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { useArticleActions } from "@/hooks/useArticleActions";
+import { supportedLngs } from "@/lib/i18n"; // Added supportedLngs import
 import {
 	type Article,
 	type Highlight,
@@ -35,11 +42,13 @@ import {
 	// User, // Removed unused User icon
 } from "lucide-react"; // Added ShieldCheck for Account
 import { useState } from "react"; // Remove useEffect import
+import { useTranslation } from "react-i18next"; // Added useTranslation
 import { Link } from "react-router-dom";
 
 export default function SettingsPage() {
 	const { toast } = useToast();
-	const { theme, textSize, setTextSize, setTheme } = useTheme(); // Get theme, textSize, setTextSize, and setTheme
+	const { theme, setTheme } = useTheme(); // Removed textSize and setTextSize
+	const { t, i18n } = useTranslation(); // Added translation hook
 	const [isExportingData, setIsExportingData] = useState(false);
 	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
 	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false); // Add state for metadata update button
@@ -168,7 +177,7 @@ export default function SettingsPage() {
 						<ArrowLeft className="h-5 w-5" />
 					</Link>
 				</Button>
-				<h1 className="text-2xl font-bold ml-2">Settings</h1>
+				<h1 className="text-2xl font-bold ml-2">{t("settings.title")}</h1>
 			</div>
 			<Tabs
 				defaultValue="account"
@@ -184,12 +193,12 @@ export default function SettingsPage() {
 						{" "}
 						{/* New Account Tab */}
 						<ShieldCheck className="h-4 w-4" />
-						<span>Account</span>
+						<span>{t("settings.account.title")}</span>
 					</TabsTrigger>
 					{/* Removed redundant Profile Tab Trigger */}
 					<TabsTrigger value="appearance" className="flex items-center gap-1">
 						<Palette className="h-4 w-4" />
-						<span>Appearance</span>
+						<span>{t("settings.appearance.title")}</span>
 					</TabsTrigger>
 					<TabsTrigger value="data" className="flex items-center gap-1">
 						<Database className="h-4 w-4" />
@@ -197,7 +206,7 @@ export default function SettingsPage() {
 					</TabsTrigger>
 					<TabsTrigger value="shortcuts" className="flex items-center gap-1">
 						<Keyboard className="h-4 w-4" />
-						<span>Shortcuts</span>
+						<span>{t("settings.shortcuts.title")}</span>
 					</TabsTrigger>
 				</TabsList>
 
@@ -232,42 +241,17 @@ export default function SettingsPage() {
 						<div className="pr-4">
 							<Card>
 								<CardHeader>
-									<CardTitle>Appearance</CardTitle>
+									<CardTitle>{t("settings.appearance.title")}</CardTitle>
 								</CardHeader>
 								<CardContent className="space-y-6">
 									{" "}
 									{/* Increased spacing */}
-									{/* Text Size Slider */}
+									{/* Text Size Slider Removed */}
 									<div className="space-y-3">
-										<Label htmlFor="text-size-slider">Text Size</Label>
+										<Label>{t("settings.appearance.theme")}</Label>
 										<p className="text-sm text-muted-foreground">
-											Adjust the application's base text size.
-										</p>
-										<Slider
-											id="text-size-slider"
-											min={1}
-											max={5}
-											step={1}
-											value={[textSize]}
-											onValueChange={(value) =>
-												setTextSize(value[0] as TextSize)
-											}
-											// Removed fixed width className="w-[60%]"
-										/>
-										{/* Optional: Add labels for slider steps */}
-										<div className="flex justify-between text-xs text-muted-foreground pt-1">
-											{" "}
-											{/* Removed fixed width w-[60%] */}
-											<span>Smallest</span>
-											<span>Default</span>
-											<span>Largest</span>
-										</div>
-									</div>
-									<Separator /> {/* Add separator */}
-									<div className="space-y-3">
-										<Label>Theme</Label>
-										<p className="text-sm text-muted-foreground">
-											Select the application theme.
+											{t("settings.appearance.themeDescription")}{" "}
+											{/* Using translation key */}
 										</p>
 										{/* Replace ThemeToggle with Switch and labels */}
 										<div className="flex items-center space-x-2">
@@ -275,7 +259,7 @@ export default function SettingsPage() {
 												htmlFor="theme-switch"
 												className="text-sm font-normal"
 											>
-												Light
+												{t("settings.appearance.light")}
 											</Label>
 											<Switch
 												id="theme-switch"
@@ -288,9 +272,35 @@ export default function SettingsPage() {
 												htmlFor="theme-switch"
 												className="text-sm font-normal"
 											>
-												Dark
+												{t("settings.appearance.dark")}
 											</Label>
 										</div>
+									</div>
+									<Separator /> {/* Add separator */}
+									{/* Language Selection */}
+									<div className="space-y-3">
+										<Label htmlFor="language-select">
+											{t("settings.appearance.language")}
+										</Label>
+										<p className="text-sm text-muted-foreground">
+											{t("settings.appearance.languageDescription")}{" "}
+											{/* Using translation key */}
+										</p>
+										<Select
+											value={i18n.language.split("-")[0]} // Use base language code
+											onValueChange={(value) => i18n.changeLanguage(value)}
+										>
+											<SelectTrigger id="language-select" className="w-[180px]">
+												<SelectValue placeholder="Select language" />
+											</SelectTrigger>
+											<SelectContent>
+												{Object.entries(supportedLngs).map(([code, name]) => (
+													<SelectItem key={code} value={code}>
+														{name}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
 									</div>
 								</CardContent>
 							</Card>
