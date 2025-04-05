@@ -164,6 +164,18 @@ export const shortcutGroups: ShortcutGroup[] = [
 					},
 				],
 			},
+			{
+				id: "sync-articles",
+				name: "Sync Articles",
+				description: "Manually trigger article synchronization",
+				category: "content",
+				keys: [
+					{
+						key: "s",
+						modifiers: { ctrl: true, alt: true },
+					},
+				],
+			},
 		],
 	},
 	{
@@ -193,6 +205,18 @@ export const shortcutGroups: ShortcutGroup[] = [
 					// Changed to array
 					{
 						key: "/",
+						modifiers: { ctrl: true },
+					},
+				],
+			},
+			{
+				id: "toggle-sidebar",
+				name: "Toggle Sidebar",
+				description: "Show or hide the main sidebar",
+				category: "interface",
+				keys: [
+					{
+						key: "b",
 						modifiers: { ctrl: true },
 					},
 				],

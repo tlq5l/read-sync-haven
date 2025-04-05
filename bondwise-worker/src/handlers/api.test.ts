@@ -4,13 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as auth from "../auth"; // Import the auth module to mock it
 import type { Env } from "../types";
 import { handleChat, handleSummarize } from "./api";
-// Cannot import MSW server/http due to rootDir constraint
-// import { server } from '../../src/mocks/server';
-// import { http, HttpResponse } from 'msw';
 
-// We will rely on MSW global setup in src/setupTests.ts to intercept fetch calls now
-// const mockFetch = vi.fn();
-// global.fetch = mockFetch;
+// Mock global.fetch directly for worker tests as MSW interception might be unreliable here
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 // Mock the authenticateRequestWithClerk function
 vi.mock("../auth", async (importOriginal) => {
@@ -23,21 +20,24 @@ vi.mock("../auth", async (importOriginal) => {
 const mockedAuth = vi.mocked(auth.authenticateRequestWithClerk);
 
 describe("Worker API Handlers", () => {
+	// Define constants locally within the describe scope
+	const MOCK_SUMMARY_LOCAL = "Fake GCF Summary";
+	const MOCK_CHAT_RESPONSE_LOCAL = "Fake GCF Chat Response";
+
 	let mockEnv: Env;
 	const testUserId = "user_api_test_456";
 
 	beforeEach(() => {
 		// Reset mocks before each test
-		// mockFetch.mockReset(); // No longer needed
+		// mockFetch.mockReset();
 		mockedAuth.mockReset();
 
 		// Mock environment variables
 		mockEnv = {
-			GCF_SUMMARIZE_URL: "http://fake-gcf/summarize", // Use the fake URL MSW will intercept
-			GCF_CHAT_URL: "http://fake-gcf/chat", // Use the fake URL MSW will intercept
+			GCF_SUMMARIZE_URL: "http://fake-gcf/summarize", // Keep fake URL for MSW interception
+			GCF_CHAT_URL: "http://fake-gcf/chat",
 			GCF_AUTH_SECRET: "test-secret",
-			// Add other required Env properties
-			SAVED_ITEMS_KV: {} as KVNamespace, // Simple mock for KV
+			SAVED_ITEMS_KV: {} as KVNamespace,
 			CLERK_SECRET_KEY: "test_secret_key",
 			CLERK_PUBLISHABLE_KEY: "test_pub_key",
 			GEMINI_API_KEY: "",
@@ -50,14 +50,19 @@ describe("Worker API Handlers", () => {
 
 	afterEach(() => {
 		vi.restoreAllMocks();
-		// server.resetHandlers(); // Cannot reset handlers without importing server
 	});
 
 	// --- handleSummarize ---
 	describe("handleSummarize", () => {
 		it("should return summary on successful GCF call", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			// MSW handler in src/mocks/handlers.ts will provide the successful response
+			// Mock fetch directly for the GCF call
+			mockFetch.mockResolvedValueOnce(
+				new Response(JSON.stringify({ summary: MOCK_SUMMARY_LOCAL }), {
+					status: 200,
+					headers: { "Content-Type": "application/json" },
+				}),
+			);
 
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
@@ -74,10 +79,13 @@ describe("Worker API Handlers", () => {
 				status?: string;
 				summary?: string;
 			};
-			// Check against the summary defined in the MSW handler for the fake URL
-			expect(body).toEqual({ status: "success", summary: "Fake GCF Summary" });
+			expect(body).toEqual({ status: "success", summary: MOCK_SUMMARY_LOCAL });
 			expect(mockedAuth).toHaveBeenCalledTimes(1);
-			// We don't check mockFetch calls anymore
+			expect(mockFetch).toHaveBeenCalledTimes(1); // Check fetch was called
+			expect(mockFetch).toHaveBeenCalledWith(
+				"http://fake-gcf/summarize",
+				expect.anything(),
+			);
 		});
 
 		it("should return 401 if authentication fails", async () => {
@@ -100,8 +108,8 @@ describe("Worker API Handlers", () => {
 			});
 
 			const response = await handleSummarize(request, mockEnv);
-			expect(response).toBe(authErrorResponse); // Should return the exact response from auth
-			// expect(mockFetch).not.toHaveBeenCalled(); // MSW handles this now
+			expect(response).toBe(authErrorResponse);
+			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
 		it("should return 400 if content is missing", async () => {
@@ -118,7 +126,7 @@ describe("Worker API Handlers", () => {
 			expect(response.status).toBe(400);
 			const body = (await response.json()) as { message?: string };
 			expect(body.message).toBe("Missing 'content' in request body");
-			// expect(mockFetch).not.toHaveBeenCalled(); // MSW handles this now
+			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
 		it("should return 503 if GCF URL is not configured", async () => {
@@ -138,7 +146,7 @@ describe("Worker API Handlers", () => {
 			expect(body.message).toBe(
 				"AI summarization service URL is not configured.",
 			);
-			// expect(mockFetch).not.toHaveBeenCalled(); // MSW handles this now
+			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
 		it("should return 500 if GCF secret is not configured", async () => {
@@ -158,16 +166,21 @@ describe("Worker API Handlers", () => {
 			expect(body.message).toBe(
 				"Worker is missing configuration for backend authentication.",
 			);
-			// expect(mockFetch).not.toHaveBeenCalled(); // MSW handles this now
+			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
 		// Note: Testing specific GCF failures (502 errors) from within this file
-		// is difficult without overriding MSW handlers, which is blocked by TS rootDir.
-		// These scenarios are implicitly tested by the global MSW setup returning success.
-		// If specific 502 testing is critical here, a different mocking approach might be needed.
-		it("should return 200 when GCF call succeeds (via global MSW)", async () => {
+		// is difficult without directly mocking fetch to fail.
+		// This test remains largely the same, relying on the direct fetch mock now.
+		it("should return 200 when GCF call succeeds (using direct fetch mock)", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			// We rely on the global MSW handler for http://fake-gcf/summarize
+			// Mock fetch directly
+			mockFetch.mockResolvedValueOnce(
+				new Response(JSON.stringify({ summary: MOCK_SUMMARY_LOCAL }), {
+					status: 200,
+					headers: { "Content-Type": "application/json" },
+				}),
+			);
 
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
@@ -179,10 +192,9 @@ describe("Worker API Handlers", () => {
 			});
 
 			const response = await handleSummarize(request, mockEnv);
-			// Check that it was intercepted and handled successfully by MSW
 			expect(response.status).toBe(200);
 			const body = (await response.json()) as { summary?: string };
-			expect(body.summary).toBe("Fake GCF Summary");
+			expect(body.summary).toBe(MOCK_SUMMARY_LOCAL); // Use local constant
 		});
 	});
 
@@ -190,7 +202,13 @@ describe("Worker API Handlers", () => {
 	describe("handleChat", () => {
 		it("should return chat response on successful GCF call", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			// MSW handler in src/mocks/handlers.ts will provide the successful response
+			// Mock fetch directly for the GCF call
+			mockFetch.mockResolvedValueOnce(
+				new Response(JSON.stringify({ response: MOCK_CHAT_RESPONSE_LOCAL }), {
+					status: 200,
+					headers: { "Content-Type": "application/json" },
+				}),
+			);
 
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
@@ -207,13 +225,16 @@ describe("Worker API Handlers", () => {
 				status?: string;
 				response?: string;
 			};
-			// Check against the response defined in the MSW handler for the fake URL
 			expect(body).toEqual({
 				status: "success",
-				response: "Fake GCF Chat Response",
+				response: MOCK_CHAT_RESPONSE_LOCAL, // Use local constant
 			});
 			expect(mockedAuth).toHaveBeenCalledTimes(1);
-			// We don't check mockFetch calls anymore
+			expect(mockFetch).toHaveBeenCalledTimes(1); // Check fetch was called
+			expect(mockFetch).toHaveBeenCalledWith(
+				"http://fake-gcf/chat",
+				expect.anything(),
+			);
 		});
 
 		it("should return 401 if authentication fails", async () => {
@@ -237,7 +258,7 @@ describe("Worker API Handlers", () => {
 
 			const response = await handleChat(request, mockEnv);
 			expect(response).toBe(authErrorResponse);
-			// expect(mockFetch).not.toHaveBeenCalled(); // MSW handles this now
+			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
 		it("should return 400 if content or message is missing", async () => {
@@ -256,7 +277,7 @@ describe("Worker API Handlers", () => {
 			expect(body.message).toBe(
 				"Missing 'content' or 'message' in request body",
 			);
-			// expect(mockFetch).not.toHaveBeenCalled(); // MSW handles this now
+			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
 		it("should return 503 if GCF URL is not configured", async () => {
@@ -274,7 +295,7 @@ describe("Worker API Handlers", () => {
 			expect(response.status).toBe(503);
 			const body = (await response.json()) as { message?: string };
 			expect(body.message).toBe("AI chat service URL is not configured.");
-			// expect(mockFetch).not.toHaveBeenCalled(); // MSW handles this now
+			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
 		it("should return 500 if GCF secret is not configured", async () => {
@@ -294,13 +315,19 @@ describe("Worker API Handlers", () => {
 			expect(body.message).toBe(
 				"Worker is missing configuration for backend authentication.",
 			);
-			// expect(mockFetch).not.toHaveBeenCalled(); // MSW handles this now
+			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
-		// Note: Testing specific GCF failures (502 errors) from within this file is difficult.
-		it("should return 200 when GCF call succeeds (via global MSW)", async () => {
+		// This test remains largely the same, relying on the direct fetch mock now.
+		it("should return 200 when GCF call succeeds (using direct fetch mock)", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			// We rely on the global MSW handler for http://fake-gcf/chat
+			// Mock fetch directly
+			mockFetch.mockResolvedValueOnce(
+				new Response(JSON.stringify({ response: MOCK_CHAT_RESPONSE_LOCAL }), {
+					status: 200,
+					headers: { "Content-Type": "application/json" },
+				}),
+			);
 
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
@@ -311,10 +338,9 @@ describe("Worker API Handlers", () => {
 				body: JSON.stringify({ content: "Context", message: "Query" }),
 			});
 			const response = await handleChat(request, mockEnv);
-			// Check that it was intercepted and handled successfully by MSW
 			expect(response.status).toBe(200);
 			const body = (await response.json()) as { response?: string };
-			expect(body.response).toBe("Fake GCF Chat Response");
+			expect(body.response).toBe(MOCK_CHAT_RESPONSE_LOCAL); // Use local constant
 		});
 	});
 });

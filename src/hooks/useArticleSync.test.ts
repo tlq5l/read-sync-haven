@@ -11,6 +11,8 @@ import type { Article, QueuedOperation } from "@/services/db";
 
 // Use vi.hoisted for mocks that need to be available before imports, including Clerk mocks
 const {
+	// Removed duplicate mockGetAllArticles declaration
+	// All hoisted mocks are defined within vi.hoisted and destructured here
 	mockGetAllArticles,
 	mockSaveArticle,
 	mockBulkSaveArticles,
@@ -27,112 +29,90 @@ const {
 	mockFetchCloudItems,
 	mockDeleteItemFromCloud,
 	mockSaveItemToCloud,
-	// Define stable Clerk mocks inside hoisted block
-	stableGetToken,
-	mockUseAuth,
-	mockUseUser,
+	mockUseAuth, // Function for clearing
+	mockUseUser, // Function for clearing
+	stableGetToken, // Function for tests/vi.mock
+	stableUseAuthResult, // Stable object for vi.mock
+	stableUseUserResult, // Stable object for vi.mock
 } = vi.hoisted(() => {
-	// Stable mock functions/values for Clerk
-	const _stableGetToken = vi.fn().mockResolvedValue("test-token");
-	const _mockUseAuth = vi.fn(() => ({
+	// --- Stable Clerk Values ---
+	const _stableGetTokenFn = vi.fn().mockResolvedValue("test-token");
+	const _stableAuthResult = {
 		userId: "test-user-id",
 		isSignedIn: true,
 		isLoaded: true,
-		getToken: _stableGetToken,
+		getToken: _stableGetTokenFn,
 		sessionId: "test-session-id",
-		actor: null,
-		orgId: null,
-		orgRole: null,
-		orgSlug: null,
-		has: vi.fn().mockReturnValue(true),
-		signOut: vi.fn(),
-	}));
-	const _mockUseUser = vi.fn(() => ({
+		// Add other properties if needed by useArticleSync or its internals
+	};
+	const _stableUserObject = {
+		primaryEmailAddress: { emailAddress: "test@example.com" },
+		id: "test-user-clerk-id",
+		// Add other properties if needed
+	};
+	const _stableUserResult = {
 		isLoaded: true,
 		isSignedIn: true,
-		user: {
-			primaryEmailAddress: { emailAddress: "test@example.com" },
-			id: "test-user-clerk-id",
-			externalId: null,
-			primaryEmailAddressId: "test-email-id",
-			primaryPhoneNumberId: null,
-			primaryWeb3WalletId: null,
-			username: null,
-			firstName: null,
-			lastName: null,
-			imageUrl: "",
-			hasImage: false,
-			banned: false,
-			locked: false,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-			phoneNumbers: [],
-			web3Wallets: [],
-			emailAddresses: [],
-			passkeys: [],
-			externalAccounts: [],
-			organizationMemberships: [],
-			sessions: [],
-			unsafeMetadata: {},
-			publicMetadata: {},
-			privateMetadata: {},
-			twoFactorEnabled: vi.fn(),
-			delete: vi.fn(),
-			update: vi.fn(),
-			createEmailAddress: vi.fn(),
-			createPhoneNumber: vi.fn(),
-			createExternalAccount: vi.fn(),
-			createWeb3Wallet: vi.fn(),
-			createPasskey: vi.fn(),
-			isPrimaryEmailAddress: vi.fn(),
-			isPrimaryPhoneNumber: vi.fn(),
-			isPrimaryWeb3Wallet: vi.fn(),
-			setProfileImage: vi.fn(),
-			getSessions: vi.fn(),
-			getOrganizationMemberships: vi.fn(),
-			getOrganizationInvitations: vi.fn(),
-			getOrganizationSuggestions: vi.fn(),
-			createOrganization: vi.fn(),
-			leaveOrganization: vi.fn(),
-			getSamlAccounts: vi.fn(),
-			removeSamlAccount: vi.fn(),
-			experimental__removeFromOrganization: vi.fn(),
-			__unstable__getTotpSecrets: vi.fn(),
-			path: "",
-			getInstance: vi.fn(),
-		},
-	}));
+		user: _stableUserObject,
+	};
+	// Mock functions for Clerk hooks (needed for clearing)
+	const _mockUseAuthFn = vi.fn(() => _stableAuthResult);
+	const _mockUseUserFn = vi.fn(() => _stableUserResult);
 
+	// --- All Other Mocks ---
+	const _mockGetAllArticles = vi.fn();
+	const _mockSaveArticle = vi.fn((article) =>
+		Promise.resolve({ ...article, _rev: "mock-rev-save" }),
+	);
+	const _mockBulkSaveArticles = vi.fn((articles) =>
+		Promise.resolve(
+			articles.map((a: any) => ({
+				ok: true,
+				id: a._id,
+				rev: `mock-rev-bulk-${a._id}`,
+			})),
+		),
+	);
+	const _mockLocalSoftDeleteArticle = vi.fn().mockResolvedValue(true);
+	const _mockArticlesDbGet = vi.fn();
+	const _mockArticlesDbPut = vi.fn();
+	const _mockArticlesDbRemove = vi.fn();
+	const _mockArticlesDbBulkDocs = vi.fn().mockResolvedValue([]);
+	const _mockOperationsQueueDbGet = vi.fn();
+	const _mockOperationsQueueDbPut = vi.fn();
+	const _mockOperationsQueueDbRemove = vi.fn();
+	const _mockOperationsQueueDbAllDocs = vi.fn();
+	const _mockOperationsQueueDbBulkDocs = vi.fn().mockResolvedValue([]);
+	const _mockFetchCloudItems = vi.fn();
+	const _mockDeleteItemFromCloud = vi.fn();
+	const _mockSaveItemToCloud = vi.fn();
+
+	// --- Returned Hoisted Object ---
 	return {
-		mockGetAllArticles: vi.fn(),
-		mockSaveArticle: vi.fn((article) =>
-			Promise.resolve({ ...article, _rev: "mock-rev-save" }),
-		),
-		mockBulkSaveArticles: vi.fn((articles) =>
-			Promise.resolve(
-				articles.map((a: any) => ({
-					ok: true,
-					id: a._id,
-					rev: `mock-rev-bulk-${a._id}`,
-				})),
-			),
-		),
-		mockLocalSoftDeleteArticle: vi.fn().mockResolvedValue(true),
-		mockArticlesDbGet: vi.fn(),
-		mockArticlesDbPut: vi.fn(),
-		mockArticlesDbRemove: vi.fn(),
-		mockArticlesDbBulkDocs: vi.fn().mockResolvedValue([]),
-		mockOperationsQueueDbGet: vi.fn(),
-		mockOperationsQueueDbPut: vi.fn(),
-		mockOperationsQueueDbRemove: vi.fn(),
-		mockOperationsQueueDbAllDocs: vi.fn(),
-		mockOperationsQueueDbBulkDocs: vi.fn().mockResolvedValue([]),
-		mockFetchCloudItems: vi.fn(),
-		mockDeleteItemFromCloud: vi.fn(),
-		mockSaveItemToCloud: vi.fn(),
-		stableGetToken: _stableGetToken,
-		mockUseAuth: _mockUseAuth,
-		mockUseUser: _mockUseUser,
+		// Standard Mocks
+		mockGetAllArticles: _mockGetAllArticles,
+		mockSaveArticle: _mockSaveArticle,
+		mockBulkSaveArticles: _mockBulkSaveArticles,
+		mockLocalSoftDeleteArticle: _mockLocalSoftDeleteArticle,
+		mockArticlesDbGet: _mockArticlesDbGet,
+		mockArticlesDbPut: _mockArticlesDbPut,
+		mockArticlesDbRemove: _mockArticlesDbRemove,
+		mockArticlesDbBulkDocs: _mockArticlesDbBulkDocs,
+		mockOperationsQueueDbGet: _mockOperationsQueueDbGet,
+		mockOperationsQueueDbPut: _mockOperationsQueueDbPut,
+		mockOperationsQueueDbRemove: _mockOperationsQueueDbRemove,
+		mockOperationsQueueDbAllDocs: _mockOperationsQueueDbAllDocs,
+		mockOperationsQueueDbBulkDocs: _mockOperationsQueueDbBulkDocs,
+		mockFetchCloudItems: _mockFetchCloudItems,
+		mockDeleteItemFromCloud: _mockDeleteItemFromCloud,
+		mockSaveItemToCloud: _mockSaveItemToCloud,
+		// Clerk Mock Functions (for clearing)
+		mockUseAuth: _mockUseAuthFn,
+		mockUseUser: _mockUseUserFn,
+		// Clerk Stable Values (for vi.mock factories / tests)
+		stableGetToken: _stableGetTokenFn,
+		stableUseAuthResult: _stableAuthResult,
+		stableUseUserResult: _stableUserResult,
 	};
 });
 
@@ -146,8 +126,8 @@ vi.mock("@/hooks/use-toast", () => ({
 
 // Use stable Clerk mocks defined in hoisted block
 vi.mock("@clerk/clerk-react", () => ({
-	useAuth: mockUseAuth, // Now defined before usage
-	useUser: mockUseUser, // Now defined before usage
+	useAuth: vi.fn(() => stableUseAuthResult), // Mock useAuth to return stable object
+	useUser: vi.fn(() => stableUseUserResult), // Mock useUser to return stable object
 }));
 
 vi.mock("@/services/db", async (importOriginal) => {
@@ -292,7 +272,14 @@ describe("useArticleSync", () => {
 			useArticleSync(true, new Set<string>()),
 		);
 
-		expect(result.current.isLoading).toBe(false);
+		// Wait for loading to finish and state to update
+		await waitFor(() => {
+			expect(result.current.isLoading).toBe(false);
+			// Also wait for the article count to reflect deduplication
+			expect(result.current.articles).toHaveLength(2);
+		});
+
+		// Now check the state after loading
 		expect(result.current.articles.length).toBe(2);
 		const article1 = result.current.articles.find((a) => a._id === "1");
 		expect(article1).toBeDefined();
@@ -878,14 +865,16 @@ describe("useArticleSync", () => {
 		);
 
 		await waitFor(() => {
-			expect(result.current.articles).toHaveLength(mockArticles.length);
+			expect(result.current.articles).toHaveLength(mockArticles.length); // Wait for length update
+
+			// Also verify content within waitFor
+			const newerArticle = result.current.articles.find((a) => a._id === "1");
+			expect(newerArticle).toBeDefined();
+			expect(newerArticle?.version).toBe(2);
+			expect(newerArticle?.title).toBe("Article 1 Updated");
 		});
 
-		// Verify that the newer version was kept
-		const newerArticle = result.current.articles.find((a) => a._id === "1");
-		expect(newerArticle).toBeDefined();
-		expect(newerArticle?.version).toBe(2);
-		expect(newerArticle?.title).toBe("Article 1 Updated");
+		// No need for assertions outside waitFor now
 	});
 });
 

@@ -2,19 +2,28 @@ import { useAuth } from "@clerk/clerk-react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { server } from "../mocks/server"; // MSW server
+import {
+	MOCK_CLERK_TOKEN, // Import constant
+	MOCK_SUMMARY, // Import constant
+	WORKER_BASE_URL, // Import constant
+} from "../mocks/constants"; // Import from new constants file
+import { server } from "../mocks/server";
 import {
 	QueryClientWrapper,
 	getTestQueryClient,
-} from "../test-utils/QueryClientWrapper"; // Import the wrapper
-// Remove direct QueryClient imports
-// import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-// import React from 'react';
+} from "../test-utils/QueryClientWrapper";
+// Removed unused imports
 import { useSummarize } from "./useSummarize";
 
-// Mock the useAuth hook from Clerk
+// Mock the useAuth hook from Clerk with a default implementation
 vi.mock("@clerk/clerk-react", () => ({
-	useAuth: vi.fn(),
+	useAuth: vi.fn().mockReturnValue({
+		// Provide a default return value
+		getToken: async () => "default-mock-token", // Default getToken
+		userId: "default-test-user",
+		isLoaded: true,
+		isSignedIn: true,
+	}),
 }));
 
 // Mock console.log/error - Removed as they are unused
@@ -23,11 +32,10 @@ vi.mock("@clerk/clerk-react", () => ({
 // 	.spyOn(console, "error")
 // 	.mockImplementation(() => {});
 
-// Constants
-const MOCK_CLERK_TOKEN = "mock-clerk-jwt-token";
-const WORKER_SUMMARIZE_URL =
-	"https://bondwise-sync-api.vikione.workers.dev/api/summarize";
-const MOCK_SUMMARY = "This is a mock summary.";
+// Constants - Use imported constants
+// const MOCK_CLERK_TOKEN = "mock-clerk-jwt-token"; // Replaced
+const WORKER_SUMMARIZE_URL = `${WORKER_BASE_URL}/api/summarize`; // Use imported base URL
+// const MOCK_SUMMARY = "This is a mock summary."; // Replaced
 
 // Get the test query client instance
 const queryClient = getTestQueryClient();
@@ -38,17 +46,16 @@ describe("useSummarize Hook", () => {
 
 	beforeEach(() => {
 		// Reset mocks before each test
-		vi.clearAllMocks(); // Use clearAllMocks to reset spies too
-		queryClient.clear(); // Clear query cache between tests
-		mockGetToken = vi.fn();
+		vi.clearAllMocks();
+		queryClient.clear();
+		mockGetToken = vi.fn().mockResolvedValue(MOCK_CLERK_TOKEN); // Default mock getToken behavior here
+		// Ensure the mock structure for useAuth is consistent and includes getToken
 		(useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
-			getToken: mockGetToken,
-			userId: "test-user-id", // Add userId if needed by other parts
+			getToken: mockGetToken, // Assign the mocked getToken function
+			userId: "test-user-id",
 			isLoaded: true,
 			isSignedIn: true,
 		});
-		// Default mock implementations
-		mockGetToken.mockResolvedValue(MOCK_CLERK_TOKEN);
 	});
 
 	afterEach(() => {
@@ -128,6 +135,8 @@ describe("useSummarize Hook", () => {
 		// Override MSW handler for this specific test
 		server.use(
 			http.post(WORKER_SUMMARIZE_URL, () => {
+				// Directly return the 401 error
+				console.log("[MSW Override] Returning 401 for /api/summarize");
 				return new HttpResponse(
 					JSON.stringify({ error: "Mock Unauthorized" }),
 					{
@@ -162,6 +171,8 @@ describe("useSummarize Hook", () => {
 		// Override MSW handler for this specific test
 		server.use(
 			http.post(WORKER_SUMMARIZE_URL, () => {
+				// Directly return the 500 error
+				console.log("[MSW Override] Returning 500 for /api/summarize");
 				return new HttpResponse(
 					JSON.stringify({ error: "Internal Server Error" }),
 					{
@@ -195,10 +206,11 @@ describe("useSummarize Hook", () => {
 		// Override MSW handler for this specific test
 		server.use(
 			http.post(WORKER_SUMMARIZE_URL, () => {
-				// Return non-JSON response
+				// Directly return invalid JSON
+				console.log("[MSW Override] Returning invalid JSON for /api/summarize");
 				return new HttpResponse("<html><body>Invalid JSON</body></html>", {
 					status: 200,
-					headers: { "Content-Type": "text/html" }, // Incorrect content type
+					headers: { "Content-Type": "text/html" },
 				});
 			}),
 		);
@@ -225,7 +237,11 @@ describe("useSummarize Hook", () => {
 		// Override MSW handler for this specific test
 		server.use(
 			http.post(WORKER_SUMMARIZE_URL, () => {
-				return HttpResponse.json({ status: "success", wrongField: "data" }); // Missing 'summary'
+				// Directly return response missing 'summary' field
+				console.log(
+					"[MSW Override] Returning missing summary field for /api/summarize",
+				);
+				return HttpResponse.json({ status: "success", wrongField: "data" });
 			}),
 		);
 

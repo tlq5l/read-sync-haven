@@ -222,26 +222,28 @@ describe("lib/keyboard-shortcuts", () => {
 					expect(shortcut).toHaveProperty("category");
 					expect(group.category).toBe(shortcut.category); // Ensure shortcut category matches group
 					expect(shortcut).toHaveProperty("keys");
-					expect(shortcut.keys).toHaveProperty("key");
-					expect(typeof shortcut.keys[0].key).toBe("string"); // Access first element
-					expect(shortcut.keys).toHaveProperty("modifiers");
-					expect(typeof shortcut.keys[0].modifiers).toBe("object"); // Access first element
-					// Optionally check modifier types
-					if (shortcut.keys[0].modifiers.ctrl !== undefined) {
-						// Access first element
-						expect(typeof shortcut.keys[0].modifiers.ctrl).toBe("boolean"); // Access first element
-					}
-					if (shortcut.keys[0].modifiers.alt !== undefined) {
-						// Access first element
-						expect(typeof shortcut.keys[0].modifiers.alt).toBe("boolean"); // Access first element
-					}
-					if (shortcut.keys[0].modifiers.shift !== undefined) {
-						// Access first element
-						expect(typeof shortcut.keys[0].modifiers.shift).toBe("boolean"); // Access first element
-					}
-					if (shortcut.keys[0].modifiers.meta !== undefined) {
-						// Access first element
-						expect(typeof shortcut.keys[0].modifiers.meta).toBe("boolean"); // Access first element
+					expect(Array.isArray(shortcut.keys)).toBe(true); // Ensure keys is an array
+					expect(shortcut.keys.length).toBeGreaterThan(0); // Ensure array is not empty
+
+					// Iterate through each key configuration in the array
+					for (const shortcutKey of shortcut.keys) {
+						expect(shortcutKey).toHaveProperty("key");
+						expect(typeof shortcutKey.key).toBe("string");
+						expect(shortcutKey).toHaveProperty("modifiers");
+						expect(typeof shortcutKey.modifiers).toBe("object");
+						// Optionally check modifier types
+						if (shortcutKey.modifiers.ctrl !== undefined) {
+							expect(typeof shortcutKey.modifiers.ctrl).toBe("boolean");
+						}
+						if (shortcutKey.modifiers.alt !== undefined) {
+							expect(typeof shortcutKey.modifiers.alt).toBe("boolean");
+						}
+						if (shortcutKey.modifiers.shift !== undefined) {
+							expect(typeof shortcutKey.modifiers.shift).toBe("boolean");
+						}
+						if (shortcutKey.modifiers.meta !== undefined) {
+							expect(typeof shortcutKey.modifiers.meta).toBe("boolean");
+						}
 					}
 					// Ensure no 'action' property exists in the definition
 					expect(shortcut).not.toHaveProperty("action");

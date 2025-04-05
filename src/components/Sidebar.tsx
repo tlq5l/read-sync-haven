@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/transition-group";
 import { useAnimation } from "@/context/AnimationContext";
 import { useArticles } from "@/context/ArticleContext";
+import { useKeyboard } from "@/context/KeyboardContext"; // Import useKeyboard
 // import { useTheme } from "@/context/ThemeContext"; // Removed as unused after theme toggle moved
 import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
@@ -29,18 +30,19 @@ import {
 	Plus,
 	Settings,
 	Shapes, // Icon for Other
-	SidebarClose, // New icon for sidebar collapse
-	SidebarOpen, // New icon for sidebar expand
-	// Sun, // Removed as unused after theme toggle moved
-	Video, // Icon for Videos
+	SidebarClose,
+	SidebarOpen,
+	// Sun,
+	Video,
 } from "lucide-react";
-import React, { useState } from "react";
-import { useTranslation } from "react-i18next"; // Added useTranslation
+import React, { useState } from "react"; // Keep useState for isLibraryOpen
+import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
-	const [collapsed, setCollapsed] = useState(false);
-	const [isLibraryOpen, setIsLibraryOpen] = useState(true); // State for library collapse
+	// const [collapsed, setCollapsed] = useState(false); // Replaced with context state
+	const { isSidebarCollapsed: collapsed, toggleSidebar } = useKeyboard(); // Use context state and toggle
+	const [isLibraryOpen, setIsLibraryOpen] = useState(true);
 	const location = useLocation();
 	const navigate = useNavigate();
 	const { setCurrentView, setSelectedCategory, filters } = useArticles();
@@ -87,10 +89,17 @@ export default function Sidebar() {
 	// 	setTheme(theme === "dark" ? "light" : "dark");
 	// };
 
-	const toggleCollapsed = () => {
-		// Use synchronizeAnimations to ensure smooth transitions
+	// const toggleCollapsed = () => { // Replaced with toggleSidebar from context
+	// 	// Use synchronizeAnimations to ensure smooth transitions
+	// 	synchronizeAnimations(() => {
+	// 		toggleSidebar(); // Call context function
+	// 	});
+	// };
+
+	// Need a wrapper to combine animation sync and context toggle
+	const handleToggleSidebar = () => {
 		synchronizeAnimations(() => {
-			setCollapsed(!collapsed);
+			toggleSidebar();
 		});
 	};
 
@@ -129,7 +138,7 @@ export default function Sidebar() {
 					<Button
 						variant="ghost"
 						size="icon"
-						onClick={toggleCollapsed}
+						onClick={handleToggleSidebar} // Use the new handler
 						className={cn(
 							"transition-transform duration-200",
 							// Removed conditional margin, parent div handles centering/alignment

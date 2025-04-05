@@ -1,8 +1,9 @@
+import { useArticles } from "@/context/ArticleContext"; // Added import
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import {
 	type Shortcut,
-	formatShortcut, // Added import
+	formatShortcut,
 	matchesShortcut,
 	shortcutGroups,
 } from "@/lib/keyboard-shortcuts";
@@ -22,10 +23,12 @@ interface KeyboardContextType {
 	isShortcutsDialogOpen: boolean;
 	openShortcutsDialog: () => void;
 	closeShortcutsDialog: () => void;
-	isSearchOverlayOpen: boolean; // Added state for search overlay
-	openSearchOverlay: () => void; // Added function to open search overlay
-	closeSearchOverlay: () => void; // Added function to close search overlay
-	updateShortcuts: (newShortcuts: Shortcut[]) => boolean; // Added update function
+	isSearchOverlayOpen: boolean;
+	openSearchOverlay: () => void;
+	closeSearchOverlay: () => void;
+	updateShortcuts: (newShortcuts: Shortcut[]) => boolean;
+	isSidebarCollapsed: boolean; // Added sidebar state
+	toggleSidebar: () => void; // Added sidebar toggle function
 }
 
 const KeyboardContext = createContext<KeyboardContextType | undefined>(
@@ -38,12 +41,27 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 	const { toast } = useToast();
 	const [shortcuts, setShortcuts] = useState<Shortcut[]>([]);
 	const [isShortcutsDialogOpen, setIsShortcutsDialogOpen] = useState(false);
-	const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false); // State for search overlay
-	const USER_SHORTCUTS_KEY = "userKeyboardShortcuts"; // Key for localStorage
+	const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false);
+	const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Added sidebar state
+	const USER_SHORTCUTS_KEY = "userKeyboardShortcuts";
+
+	const articlesContext = useArticles(); // Get articles context
+
+	// Function to toggle sidebar state
+	const toggleSidebar = useCallback(() => {
+		setIsSidebarCollapsed((prev) => !prev);
+		// Potentially trigger animations if needed here
+	}, []);
 
 	// Function to get action by ID (avoids repetition)
 	const getActionById = useCallback(
 		(id: string): (() => void) => {
+			// Ensure articlesContext is loaded before trying to use it
+			// This might require adjusting dependencies or ensuring ArticleProvider wraps KeyboardProvider
+			const refreshAction =
+				articlesContext?.refreshArticles ??
+				(() => console.warn("Article context not ready for refresh"));
+
 			switch (id) {
 				case "goto-home":
 					return () => navigate("/");
@@ -87,18 +105,35 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 								"Press Delete when an article card or reader is active.",
 						});
 					};
+				// Add cases for the new shortcuts
+				case "sync-articles":
+					return () => {
+						toast({ title: "Syncing...", description: "Refreshing articles." });
+						refreshAction().catch((err) => {
+							// Use the potentially wrapped refreshAction
+							console.error("Error during manual sync:", err);
+							toast({
+								title: "Sync Failed",
+								description: "Could not refresh articles.",
+								variant: "destructive",
+							});
+						});
+					};
+				case "toggle-sidebar":
+					return toggleSidebar; // Return the memoized toggle function
 				default:
-					return () => console.log(`Action for ${id} not implemented`);
+					return () =>
+						console.warn(`Action for shortcut ID "${id}" not implemented`); // Changed log level
 			}
 		},
 		[
 			navigate,
-			// setIsShortcutsDialogOpen, // Removed stable setter
-			// setIsSearchOverlayOpen, // Removed stable setter
 			theme,
 			setTheme,
 			toast,
-		], // Dependencies for useCallback
+			toggleSidebar, // Add toggleSidebar as dependency
+			articlesContext, // Add articlesContext dependency
+		],
 	);
 
 	// Load shortcuts from localStorage or defaults
@@ -236,7 +271,9 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 				isSearchOverlayOpen,
 				openSearchOverlay,
 				closeSearchOverlay,
-				updateShortcuts, // Provide the update function
+				updateShortcuts,
+				isSidebarCollapsed, // Provide sidebar state
+				toggleSidebar, // Provide sidebar toggle function
 			}}
 		>
 			{children}

@@ -295,10 +295,10 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 						{/* Wrap title and excerpt and make this section grow */}
 						<div className="flex-grow mb-3">
 							<h3 className="text-lg font-medium line-clamp-2 mb-2">
-								{article.title || "Untitled"}
+								{article.title || t("articleCard.untitled")}
 							</h3>
 							<p className="text-sm text-muted-foreground line-clamp-2">
-								{article.excerpt || "No excerpt available"}
+								{article.excerpt || t("articleCard.noExcerpt")}
 							</p>
 						</div>
 						{/* Keep bottom metadata section */}
@@ -307,10 +307,10 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 							{/* Use mt-auto to push to bottom */}
 							<span>
 								{article.type === "pdf" && !article.siteName
-									? "PDF Document"
+									? t("articleCard.pdfSource")
 									: article.type === "epub" && !article.siteName
-										? "EPUB Book"
-										: article.siteName || "Unknown source"}
+										? t("articleCard.epubSource")
+										: article.siteName || t("articleCard.unknownSource")}
 							</span>
 							<div className="flex items-center gap-3">
 								<span>{article.estimatedReadTime || "?"} min read</span>
