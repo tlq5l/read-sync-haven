@@ -1,0 +1,27 @@
+{
+	"appName": "Read Sync Haven",
+	"settings": {
+		"title": "Settings",
+		"tabs": {
+			"account": "Account",
+			"appearance": "Appearance",
+			"data": "Data",
+			"shortcuts": "Shortcuts"
+		},
+		"appearance": {
+			"title": "Appearance",
+			"textSizeLabel": "Text Size",
+			"textSizeDescription": "Adjust the application's base text size.",
+			"languageLabel": "Language",
+			"languageDescription": "Choose the application language."
+		},
+		"data": {
+			"title": "Data Management"
+		}
+	},
+	"sidebar": {
+		"allArticles": "All Articles",
+		"starred": "Starred",
+		"archived": "Archived"
+	}
+}
