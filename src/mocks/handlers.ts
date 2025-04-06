@@ -1,12 +1,10 @@
 import { http, HttpResponse, type RequestHandler } from "msw";
-
-// Define the base URL for the production worker
-const WORKER_BASE_URL = "https://bondwise-sync-api.vikione.workers.dev";
-
-// Define mock responses
-const MOCK_SUMMARY = "This is a mock summary.";
-const MOCK_CHAT_RESPONSE = "This is a mock AI chat response.";
-const MOCK_CLERK_TOKEN = "mock-clerk-jwt-token"; // Example token
+import {
+	MOCK_CHAT_RESPONSE,
+	MOCK_CLERK_TOKEN,
+	MOCK_SUMMARY,
+	WORKER_BASE_URL,
+} from "./constants"; // Import constants
 
 // Helper to check Authorization header
 const checkAuthHeader = (request: Request): boolean => {

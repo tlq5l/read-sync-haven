@@ -84,10 +84,16 @@ export async function fetchCloudItems(
  */
 export async function saveItemToCloud(
 	article: Article,
+	token: string, // Add token parameter
 ): Promise<CloudSyncStatus> {
 	if (!article.userId) {
 		console.error("Cannot save to cloud: article has no userId", article._id);
 		return "no_user_id";
+	}
+	if (!token) {
+		// Added check for token
+		console.error("Cannot save to cloud: no token provided", article._id);
+		return "unauthorized"; // Or a more specific status? Using unauthorized for now.
 	}
 
 	try {
@@ -97,6 +103,7 @@ export async function saveItemToCloud(
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
+					Authorization: `Bearer ${token}`, // Add Authorization header
 				},
 				// Send the entire Article object. The worker now expects fields
 				// like _id, savedAt (as number), fileData, and the correct type directly.
@@ -131,10 +138,16 @@ export async function saveItemToCloud(
  */
 export async function deleteItemFromCloud(
 	articleId: string,
+	token: string, // Add token parameter
 ): Promise<CloudSyncStatus> {
 	if (!articleId) {
 		console.error("Cannot delete from cloud: articleId is missing.");
 		return "no_article_id";
+	}
+	if (!token) {
+		// Added check for token
+		console.error("Cannot delete from cloud: no token provided", articleId);
+		return "unauthorized"; // Or a more specific status? Using unauthorized for now.
 	}
 
 	try {
@@ -149,9 +162,7 @@ export async function deleteItemFromCloud(
 		const response = await fetch(deleteUrl, {
 			method: "DELETE",
 			headers: {
-				// Add authentication headers if required by the worker
-				// Assuming the worker uses the same auth as fetch/save
-				// If not, this needs adjustment based on worker requirements
+				Authorization: `Bearer ${token}`, // Add Authorization header
 			},
 		});
 

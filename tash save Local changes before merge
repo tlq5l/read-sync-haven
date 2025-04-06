@@ -1,0 +1,172 @@
+[1mdiff --cc src/hooks/useArticleSync.test.ts[m
+[1mindex 9011ec6,2bcba19..0000000[m
+[1m--- a/src/hooks/useArticleSync.test.ts[m
+[1m+++ b/src/hooks/useArticleSync.test.ts[m
+[36m@@@ -94,41 -279,21 +279,28 @@@[m [mdescribe("useArticleSync", () => [m
+  		const duplicateArticles: Article[] = [[m
+  			...mockArticles,[m
+  			{[m
+[31m- 				_id: "1", // Same ID as the first article[m
+[31m- 				url: "http://example.com/1",[m
+[31m- 				title: "Article 1 Updated", // Different title[m
+[31m- 				content: "Updated content", // Different content[m
+[31m- 				savedAt: 3000, // Newer timestamp[m
+[31m- 				status: "inbox",[m
+[31m- 				isRead: false,[m
+[31m- 				favorite: true, // Different favorite status[m
+[31m- 				type: "article" as const,[m
+[31m- 				userId: "test-user-id",[m
+[31m- 				excerpt: "",[m
+[31m- 				tags: [],[m
+[32m+ 				...baseMockArticle("1", 1, 3000, " Updated"),[m
+[32m+ 				_rev: "rev-1-1-dup",[m
+[32m+ 				favorite: true,[m
+  			},[m
+  		];[m
+[32m+ 		mockGetAllArticles.mockResolvedValue(duplicateArticles); // Initial cache load has duplicates[m
+  [m
+[31m- 		// Mock getAllArticles to return articles with duplicates[m
+[31m- 		vi.mocked(db.getAllArticles).mockResolvedValue(duplicateArticles);[m
+[32m+ 		const { result } = renderHook(() => useArticleSync(true));[m
+  [m
+[32m++<<<<<<< HEAD[m
+[32m +		// Render the hook[m
+[32m +		const { result } = renderHook([m
+[32m +			() => useArticleSync(true, new Set<string>()), // Pass empty set for hidingArticleIds[m
+[32m +		);[m
+[32m++=======[m
+[32m+ 		// Wait specifically for the article list to settle with the expected length[m
+[32m+ 		await waitFor(() => expect(result.current.articles.length).toBe(2));[m
+[32m+ 		await waitFor(() => expect(result.current.isRefreshing).toBe(false)); // Wait for sync to finish[m
+[32m++>>>>>>> 571beb67fed9bff79d112873f85ae6dff3675eea[m
+  [m
+[31m- 		// Wait for initial load to complete[m
+[31m- 		await waitFor(() => {[m
+[31m- 			expect(result.current.isLoading).toBe(false);[m
+[31m- 		});[m
+[31m- [m
+[31m- 		// Deduplication is now internal to the hook, we verify the result below[m
+[31m- [m
+[31m- 		// Verify we only have 2 articles (not 3)[m
+[32m+ 		expect(result.current.isLoading).toBe(false);[m
+  		expect(result.current.articles.length).toBe(2);[m
+[31m- [m
+[31m- 		// Verify the duplicate article has been replaced with the newer version[m
+  		const article1 = result.current.articles.find((a) => a._id === "1");[m
+  		expect(article1).toBeDefined();[m
+  		expect(article1?.title).toBe("Article 1 Updated");[m
+[36m@@@ -173,49 -314,759 +321,779 @@@[m
+  			},[m
+  		];[m
+  [m
+[31m- 		vi.mocked(cloudSync.fetchCloudItems).mockResolvedValue(cloudArticles);[m
+[32m+ 		// Mock initial load: Returns the two base articles[m
+[32m+ 		mockGetAllArticles.mockResolvedValueOnce([...mockArticles]);[m
+  [m
+[31m- 		// After sync, getAllArticles will be called again and should return[m
+[31m- 		// the combination of local and cloud articles (with potential duplicates)[m
+[31m- 		const combinedArticles: Article[] = [...mockArticles, ...cloudArticles];[m
+[31m- 		// We need to replace the getAllArticles mock to return the combined articles during the second call[m
+[31m- 		// This will properly simulate the scenario where local and cloud articles are combined[m
+[31m- 		const getAllArticlesMock = vi.mocked(db.getAllArticles);[m
+[32m+ 		// Mock fetchCloudItems: Returns the cloud state with updated #1 and new #3[m
+[32m+ 		mockFetchCloudItems.mockResolvedValue(cloudArticles);[m
+  [m
+[32m++<<<<<<< HEAD[m
+[32m +		// First call returns the initial mockArticles[m
+[32m +		getAllArticlesMock.mockResolvedValueOnce(mockArticles);[m
+[32m +[m
+[32m +		// Second call (after cloud sync) should return combined articles[m
+[32m +		getAllArticlesMock.mockResolvedValueOnce(combinedArticles);[m
+[32m +[m
+[32m +		// Subsequent calls should also return the combined articles[m
+[32m +		getAllArticlesMock.mockResolvedValue(combinedArticles);[m
+[32m +[m
+[32m +		// Render the hook[m
+[32m +		const { result } = renderHook([m
+[32m +			() => useArticleSync(true, new Set<string>()), // Pass empty set for hidingArticleIds[m
+[32m +		);[m
+[32m +[m
+[32m +		// Wait for sync to complete[m
+[32m +		await waitFor(() => {[m
+[32m +			expect(result.current.isLoading).toBe(false);[m
+[32m++=======[m
+[32m+ 		// Mock bulkSaveArticles: This will be called to save the updated #1 and new #3[m
+[32m+ 		let savedArticles: Article[] = [];[m
+[32m+ 		mockBulkSaveArticles.mockImplementation(async (articlesToSave) => {[m
+[32m+ 			savedArticles = articlesToSave.map((a: any) => ({[m
+[32m+ 				...a,[m
+[32m+ 				_rev: `mock-rev-bulk-${a._id}-${a.version}`,[m
+[32m+ 			}));[m
+[32m+ 			return savedArticles.map((a) => ({ ok: true, id: a._id, rev: a._rev }));[m
+[32m++>>>>>>> 571beb67fed9bff79d112873f85ae6dff3675eea[m
+[32m+ 		});[m
+[32m+ [m
+[32m+ 		// Mock the final getAllArticles call (non-deleted) after sync[m
+[32m+ 		mockGetAllArticles.mockImplementation(async (params) => {[m
+[32m+ 			if (params?.includeDeleted) {[m
+[32m+ 				// This is the reconciliation fetch, return the initial state[m
+[32m+ 				return [...mockArticles];[m
+[32m+ 			}[m
+[32m+ 			// This is the final UI state fetch[m
+[32m+ 			// Return the original article #2 plus the saved articles (#1 updated, #3 new)[m
+[32m+ 			const finalState = [[m
+[32m+ 				...mockArticles.filter((a) => a._id === "2"),[m
+[32m+ 				...savedArticles,[m
+[32m+ 			];[m
+[32m+ 			return finalState;[m
+  		});[m
+  [m
+[31m- 		// Deduplication is now internal to the hook, we verify the result below[m
+[32m+ 		const { result } = renderHook(() => useArticleSync(true));[m
+  [m
+[31m- 		// We should have 3 articles after deduplication (not 4)[m
+[31m- 		expect(result.current.articles.length).toBe(3);[m
+[32m+ 		// Wait for the hook to finish loading and refreshing, and for the articles[m
+[32m+ 		// count to become 3.[m
+[32m+ 		await waitFor([m
+[32m+ 			() => {[m
+[32m+ 				expect(result.current.isLoading).toBe(false);[m
+[32m+ 				expect(result.current.isRefreshing).toBe(false);[m
+[32m+ 				expect(result.current.articles.length).toBe(3);[m
+[32m+ 			},[m
+[32m+ 			{ timeout: 2000 },[m
+[32m+ 		);[m
+[32m+ [m
+[32m+ 		// Additional check to ensure mocks were called as expected[m
+[32m+ 		expect(mockFetchCloudItems).toHaveBeenCalledTimes(1);[m
+[32m+ 		expect(mockBulkSaveArticles).toHaveBeenCalledTimes(1);[m
+  [m
+[31m- 		// Verify the duplicate article has been replaced with the cloud (newer) version[m
+[32m+ 		// Verify the content of the articles after sync[m
+  		const article1 = result.current.articles.find((a) => a._id === "1");[m
+  		expect(article1).toBeDefined();[m
+[31m- 		expect(article1?.title).toBe("Cloud Article 1");[m
+[31m- 		expect(article1?.savedAt).toBe(5000);[m
+[32m+ 		expect(article1?.title).toBe("Article 1 Cloud Updated");[m
+[32m+ 		expect(article1?.version).toBe(2);[m
+  		expect(article1?.isRead).toBe(true);[m
+[31m- 		expect(article1?.favorite).toBe(true);[m
+  [m
+[31m- 		// Verify the other articles are present[m
+[31m- 		expect(result.current.articles.some((a) => a._id === "2")).toBe(true);[m
+[31m- 		expect(result.current.articles.some((a) => a._id === "3")).toBe(true);[m
+[32m+ 		const article2 = result.current.articles.find((a) => a._id === "2");[m
+[32m+ 		expect(article2).toBeDefined(); // Should still exist[m
+[32m+ [m
+[32m+ 		const article3 = result.current.articles.find((a) => a._id === "3");[m
+[32m+ 		expect(article3).toBeDefined(); // Should be newly added[m
+[32m+ 		expect(article3?.title).toBe("Article 3 Cloud Article 3");[m
+[32m+ 	});[m
+[32m+ [m
+[32m+ 	// --- New Reconciliation Tests ---[m
+[32m+ [m
+[32m+ 	it("Scenario: Local Delete (Online)", async () => {[m
+[32m+ 		const localDeletedArticle = {[m
+[32m+ 			...baseMockArticle("1", 2, 2000),[m
+[32m+ 			deletedAt: Date.now(),[m
+[32m+ 			_rev: "rev-1-2",[m
+[32m+ 		};[m
+[32m+ 		const cloudArticle = baseMockArticle("1", 1, 1000);[m
+[32m+ [m
+[32m+ 		// Override mock for articlesDb

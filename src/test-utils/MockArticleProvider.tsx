@@ -1,4 +1,4 @@
-import type { useArticles } from "@/context/ArticleContext";
+// Removed unused import: import type { useArticles } from "@/context/ArticleContext";
 import type { ArticleView } from "@/hooks/useArticleView";
 import type { Article, ArticleCategory, Tag } from "@/services/db"; // Import ArticleCategory from db
 import type {
@@ -6,7 +6,7 @@ import type {
 	ArticleSortField,
 	SortCriteria,
 } from "@/types/articles";
-import { act } from "@testing-library/react"; // Import act (keep only one)
+// Removed unused act import
 import React, { useCallback, useMemo, useState } from "react";
 import { vi } from "vitest"; // Import vi
 
@@ -26,6 +26,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t1"],
 		estimatedReadTime: 5,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "2",
@@ -41,6 +42,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t2"],
 		estimatedReadTime: 15,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "3",
@@ -56,6 +58,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t1", "t2"],
 		estimatedReadTime: 10,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "4",
@@ -71,6 +74,7 @@ export const mockRawArticles: Article[] = [
 		tags: ["t3"],
 		estimatedReadTime: 20,
 		type: "pdf",
+		version: 1, // Added version
 	},
 ];
 export const mockTags: Tag[] = [
@@ -80,6 +84,10 @@ export const mockTags: Tag[] = [
 ];
 
 // --- Mock Context Setup ---
+// Revert to using Omit with the original type name
+// Need to import useArticles again for ReturnType
+import type { useArticles } from "@/context/ArticleContext";
+
 export type MockArticleContextType = Omit<
 	ReturnType<typeof useArticles>,
 	| "refreshArticles"
@@ -140,7 +148,7 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 				(a) =>
 					a.title.toLowerCase().includes(query) ||
 					a.excerpt?.toLowerCase().includes(query),
-			); // Optional chaining for excerpt
+			);
 		}
 		if (filters.siteNames.length > 0)
 			filtered = filtered.filter((a) =>
@@ -151,7 +159,7 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		if (filters.tags.length > 0)
 			filtered = filtered.filter((a) =>
 				a.tags?.some((tag) => filters.tags.includes(tag)),
-			); // Optional chaining for tags
+			);
 		if (filters.category)
 			filtered = filtered.filter((a) => a.category === filters.category);
 
@@ -198,12 +206,12 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		(category: ArticleCategory | null) =>
 			setFilters((prev) => ({ ...prev, category })),
 		[],
-	); // Correct type for category
+	);
 
 	const value: MockArticleContextType = useMemo(
 		() => ({
-			articles: mockRawArticles, // Raw articles
-			processedArticles, // Use derived articles
+			articles: mockRawArticles,
+			processedArticles,
 			isLoading: false,
 			isRefreshing: false,
 			error: null,
@@ -212,30 +220,26 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			currentView,
 			setCurrentView,
 			filters,
-			setFilters, // Provide direct setter
-			setSearchQuery, // Provide stable helper
+			setFilters,
+			setSearchQuery,
 			sortCriteria,
-			setSortCriteria, // Provide direct setter
-			setSortField, // Provide stable helper
-			toggleSortDirection, // Provide stable helper
-			setSelectedCategory, // Added mock setter
-			// Use the exported mock functions in the context value
+			setSortCriteria,
+			setSortField,
+			toggleSortDirection,
+			setSelectedCategory,
 			refreshArticles: mockRefreshArticles,
 			retryLoading: mockRetryLoading,
 			optimisticRemoveArticle: mockOptimisticRemoveArticle,
 		}),
 		[
-			// Only include values that actually change and affect the output
 			processedArticles,
 			currentView,
 			filters,
-			// setFilters is stable
-			setSearchQuery, // Stable helper reference
+			setSearchQuery,
 			sortCriteria,
-			// setSortCriteria is stable
-			setSortField, // Stable helper reference
-			setSelectedCategory, // Add stable mock function reference
-			toggleSortDirection, // Stable helper reference
+			setSortField,
+			setSelectedCategory,
+			toggleSortDirection,
 		],
 	);
 
@@ -246,18 +250,12 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	);
 };
 
-// Test utility functions
+// Export test helper functions
 export function testUpdateFilters(newFilters: Partial<ArticleFilters>) {
 	if (!_mockSetFilters) {
-		console.error(
-			"Mock provider not initialized for filters. Ensure MockArticleProvider is rendered.",
-		);
-		return; // Or throw error
+		throw new Error("Cannot update filters - provider not mounted");
 	}
-	const setFilters = _mockSetFilters; // Assign after check
-	act(() => {
-		setFilters((prev) => ({ ...prev, ...newFilters }));
-	});
+	_mockSetFilters((prev) => ({ ...prev, ...newFilters }));
 }
 
 export function testSetSort(
@@ -265,29 +263,17 @@ export function testSetSort(
 	direction: "asc" | "desc",
 ) {
 	if (!_mockSetSortCriteria) {
-		console.error(
-			"Mock provider not initialized for sort criteria. Ensure MockArticleProvider is rendered.",
-		);
-		return; // Or throw error
+		throw new Error("Cannot update sort - provider not mounted");
 	}
-	const setSortCriteria = _mockSetSortCriteria; // Assign after check
-	act(() => {
-		setSortCriteria({ field, direction });
-	});
+	_mockSetSortCriteria({ field, direction });
 }
 
 export function testToggleSortDirection() {
 	if (!_mockSetSortCriteria) {
-		console.error(
-			"Mock provider not initialized for sort criteria. Ensure MockArticleProvider is rendered.",
-		);
-		return; // Or throw error
+		throw new Error("Cannot toggle sort direction - provider not mounted");
 	}
-	const setSortCriteria = _mockSetSortCriteria; // Assign after check
-	act(() => {
-		setSortCriteria((prev) => ({
-			...prev,
-			direction: prev.direction === "asc" ? "desc" : "asc",
-		}));
-	});
+	_mockSetSortCriteria((prev) => ({
+		...prev,
+		direction: prev.direction === "asc" ? "desc" : "asc",
+	}));
 }

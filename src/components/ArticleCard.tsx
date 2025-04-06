@@ -19,7 +19,8 @@ import {
 	MoreHorizontal,
 	Trash2,
 } from "lucide-react";
-import React, { useState } from "react"; // Import React directly
+import React, { useState } from "react";
+import { useTranslation } from "react-i18next"; // Added useTranslation
 import { Link } from "react-router-dom";
 
 interface ArticleCardProps {
@@ -32,9 +33,10 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 	article,
 	index = 0,
 }) => {
-	const { updateArticleStatus, optimisticRemoveArticle } = useArticles(); // Use optimistic remove
+	const { updateArticleStatus, optimisticRemoveArticle } = useArticles(); // Revert to optimisticRemoveArticle
 	const { toast } = useToast();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
+	const { t } = useTranslation(); // Added translation hook
 
 	// Use synchronized animation with staggered delay based on index
 	const cardAnimation = useSynchronizedAnimation({
@@ -50,7 +52,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 		e.stopPropagation();
 		try {
 			// No need to check _rev for optimistic remove
-			await optimisticRemoveArticle(article._id);
+			await optimisticRemoveArticle(article._id); // Revert function call
 		} catch (error) {
 			console.error("Error deleting article:", error);
 			toast({
@@ -93,7 +95,9 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 			e.preventDefault();
 			e.stopPropagation();
 			// Call optimistic remove directly, similar to handleDelete but for keyboard event
-			optimisticRemoveArticle(article._id).catch((error) => {
+			optimisticRemoveArticle(article._id).catch((error: any) => {
+				// Revert function call
+				// Reverted handler
 				console.error("Error deleting article via keyboard:", error);
 				toast({
 					title: "Error",
@@ -131,7 +135,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 									className="text-xs text-muted-foreground"
 									data-testid="read-status"
 								>
-									Read
+									{t("articleCard.read")}
 								</span>
 								<div className="flex items-center gap-1">
 									{/* Move to Later Button */}
@@ -144,7 +148,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "later" });
 										}}
-										aria-label="Move to Later"
+										aria-label={t("articleCard.readLater")}
 									>
 										<Clock size={16} />
 									</Button>
@@ -158,7 +162,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "archived" });
 										}}
-										aria-label="Archive"
+										aria-label={t("articleCard.archive")}
 									>
 										<Archive size={16} />
 									</Button>
@@ -172,7 +176,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "inbox" });
 										}}
-										aria-label="Move to Inbox"
+										aria-label={t("articleCard.moveToInbox")}
 									>
 										<Inbox size={16} />
 									</Button>
@@ -200,7 +204,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 												onClick={handleDelete}
 											>
 												<Trash2 className="mr-2 h-4 w-4" />
-												<span>Delete</span>
+												<span>{t("articleCard.delete")}</span>
 											</DropdownMenuItem>
 										</DropdownMenuContent>
 									</DropdownMenu>
@@ -212,7 +216,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 									className="text-xs font-medium text-bondwise-500"
 									data-testid="unread-status"
 								>
-									Unread
+									{t("articleCard.unread")}
 								</span>
 								<div className="flex items-center gap-1">
 									{/* Move to Later Button */}
@@ -225,7 +229,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "later" });
 										}}
-										aria-label="Move to Later"
+										aria-label={t("articleCard.readLater")}
 									>
 										<Clock size={16} />
 									</Button>
@@ -239,7 +243,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "archived" });
 										}}
-										aria-label="Archive"
+										aria-label={t("articleCard.archive")}
 									>
 										<Archive size={16} />
 									</Button>
@@ -253,7 +257,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "inbox" });
 										}}
-										aria-label="Move to Inbox"
+										aria-label={t("articleCard.moveToInbox")}
 									>
 										<Inbox size={16} />
 									</Button>
@@ -281,7 +285,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 												onClick={handleDelete}
 											>
 												<Trash2 className="mr-2 h-4 w-4" />
-												<span>Delete</span>
+												<span>{t("articleCard.delete")}</span>
 											</DropdownMenuItem>
 										</DropdownMenuContent>
 									</DropdownMenu>
@@ -291,10 +295,10 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 						{/* Wrap title and excerpt and make this section grow */}
 						<div className="flex-grow mb-3">
 							<h3 className="text-lg font-medium line-clamp-2 mb-2">
-								{article.title || "Untitled"}
+								{article.title || t("articleCard.untitled")}
 							</h3>
 							<p className="text-sm text-muted-foreground line-clamp-2">
-								{article.excerpt || "No excerpt available"}
+								{article.excerpt || t("articleCard.noExcerpt")}
 							</p>
 						</div>
 						{/* Keep bottom metadata section */}
@@ -303,10 +307,10 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 							{/* Use mt-auto to push to bottom */}
 							<span>
 								{article.type === "pdf" && !article.siteName
-									? "PDF Document"
+									? t("articleCard.pdfSource")
 									: article.type === "epub" && !article.siteName
-										? "EPUB Book"
-										: article.siteName || "Unknown source"}
+										? t("articleCard.epubSource")
+										: article.siteName || t("articleCard.unknownSource")}
 							</span>
 							<div className="flex items-center gap-3">
 								<span>{article.estimatedReadTime || "?"} min read</span>

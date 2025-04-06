@@ -448,6 +448,7 @@ describe("Worker Item Handlers", () => {
 			favorite: false,
 			siteName: "New Site",
 			estimatedReadTime: 1,
+			content: "<p>This is the article content.</p>", // Added required content
 		};
 
 		it("should save a new item correctly", async () => {
@@ -473,16 +474,26 @@ describe("Worker Item Handlers", () => {
 
 			const key = createUserItemKey(testUserId, newItem._id);
 			// Check that put was called with the correct key and the stringified newItem
-			expect(mockKvNamespace.put).toHaveBeenCalledWith(
-				key,
-				JSON.stringify(newItem),
-			);
+			// Verify put was called, then check arguments more robustly
+			expect(mockKvNamespace.put).toHaveBeenCalled();
+			const putCalls = vi.mocked(mockKvNamespace.put).mock.calls;
+			expect(putCalls.length).toBeGreaterThan(0);
+			const lastCallArgs = putCalls[putCalls.length - 1];
+			expect(lastCallArgs[0]).toBe(key); // Check key separately
+			expect(JSON.parse(lastCallArgs[1] as string)).toEqual(newItem); // Cast to string before parsing
 			// Check that the item was actually stored in our mock KV store
-			expect(mockKvNamespace._store.get(key)).toBe(JSON.stringify(newItem));
+			const storedValue = mockKvNamespace._store.get(key);
+			expect(storedValue).toBeDefined(); // Ensure something was stored
+			expect(JSON.parse(storedValue ?? "{}")).toEqual(newItem); // Compare parsed objects
 		});
 
 		it("should return 400 for invalid item data", async () => {
-			const invalidItem = { ...newItem, title: undefined }; // Missing title
+			// Still missing title, but add content to satisfy the new check
+			const invalidItem = {
+				...newItem,
+				title: undefined,
+				content: "<p>Content exists</p>",
+			};
 			const request = new Request("http://example.com/items", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -500,8 +511,57 @@ describe("Worker Item Handlers", () => {
 			expect(mockKvNamespace.put).not.toHaveBeenCalled();
 		});
 
+		it("should return 400 if content is missing", async () => {
+			const itemMissingContent = { ...newItem };
+			(itemMissingContent as Partial<WorkerArticle>).content = undefined; // Remove content using undefined assignment
+
+			const request = new Request("http://example.com/items", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(itemMissingContent),
+			}); // <-- Added missing closing parenthesis here
+			// Removed the misplaced nested test case from here - Ensure this comment is accurate or remove it.
+			const response = await handlePostItem(
+				request,
+				mockEnv,
+				mockCtx,
+				testUserId,
+			);
+			expect(response.status).toBe(400);
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toContain("Invalid article data");
+			expect(body.message).toContain("content"); // Check if 'content' is mentioned
+			expect(mockKvNamespace.put).not.toHaveBeenCalled();
+		});
+
+		it("should return 400 if content is an empty string", async () => {
+			const itemEmptyContent = { ...newItem, content: "" }; // Empty string content
+
+			const request = new Request("http://example.com/items", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(itemEmptyContent),
+			});
+			const response = await handlePostItem(
+				request,
+				mockEnv,
+				mockCtx,
+				testUserId,
+			);
+			expect(response.status).toBe(400);
+			const body = (await response.json()) as { message?: string };
+			expect(body.message).toContain("Invalid article data");
+			expect(body.message).toContain("content"); // Check if 'content' is mentioned
+			expect(mockKvNamespace.put).not.toHaveBeenCalled();
+		});
+
 		it("should return 403 if item userId does not match authenticated userId", async () => {
-			const wrongUserItem = { ...newItem, userId: "wrong_user" };
+			// Add content to satisfy the new check, userId is still wrong
+			const wrongUserItem = {
+				...newItem,
+				userId: "wrong_user",
+				content: "<p>Content exists</p>",
+			};
 			const request = new Request("http://example.com/items", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },

@@ -6,31 +6,39 @@ import { useAuth } from "@clerk/clerk-react";
 import { useCallback, useMemo } from "react";
 
 export function useReadingProgress() {
-	const { userId, isSignedIn } = useAuth();
+	const { userId, isSignedIn, getToken } = useAuth(); // Add getToken
 	// Note: Toast is not used here, but kept in case error handling needs it later.
 	// const { toast } = useToast();
 
 	// Debounced function for syncing progress updates to the cloud
 	const debouncedSyncProgress = useMemo(
 		() =>
-			debounce((articleToSync: Article) => {
-				saveItemToCloud(articleToSync)
-					.then((status: CloudSyncStatus) => {
-						if (status !== "success") {
-							console.warn(
-								`Debounced sync for progress update ${articleToSync._id} failed with status: ${status}`,
-							);
-						}
-						// No console log on success to reduce noise
-					})
-					.catch((err) => {
-						console.error(
-							`Error syncing progress update for ${articleToSync._id}:`,
-							err,
+			debounce(async (articleToSync: Article) => {
+				// Make inner function async
+				try {
+					const token = await getToken(); // Fetch token inside debounced call
+					if (!token) {
+						console.error("Cannot sync reading progress: No token available.");
+						return;
+					}
+					const status: CloudSyncStatus = await saveItemToCloud(
+						articleToSync,
+						token,
+					); // Pass token
+					if (status !== "success") {
+						console.warn(
+							`Debounced sync for progress update ${articleToSync._id} failed with status: ${status}`,
 						);
-					});
+					}
+					// No console log on success to reduce noise
+				} catch (err) {
+					console.error(
+						`Error syncing progress update for ${articleToSync._id}:`,
+						err,
+					);
+				}
 			}, 1500), // Debounce for 1.5 seconds
-		[], // No dependencies, saveItemToCloud is a stable import
+		[getToken], // Add getToken as dependency
 	);
 
 	// Update reading progress
@@ -82,7 +90,7 @@ export function useReadingProgress() {
 				// No toast for progress updates
 			}
 		},
-		[userId, isSignedIn, debouncedSyncProgress], // Add stable debounced function
+		[userId, isSignedIn, debouncedSyncProgress], // debouncedSyncProgress depends on getToken now
 	);
 
 	return { updateReadingProgress };

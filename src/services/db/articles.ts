@@ -1,14 +1,11 @@
 // src/services/db/articles.ts
 
 import { v4 as uuidv4 } from "uuid";
-import { articlesDb } from "./config"; // Import the initialized DB instance
-import { removeDuplicateArticles } from "./duplicates"; // Import from new file
-import type { Article, ArticleCategory } from "./types"; // Import ArticleCategory
+import { articlesDb, operationsQueueDb } from "./config"; // Import the initialized DB instances
+// Removed unused import: import { removeDuplicateArticles } from "./duplicates";
+import type { Article, ArticleCategory, QueuedOperation } from "./types"; // Import necessary types
 import { executeWithRetry } from "./utils";
-
-// Re-export removeDuplicateArticles to maintain API
-export { removeDuplicateArticles };
-
+// Removed redundant re-export of removeDuplicateArticles
 // Helper to infer category from type
 const inferCategoryFromType = (type: Article["type"]): ArticleCategory => {
 	switch (type) {
@@ -46,12 +43,13 @@ export async function saveArticle(
 		const docToSave: Article = {
 			...article,
 			_id: docId,
-			// Ensure required fields have defaults if not provided, although caller should provide them
 			savedAt: article.savedAt || Date.now(),
 			isRead: article.isRead ?? false,
 			favorite: article.favorite ?? false,
 			tags: article.tags || [],
 			type: article.type || "article",
+			version: isUpdate ? (article.version || 0) + 1 : 1, // Increment version on update, init to 1 on create
+			deletedAt: undefined, // Ensure deletedAt is not set on save/update
 			// Ensure _rev is only included if it's an update attempt
 			...(isUpdate && article._rev ? { _rev: article._rev } : {}),
 			// Set category: prioritize explicit, then infer, then default to 'other'
@@ -101,51 +99,52 @@ export async function saveArticle(
 					// A more robust strategy might involve comparing fields or using a merge function.
 					// Refined merge strategy: Prioritize incoming content, preserve local state.
 					const latestArticle = latestDoc as Article; // Cast for type safety
-					const docToRetry: Article = {
-						// Base fields from latestDoc
-						_id: latestArticle._id, // Use ID from latest doc (should match docId)
-						_rev: latestArticle._rev, // CRITICAL: Use latest rev
-						userId: latestArticle.userId, // Keep existing userId from local doc
+					// --- Conflict Resolution Logic with Versioning ---
+					// Decide winner based on version number. If equal, use timestamp (optional).
+					// For simplicity here, assume incoming 'article' is from cloud sync.
+					// A more robust conflict resolver might be needed for multi-client scenarios.
+					const incomingVersion = article.version || 0; // Assume 0 if missing from incoming
+					const localVersion = latestArticle.version || 0;
 
-						// Fields primarily from incoming 'article' (source of truth for content)
-						// Use nullish coalescing (??) to fall back to latestDoc value if incoming is null/undefined
-						title: article.title ?? latestArticle.title,
-						url: article.url ?? latestArticle.url,
-						// Content should exist due to filtering in useArticleSync, but fallback just in case
-						content: article.content ?? latestArticle.content,
-						excerpt: article.excerpt ?? latestArticle.excerpt,
-						htmlContent: article.htmlContent ?? latestArticle.htmlContent,
-						type: article.type ?? latestArticle.type,
-						savedAt: article.savedAt ?? latestArticle.savedAt, // Usually from cloud
+					let docToRetry: Article;
 
-						// Fields primarily from 'latestDoc' (local state) unless overridden by incoming 'article'
-						status: article.status ?? latestArticle.status ?? "inbox", // Add status merge logic
-						isRead: article.isRead ?? latestArticle.isRead,
-						favorite: article.favorite ?? latestArticle.favorite,
-						tags: article.tags ?? latestArticle.tags,
-						readAt: article.readAt ?? latestArticle.readAt,
-						scrollPosition:
-							article.scrollPosition ?? latestArticle.scrollPosition,
+					if (incomingVersion >= localVersion) {
+						// Incoming (cloud) version is newer or same, overwrite local state but keep essential local fields
+						console.log(
+							`Conflict: Incoming version (${incomingVersion}) >= local (${localVersion}). Applying incoming changes.`,
+						);
+						docToRetry = {
+							...latestArticle, // Start with latest local doc
+							...article, // Overwrite with incoming fields
+							_id: latestArticle._id, // Ensure correct ID
+							_rev: latestArticle._rev, // Use latest rev for PouchDB update
+							userId: latestArticle.userId, // Preserve original userId
+							version: incomingVersion, // Use incoming version
+							// Ensure local-only states like readAt, scrollPosition are potentially preserved if desired
+							readAt: article.readAt ?? latestArticle.readAt,
+							scrollPosition:
+								article.scrollPosition ?? latestArticle.scrollPosition,
+							// Ensure 'deletedAt' is cleared if incoming data represents an undelete/update
+							deletedAt: undefined,
+						};
+					} else {
+						// Local version is newer, potentially keep local changes.
+						// For now, log this scenario. More complex merging could be added.
+						console.warn(
+							`Conflict: Local version (${localVersion}) > incoming (${incomingVersion}). Keeping local version for article ${docId}.`,
+						);
+						// To keep local, we essentially do nothing and let the initial put fail
+						// Or we could re-put the existing localDoc with incremented version again? Risky.
+						// Let's throw the conflict error to signal manual intervention or a different strategy needed.
+						throw error; // Rethrow original conflict error if local is newer for now
+						// --- Alternative: Force update with local data + incremented version ---
+						// docToRetry = {
+						// 	...latestArticle,
+						// 	version: localVersion + 1, // Increment local version again
+						// };
+					}
+					// --- End Conflict Resolution Logic ---
 
-						// Other optional fields, prioritize incoming if present
-						siteName: article.siteName ?? latestArticle.siteName,
-						author: article.author ?? latestArticle.author,
-						publishedDate: article.publishedDate ?? latestArticle.publishedDate, // Corrected typo
-						estimatedReadTime:
-							article.estimatedReadTime ?? latestArticle.estimatedReadTime,
-						coverImage: article.coverImage ?? latestArticle.coverImage,
-						language: article.language ?? latestArticle.language,
-						// Ensure file-related fields are preserved if they exist on latestArticle
-						fileData: article.fileData ?? latestArticle.fileData,
-						fileName: article.fileName ?? latestArticle.fileName,
-						fileSize: article.fileSize ?? latestArticle.fileSize,
-						pageCount: article.pageCount ?? latestArticle.pageCount,
-						// Merge category: prioritize incoming explicit, then inferred from incoming type, then existing
-						category:
-							article.category ??
-							inferCategoryFromType(article.type ?? latestArticle.type) ??
-							latestArticle.category,
-					};
 					const retryResponse = await articlesDb.put(docToRetry);
 					if (retryResponse.ok) {
 						console.log(
@@ -160,7 +159,8 @@ export async function saveArticle(
 					);
 				} catch (retryError) {
 					// Log the original conflict warning ONLY if the retry fails
-					+console.warn(
+					// The '+' seems to be a typo/artifact, removing it.
+					console.warn(
 						`Conflict saving article ${docId}. Initial error:`,
 						error,
 					);
@@ -215,6 +215,8 @@ export async function bulkSaveArticles(
 				continue;
 			}
 
+			// Prepare doc, initialize version for new docs
+			// const isPotentialUpdate = !!article._id; // Removed unused variable
 			const preparedDoc: Article & { _id: string } = {
 				...article,
 				_id: docId,
@@ -225,7 +227,9 @@ export async function bulkSaveArticles(
 				type: article.type || "article",
 				category:
 					article.category ?? inferCategoryFromType(article.type || "article"),
-				// _rev will be added later if it's an update
+				version: article.version || 1, // Use incoming version or default to 1 for new
+				deletedAt: undefined, // Ensure deletedAt is not set on bulk save
+				// _rev will be added later if it's an update based on existingDocsMap
 			};
 			docsToProcess.push(preparedDoc);
 
@@ -270,155 +274,49 @@ export async function bulkSaveArticles(
 			}
 		}
 
-		// 3. Check for existing articles with the same URL to prevent duplicates
-		const existingDocsByUrl = new Map<string, Article>();
-		try {
-			// Fetch all articles to check for URL duplicates
-			const allDocsResponse = await articlesDb.allDocs<Article>({
-				include_docs: true,
-			});
+		// Resolved bulkSaveArticles logic: Kept version comparison logic from backup-staging-local
+		// 3. Merge and prepare final documents for bulkDocs
+		const finalDocsToSave: Article[] = docsToProcess.map((doc) => {
+			let resultDoc: Article; // Define result variable outside if/else
+			const existingDoc = existingDocsMap.get(doc._id);
 
-			const allArticles: Article[] = allDocsResponse.rows
-				.filter((row) => !!row.doc && row.id.startsWith("article_")) // Ensure doc exists and is an article
-				.map((row) => row.doc as Article);
+			if (existingDoc) {
+				// --- Handle Existing Document (Merge/Update) ---
+				const incomingVersion = doc.version || 0;
+				const localVersion = existingDoc.version || 0;
 
-			// Create a map of URL to article for quick lookup
-			for (const article of allArticles) {
-				if (article.url) {
-					// Normalize URL for comparison
-					const normalizedUrl = article.url
-						.toLowerCase()
-						.trim()
-						.replace(/\/$/, "");
-					existingDocsByUrl.set(normalizedUrl, article);
+				if (incomingVersion >= localVersion) {
+					// Incoming (cloud) version is newer or same
+					console.log(
+						`Bulk Merge: Incoming version (${incomingVersion}) >= local (${localVersion}) for ${existingDoc._id}. Applying incoming.`,
+					);
+					resultDoc = {
+						// Assign to resultDoc
+						...existingDoc,
+						...doc,
+						_id: existingDoc._id,
+						_rev: existingDoc._rev,
+						userId: doc.userId ?? existingDoc.userId,
+						version: incomingVersion,
+						deletedAt: undefined,
+					};
+				} else {
+					// Local version is newer, keep local
+					console.log(
+						`Bulk Merge: Local version (${localVersion}) > incoming (${incomingVersion}) for ${existingDoc._id}. Keeping local.`,
+					);
+					resultDoc = {
+						// Assign to resultDoc
+						...existingDoc,
+					};
 				}
-			}
-
-			console.log(
-				`Checked ${allArticles.length} articles for URL duplicates, found ${existingDocsByUrl.size} unique URLs.`,
-			);
-		} catch (fetchError) {
-			console.error(
-				"Error fetching articles for URL duplicate check:",
-				fetchError,
-			);
-			// Continue without URL duplicate checking if this fails
-		}
-
-		// 4. Merge and prepare final documents for bulkDocs, checking for URL duplicates
-		const finalDocsToSave: Article[] = [];
-		const processedUrls = new Set<string>(); // Track URLs we've already processed
-
-		for (const doc of docsToProcess) {
-			// Check if we already have an existing document with this ID
-			const existingDocById = existingDocsMap.get(doc._id);
-
-			// Normalize URL for comparison
-			const normalizedUrl = doc.url.toLowerCase().trim().replace(/\/$/, "");
-
-			// Check if we've already processed this URL in this batch
-			if (processedUrls.has(normalizedUrl)) {
-				console.log(
-					`Skipping duplicate URL in batch: ${doc.url} (ID: ${doc._id})`,
-				);
-				continue;
-			}
-
-			// Check if we already have an existing document with this URL
-			const existingDocByUrl = existingDocsByUrl.get(normalizedUrl);
-
-			let finalDoc: Article;
-
-			if (existingDocById) {
-				// If we have an existing doc with the same ID, update it
-				console.log(`Updating existing article with ID: ${doc._id}`);
-				finalDoc = {
-					_id: existingDocById._id,
-					_rev: existingDocById._rev, // Use existing revision for update
-					userId: doc.userId ?? existingDocById.userId,
-					title: doc.title ?? existingDocById.title,
-					url: doc.url ?? existingDocById.url,
-					content: doc.content ?? existingDocById.content,
-					excerpt: doc.excerpt ?? existingDocById.excerpt,
-					htmlContent: doc.htmlContent ?? existingDocById.htmlContent,
-					type: doc.type ?? existingDocById.type,
-					savedAt: doc.savedAt ?? existingDocById.savedAt,
-					status: doc.status ?? existingDocById.status ?? "inbox",
-					isRead: doc.isRead ?? existingDocById.isRead,
-					favorite: doc.favorite ?? existingDocById.favorite,
-					tags: doc.tags ?? existingDocById.tags,
-					readAt: doc.readAt ?? existingDocById.readAt,
-					scrollPosition: doc.scrollPosition ?? existingDocById.scrollPosition,
-					siteName: doc.siteName ?? existingDocById.siteName,
-					author: doc.author ?? existingDocById.author,
-					publishedDate: doc.publishedDate ?? existingDocById.publishedDate,
-					estimatedReadTime:
-						doc.estimatedReadTime ?? existingDocById.estimatedReadTime,
-					coverImage: doc.coverImage ?? existingDocById.coverImage,
-					language: doc.language ?? existingDocById.language,
-					fileData: doc.fileData ?? existingDocById.fileData,
-					fileName: doc.fileName ?? existingDocById.fileName,
-					fileSize: doc.fileSize ?? existingDocById.fileSize,
-					pageCount: doc.pageCount ?? existingDocById.pageCount,
-					category:
-						doc.category ??
-						inferCategoryFromType(doc.type ?? existingDocById.type) ??
-						existingDocById.category,
-				};
-			} else if (existingDocByUrl && existingDocByUrl._id !== doc._id) {
-				// If we have an existing doc with the same URL but different ID, update that instead
-				console.log(`Found existing article with same URL: ${doc.url}`);
-				console.log(
-					`Using existing article ID: ${existingDocByUrl._id} instead of ${doc._id}`,
-				);
-
-				// Update the existing article with the new content
-				finalDoc = {
-					_id: existingDocByUrl._id,
-					_rev: existingDocByUrl._rev,
-					userId: doc.userId ?? existingDocByUrl.userId,
-					title: doc.title ?? existingDocByUrl.title,
-					url: doc.url ?? existingDocByUrl.url,
-					content: doc.content ?? existingDocByUrl.content,
-					excerpt: doc.excerpt ?? existingDocByUrl.excerpt,
-					htmlContent: doc.htmlContent ?? existingDocByUrl.htmlContent,
-					type: doc.type ?? existingDocByUrl.type,
-					// Use the newer savedAt timestamp
-					savedAt: Math.max(doc.savedAt || 0, existingDocByUrl.savedAt || 0),
-					status: doc.status ?? existingDocByUrl.status ?? "inbox",
-					// Prefer the new document's read status if it's explicitly set
-					isRead:
-						doc.isRead !== undefined ? doc.isRead : existingDocByUrl.isRead,
-					favorite: doc.favorite ?? existingDocByUrl.favorite,
-					tags: doc.tags ?? existingDocByUrl.tags,
-					readAt: doc.readAt ?? existingDocByUrl.readAt,
-					scrollPosition: doc.scrollPosition ?? existingDocByUrl.scrollPosition,
-					siteName: doc.siteName ?? existingDocByUrl.siteName,
-					author: doc.author ?? existingDocByUrl.author,
-					publishedDate: doc.publishedDate ?? existingDocByUrl.publishedDate,
-					estimatedReadTime:
-						doc.estimatedReadTime ?? existingDocByUrl.estimatedReadTime,
-					coverImage: doc.coverImage ?? existingDocByUrl.coverImage,
-					language: doc.language ?? existingDocByUrl.language,
-					fileData: doc.fileData ?? existingDocByUrl.fileData,
-					fileName: doc.fileName ?? existingDocByUrl.fileName,
-					fileSize: doc.fileSize ?? existingDocByUrl.fileSize,
-					pageCount: doc.pageCount ?? existingDocByUrl.pageCount,
-					category:
-						doc.category ??
-						inferCategoryFromType(doc.type ?? existingDocByUrl.type) ??
-						existingDocByUrl.category,
-				};
 			} else {
-				// No existing doc with this ID or URL, use as-is
-				// Remove potential _rev if it somehow exists
-				const { _rev, ...newDoc } = doc;
-				finalDoc = newDoc as Article;
+				// --- Handle New Document ---
+				const { _rev, ...newDoc } = doc; // Remove potential _rev
+				resultDoc = { ...newDoc, version: newDoc.version || 1 } as Article; // Assign to resultDoc, ensure version
 			}
-
-			finalDocsToSave.push(finalDoc);
-			processedUrls.add(normalizedUrl); // Mark this URL as processed
-		}
+			return resultDoc; // Single return point for map callback
+		});
 
 		// 4. Execute bulkDocs
 		if (finalDocsToSave.length === 0) {
@@ -503,19 +401,21 @@ export async function updateArticle(
 			});
 
 			// Merge the updates onto the existing document
+			// Merge updates and increment version
 			const updatedArticle: Article = {
 				...existingArticle,
-				...articleUpdate,
-				// Ensure _id and _rev from the update object are used for the put operation
-				_id: articleUpdate._id,
+				...articleUpdate, // Apply partial updates
+				_id: articleUpdate._id, // Ensure ID and Rev are correct for PouchDB
 				_rev: articleUpdate._rev,
-				// Update category: Use explicit if provided, infer if type changed, else keep existing
+				version: (existingArticle.version || 0) + 1, // Increment version
+				// Update category logic (remains the same)
 				category:
 					articleUpdate.category !== undefined
 						? articleUpdate.category
 						: articleUpdate.type !== undefined
 							? inferCategoryFromType(articleUpdate.type)
 							: existingArticle.category,
+				deletedAt: undefined, // Ensure deletedAt is not set on update
 			};
 
 			const response = await articlesDb.put(updatedArticle);
@@ -547,34 +447,58 @@ export async function updateArticle(
 }
 
 /**
- * Deletes an article from the database.
- * Requires the article's _id and latest _rev.
+ * Soft deletes an article locally and queues the delete operation for cloud sync.
  *
- * @param id - The _id of the article to delete.
- * @param rev - The latest _rev of the article to delete.
- * @returns True if deletion was successful, false otherwise.
- * @throws Error if deletion fails (e.g., conflict, document not found).
+ * @param id - The _id of the article to soft delete.
+ * @returns True if soft deletion and queuing were successful, false otherwise.
+ * @throws Error if fetching the article or saving the soft delete fails.
  */
-export async function deleteArticle(id: string, rev: string): Promise<boolean> {
+export async function deleteArticle(id: string): Promise<boolean> {
+	console.log(`Attempting to soft delete article ${id} locally...`);
 	try {
-		// Use executeWithRetry for potential transient errors during delete
-		return await executeWithRetry(async () => {
-			console.log(`Attempting to delete article ${id} with rev ${rev}`);
-			const response = await articlesDb.remove(id, rev);
-			if (response.ok) {
-				console.log(`Article ${id} deleted successfully.`);
-				return true;
-			}
-			// This part should ideally not be reached if remove throws on failure
-			console.error(
-				`Failed to delete article ${id}. Response: ${JSON.stringify(response)}`,
+		// 1. Fetch the latest version of the article
+		const article = await articlesDb.get(id);
+
+		// 2. Prepare the soft delete update
+		const updatedArticle: Article = {
+			...article,
+			deletedAt: Date.now(),
+			version: (article.version || 0) + 1, // Increment version
+		};
+
+		// 3. Save the soft delete update locally
+		const response = await articlesDb.put(updatedArticle);
+		if (!response.ok) {
+			throw new Error(
+				`Failed to save soft delete for article ${id}. Response: ${JSON.stringify(
+					response,
+				)}`,
 			);
-			return false;
-		});
+		}
+		console.log(`Article ${id} soft deleted locally with rev ${response.rev}.`);
+
+		// 4. Queue the delete operation for cloud sync
+		const queueOp: QueuedOperation = {
+			_id: `queue_delete_${id}_${Date.now()}`, // Unique ID for the queue item
+			type: "delete",
+			docId: id,
+			timestamp: Date.now(),
+			retryCount: 0,
+		};
+		await operationsQueueDb.put(queueOp);
+		console.log(`Delete operation for article ${id} queued for cloud sync.`);
+
+		return true;
 	} catch (error: any) {
-		console.error(`Error deleting article ${id}:`, error);
-		// Rethrow the error for the caller to potentially handle (e.g., notify user)
-		throw error;
+		if (error.name === "not_found") {
+			console.warn(`Article ${id} not found for deletion.`);
+			// If not found locally, maybe it was already deleted? Or never existed.
+			// Consider if we still need to queue a delete for the cloud in this case.
+			// For now, return false as the local operation didn't proceed as expected.
+			return false;
+		}
+		console.error(`Error soft deleting article ${id}:`, error);
+		throw error; // Rethrow other errors
 	}
 }
 
@@ -593,16 +517,20 @@ export async function deleteArticle(id: string, rev: string): Promise<boolean> {
  * @param options.userIds - Filter by one or more user IDs. If provided, only articles matching these IDs are returned.
  * @returns A promise resolving to an array of Article documents. Returns empty array on error.
  */
-export async function getAllArticles(options?: {
-	limit?: number;
-	skip?: number;
-	isRead?: boolean;
-	favorite?: boolean;
-	tag?: string;
-	sortBy?: "savedAt" | "title" | "readAt";
-	sortDirection?: "asc" | "desc";
-	userIds?: string[]; // Changed from userId/userIds to just userIds for clarity
-}): Promise<Article[]> {
+export async function getAllArticles(
+	// Corrected signature: Parameter is non-optional but has a default value
+	options: {
+		limit?: number;
+		skip?: number;
+		isRead?: boolean;
+		favorite?: boolean;
+		tag?: string;
+		sortBy?: "savedAt" | "title" | "readAt" | "version";
+		sortDirection?: "asc" | "desc";
+		userIds?: string[];
+		includeDeleted?: boolean;
+	} = {},
+): Promise<Article[]> {
 	return executeWithRetry(async () => {
 		try {
 			console.log("Getting all articles with options:", options);
@@ -623,7 +551,7 @@ export async function getAllArticles(options?: {
 				`Retrieved ${articles.length} total articles. Applying filters...`,
 			);
 
-			// --- In-Memory Filtering --- (Now 'articles' is guaranteed Article[])
+			// --- In-Memory Filtering ---
 			// User ID filter
 			if (options?.userIds && options.userIds.length > 0) {
 				const userIdsSet = new Set(options.userIds);
@@ -635,6 +563,18 @@ export async function getAllArticles(options?: {
 					`After userId filter (${options.userIds.join(
 						", ",
 					)}): ${articles.length} articles`,
+				);
+			}
+
+			// Filter out soft-deleted articles unless requested
+			if (!options.includeDeleted) {
+				articles = articles.filter((doc) => !doc.deletedAt);
+				console.log(
+					`After includeDeleted filter (false): ${articles.length} articles`,
+				);
+			} else {
+				console.log(
+					`Skipping includeDeleted filter (true): ${articles.length} articles remain`,
 				);
 			}
 

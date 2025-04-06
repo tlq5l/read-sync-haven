@@ -1,12 +1,23 @@
 import { useToast } from "@/hooks/use-toast";
-import { fetchCloudItems } from "@/services/cloudSync"; // Removed unused CloudSyncStatus type
-import { type Article, bulkSaveArticles, getAllArticles } from "@/services/db";
+import {
+	deleteItemFromCloud,
+	fetchCloudItems,
+	saveItemToCloud,
+} from "@/services/cloudSync";
+import {
+	type Article,
+	type QueuedOperation,
+	articlesDb,
+	bulkSaveArticles,
+	getAllArticles,
+	deleteArticle as localSoftDeleteArticle,
+	operationsQueueDb,
+} from "@/services/db";
 import { useAuth, useUser } from "@clerk/clerk-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-// --- Helper Functions ---
+// --- Helper Functions (unchanged) ---
 
-// Deduplicates articles based on _id, keeping the one with the latest savedAt timestamp.
 const deduplicateArticlesById = (articlesToDedup: Article[]): Article[] => {
 	const articleMap = new Map<string, Article>();
 	for (const article of articlesToDedup) {
@@ -24,476 +35,574 @@ const deduplicateArticlesById = (articlesToDedup: Article[]): Article[] => {
 	return Array.from(articleMap.values());
 };
 
-// Deduplicates articles based on URL, keeping the one with the latest savedAt timestamp.
-const deduplicateArticlesByUrl = (articlesToDedup: Article[]): Article[] => {
-	const articlesByUrl = new Map<string, Article>();
-	for (const article of articlesToDedup) {
-		if (!article.url) {
-			console.warn("Deduplicating article without a URL:", article);
-			continue;
-		}
-		// Normalize URL for comparison (lowercase, trim, remove trailing slash)
-		const normalizedUrl = article.url.toLowerCase().trim().replace(/\/$/, "");
-		const existingArticle = articlesByUrl.get(normalizedUrl);
-		const currentSavedAt = article.savedAt ?? 0;
-		const existingSavedAt = existingArticle?.savedAt ?? 0;
-		if (!existingArticle || currentSavedAt > existingSavedAt) {
-			articlesByUrl.set(normalizedUrl, article);
-		}
-	}
-	return Array.from(articlesByUrl.values());
-};
-
+// Removed deduplicateArticlesByUrl function from HEAD as it's not used in the newer sync logic.
 // Loads articles from the local cache (PouchDB)
 async function _loadArticlesFromCache(
 	isMounted: boolean,
 	isSignedIn: boolean | null | undefined,
 	userId: string | null | undefined,
 	setArticles: React.Dispatch<React.SetStateAction<Article[]>>,
-	setIsLoading: React.Dispatch<React.SetStateAction<boolean>>,
-	setIsRefreshing: React.Dispatch<React.SetStateAction<boolean>>,
 ): Promise<boolean> {
 	if (!isSignedIn || !userId) return false;
-
 	try {
-		console.log(
-			`Sync Hook: Attempting to load articles from cache for user ${userId}...`,
-		);
+		console.log(`Cache Load: User ${userId}`);
 		const cachedArticles = await getAllArticles({ userIds: [userId] });
-
-		if (isMounted && cachedArticles && cachedArticles.length > 0) {
-			console.log(
-				`Sync Hook: Loaded ${cachedArticles.length} articles from cache.`,
-			);
+		if (isMounted && cachedArticles?.length > 0) {
+			console.log(`Cache Load: Found ${cachedArticles.length} articles.`);
 			const dedupedArticles = deduplicateArticlesById(cachedArticles);
-			if (dedupedArticles.length < cachedArticles.length) {
-				console.log(
-					`Sync Hook: Removed ${cachedArticles.length - dedupedArticles.length} duplicate articles from cache.`,
-				);
-			}
 			const sortedArticles = [...dedupedArticles].sort(
 				(a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0),
 			);
 			setArticles(sortedArticles);
-			setIsLoading(false);
-			setIsRefreshing(true); // Start background refresh
-			return true; // Loaded from cache
+			return true;
 		}
-		if (isMounted) {
-			console.log(
-				"Sync Hook: No articles found in cache or component unmounted.",
-			);
-			setIsLoading(true); // Need to load from cloud
-			setIsRefreshing(false);
-			setArticles([]);
-		}
+		if (isMounted) setArticles([]);
 	} catch (cacheErr) {
-		console.error("Sync Hook: Error loading articles from cache:", cacheErr);
-		if (isMounted) {
-			setIsLoading(true); // Need to try cloud
-			setIsRefreshing(false);
-			setArticles([]);
-		}
+		console.error("Cache Load Error:", cacheErr);
+		if (isMounted) setArticles([]);
 	}
-	return false; // Not loaded from cache
+	return false;
 }
 
-// Performs synchronization with the cloud
-async function _performCloudSync(
-	isMounted: boolean,
-	loadedFromCache: boolean,
-	isSignedIn: boolean | null | undefined,
-	userId: string | null | undefined,
-	getToken: () => Promise<string | null>,
-	user:
-		| { primaryEmailAddress?: { emailAddress?: string | null } | null }
-		| null
-		| undefined,
-	toast: (props: any) => void, // Consider using a more specific type if available from useToast
-	setArticles: React.Dispatch<React.SetStateAction<Article[]>>,
-	setIsLoading: React.Dispatch<React.SetStateAction<boolean>>,
-	setIsRefreshing: React.Dispatch<React.SetStateAction<boolean>>,
-	setError: React.Dispatch<React.SetStateAction<Error | null>>,
-	fetchLockRef: React.MutableRefObject<boolean>, // Pass ref to manage lock
-) {
-	if (!isSignedIn || !userId) return;
+async function _processOfflineQueue(token: string): Promise<{
+	processedDeletes: Set<string>;
+	processedUpdates: Set<string>;
+	failedOps: number;
+}> {
+	console.log("Queue Processing: Starting...");
+	let failedOps = 0;
+	const processedDeletes = new Set<string>();
+	const processedUpdates = new Set<string>();
 
-	if (!loadedFromCache && isMounted) {
-		setIsLoading(true);
-		setIsRefreshing(false);
+	try {
+		const queueResult = await operationsQueueDb.allDocs<QueuedOperation>({
+			include_docs: true,
+			limit: 50,
+		});
+
+		if (queueResult.rows.length === 0) {
+			console.log("Queue Processing: Empty.");
+			return { processedDeletes, processedUpdates, failedOps };
+		}
+		console.log(`Queue Processing: Found ${queueResult.rows.length} items.`);
+
+		const opsToRemove: QueuedOperation[] = [];
+		const opsToUpdate: QueuedOperation[] = [];
+
+		for (const row of queueResult.rows) {
+			if (!row.doc) continue;
+			const op = row.doc;
+			let success = false;
+			try {
+				if (op.type === "delete") {
+					const deleteStatus = await deleteItemFromCloud(op.docId, token);
+					if (deleteStatus === "success" || deleteStatus === "not_found") {
+						success = true;
+						processedDeletes.add(op.docId);
+					} else {
+						console.warn(
+							`Queue Delete Failed: ${op.docId}, Status: ${deleteStatus}`,
+						);
+					}
+				} else if (op.type === "update" && op.data) {
+					const latestLocal = await articlesDb.get(op.docId).catch(() => null);
+					if (latestLocal && !latestLocal.deletedAt) {
+						const updateStatus = await saveItemToCloud(latestLocal, token);
+						if (updateStatus === "success") {
+							success = true;
+							processedUpdates.add(op.docId);
+						} else {
+							console.warn(
+								`Queue Update Failed: ${op.docId}, Status: ${updateStatus}`,
+							);
+						}
+					} else {
+						success = true; /* Skip update, remove op */
+					}
+				}
+
+				if (success) {
+					opsToRemove.push(op);
+				} else {
+					op.retryCount = (op.retryCount || 0) + 1;
+					if (op.retryCount <= 5) opsToUpdate.push(op);
+					else {
+						opsToRemove.push(op);
+						failedOps++;
+						console.error(`Queue Max Retries: ${op.type} ${op.docId}`);
+					}
+				}
+			} catch (opError) {
+				console.error(`Queue Item Error ${op._id}:`, opError);
+				failedOps++;
+				op.retryCount = (op.retryCount || 0) + 1;
+				if (op.retryCount <= 5) opsToUpdate.push(op);
+				else {
+					opsToRemove.push(op);
+					console.error(`Queue Max Retries (Error): ${op.type} ${op.docId}`);
+				}
+			}
+		}
+		if (opsToRemove.length > 0)
+			await operationsQueueDb.bulkDocs(
+				opsToRemove.map((op) => ({ ...op, _deleted: true })),
+			);
+		if (opsToUpdate.length > 0) await operationsQueueDb.bulkDocs(opsToUpdate);
+	} catch (queueError) {
+		console.error("Queue Access Error:", queueError);
+		failedOps = -1;
+	}
+	console.log(
+		`Queue Processing Finished. Failed ops: ${failedOps >= 0 ? failedOps : "N/A"}.`,
+	);
+	return { processedDeletes, processedUpdates, failedOps };
+}
+
+// _performCloudSync now only manages isRefreshing state
+async function _performCloudSync(
+	authResult: ReturnType<typeof useAuth>,
+	userResult: ReturnType<typeof useUser>,
+	isMountedRef: React.MutableRefObject<boolean>,
+	toast: (props: any) => void,
+	setArticles: React.Dispatch<React.SetStateAction<Article[]>>,
+	setIsRefreshing: React.Dispatch<React.SetStateAction<boolean>>, // Changed: No setIsLoading
+	setError: React.Dispatch<React.SetStateAction<Error | null>>,
+	fetchLockRef: React.MutableRefObject<boolean>,
+	hidingArticleIds: Set<string>,
+) {
+	const userId = authResult.userId;
+	// Declare loadedFromCache here
+	let loadedFromCache = false;
+
+	if (!authResult.isSignedIn || !userId) {
+		console.log("Sync: Skipping - Not signed in.");
+		if (isMountedRef.current) setIsRefreshing(false); // Ensure refreshing is false if skipped
+		return;
+	}
+
+	if (fetchLockRef.current) {
+		console.log("Sync: Already in progress, skipping.");
+		return;
+	}
+	fetchLockRef.current = true;
+
+	console.log("Sync: Starting...");
+	if (isMountedRef.current) {
+		setIsRefreshing(true); // Set refreshing true at the start
+		setError(null);
 	}
 
 	let syncTimeoutId: NodeJS.Timeout | null = null;
-	let syncInProgress = true;
+	const syncPromise = new Promise<void>((resolve, reject) => {
+		// Wrap async logic in an IIAFE
+		(async () => {
+			// Determine loadedFromCache status first inside the main try block
+			loadedFromCache = await _loadArticlesFromCache(
+				isMountedRef.current,
+				authResult.isSignedIn,
+				userId,
+				() => {},
+			); // Dummy setter
 
-	// Setup timeout for the sync operation
-	syncTimeoutId = setTimeout(() => {
-		if (isMounted && syncInProgress) {
-			console.warn("Sync Hook: Cloud sync timed out");
-			setIsRefreshing(false);
-			fetchLockRef.current = false; // Release lock on timeout
-			const timeoutError = new Error(
-				"Syncing articles timed out. Displaying cached data.",
-			);
-			setError(timeoutError);
-			toast({
-				title: "Sync Timeout",
-				description: timeoutError.message,
-				variant: "default",
-			});
-		}
-	}, 15000); // 15 second timeout
-
-	try {
-		console.log("Sync Hook: Starting sync with cloud...");
-		const token = await getToken();
-		const userEmail = user?.primaryEmailAddress?.emailAddress;
-
-		if (!token)
-			throw new Error("Could not retrieve authentication token for sync.");
-
-		const fetchedArticles = await fetchCloudItems(token, userEmail);
-		syncInProgress = false; // Mark sync as complete
-		if (syncTimeoutId) clearTimeout(syncTimeoutId);
-
-		console.log(
-			`Sync Hook: Synced ${fetchedArticles.length} articles from cloud for user ${userId} / ${userEmail}`,
-		);
-
-		// Filter out articles with missing essential fields
-		const completeArticles = fetchedArticles.filter((article) => {
-			const hasEssentialFields =
-				article.title && article.url && article.content;
-			if (!hasEssentialFields)
-				console.warn(
-					`Sync Hook: Skipping save for incomplete article ${article._id}`,
-				);
-			return hasEssentialFields;
-		});
-
-		// Deduplicate articles by URL to prevent duplicate content
-		const dedupedArticles = deduplicateArticlesByUrl(completeArticles);
-		if (dedupedArticles.length < completeArticles.length) {
-			console.log(
-				`Sync Hook: Removed ${completeArticles.length - dedupedArticles.length} duplicate articles by URL during cloud sync.`,
-			);
-		}
-
-		const articlesToBulkSave = dedupedArticles.map((article) => {
-			const articleToSave = { ...article, userId };
-			if (articleToSave.type === "epub") {
-				if (
-					!articleToSave.fileData &&
-					articleToSave.content &&
-					articleToSave.content.length > 100
-				) {
-					console.warn(
-						`Sync Hook: Migrating EPUB ${articleToSave._id} from content to fileData during bulk sync.`,
-					);
-					articleToSave.fileData = articleToSave.content;
-					articleToSave.content = "EPUB content migrated from content field.";
-				} else if (articleToSave.fileData) {
-					articleToSave.content = "EPUB content is stored in fileData.";
-				} else {
-					console.warn(
-						`Sync Hook: EPUB ${articleToSave._id} from cloud is missing fileData.`,
-					);
-				}
-			}
-			return articleToSave;
-		});
-
-		if (articlesToBulkSave.length > 0) {
-			console.log(
-				`Sync Hook: Attempting to bulk save/update ${articlesToBulkSave.length} synced articles locally...`,
-			);
+			// Kept the reconciliation logic from backup-staging-local below
 			try {
-				const bulkResponse = await bulkSaveArticles(articlesToBulkSave);
-				console.log("Sync Hook: Bulk save operation completed.");
-				const successfulOpsCount = bulkResponse.filter(
-					(res): res is PouchDB.Core.Response => "ok" in res && res.ok,
-				).length;
-				const failedOpsCount = bulkResponse.length - successfulOpsCount;
-				if (failedOpsCount > 0)
-					console.warn(
-						`Sync Hook: Failed to bulk save/update ${failedOpsCount} articles.`,
-						bulkResponse.filter(
-							(res): res is PouchDB.Core.Error => "error" in res && !!res.error,
+				const token = await authResult.getToken();
+				const userEmail = userResult.user?.primaryEmailAddress?.emailAddress;
+
+				if (!token) {
+					throw new Error("Authentication token missing, cannot sync.");
+				}
+
+				// Process Queue
+				const { processedDeletes, processedUpdates, failedOps } =
+					await _processOfflineQueue(token);
+				if (failedOps < 0)
+					toast({
+						title: "Sync Warning",
+						description: "Error processing offline changes.",
+					});
+
+				// Fetch States
+				console.log("Sync: Fetching local & cloud articles...");
+				const [allLocalDocs, cloudArticlesRaw] = await Promise.all([
+					getAllArticles({ userIds: [userId], includeDeleted: true }),
+					fetchCloudItems(token, userEmail),
+				]);
+				const localArticlesMap = new Map(
+					allLocalDocs.map((doc) => [doc._id, doc]),
+				);
+				const cloudArticles = cloudArticlesRaw.map((a) => ({
+					...a,
+					userId: a.userId ?? userId,
+					version: a.version || 1,
+				}));
+				const cloudArticlesMap = new Map(
+					cloudArticles.map((doc) => [doc._id, doc]),
+				);
+				console.log(
+					`Sync: Fetched ${localArticlesMap.size} local, ${cloudArticlesMap.size} cloud.`,
+				);
+
+				// Reconcile
+				console.log("Sync: Reconciling...");
+				const toCreateLocally: Article[] = [];
+				const toUpdateLocally: Article[] = [];
+				const toSoftDeleteLocally: string[] = [];
+				const cloudDeletesToHardDeleteLocally: Article[] = [];
+				const toUpdateCloudQueue: QueuedOperation[] = [];
+
+				const isValidCloudArticle = (
+					article: Article | null | undefined,
+				): article is Article => {
+					if (
+						!article?._id ||
+						!article.title ||
+						!article.url ||
+						!article.content
+					) {
+						console.warn(
+							`Sync: Invalid cloud data for ID: ${article?._id || "UNKNOWN"}`,
+							article,
+						);
+						return false;
+					}
+					return true;
+				};
+
+				for (const [cloudId, cloudArticle] of cloudArticlesMap.entries()) {
+					const localArticle = localArticlesMap.get(cloudId);
+					if (!localArticle) {
+						// Cloud Create
+						if (isValidCloudArticle(cloudArticle))
+							toCreateLocally.push(cloudArticle);
+					} else {
+						// Exists locally
+						const localV = localArticle.version || 0;
+						const cloudV = cloudArticle.version || 0;
+						if (localArticle.deletedAt) {
+							// Locally deleted
+							if (cloudV > localV) {
+								// Cloud Undelete/Update
+								if (isValidCloudArticle(cloudArticle))
+									toUpdateLocally.push({
+										...cloudArticle,
+										_rev: localArticle._rev,
+									});
+							} else {
+								// Local delete wins, ensure cloud delete (if not queued)
+								if (!processedDeletes.has(cloudId)) {
+									console.log(
+										`Sync: Re-attempting cloud delete for ${cloudId}`,
+									);
+									const delStatus = await deleteItemFromCloud(
+										cloudId,
+										token,
+									).catch((e) => {
+										console.error(e);
+										return "error";
+									});
+									if (delStatus === "success" || delStatus === "not_found")
+										cloudDeletesToHardDeleteLocally.push(localArticle);
+								} else {
+									cloudDeletesToHardDeleteLocally.push(localArticle);
+								} // Mark for hard delete
+							}
+						} else {
+							// Exists locally, not deleted
+							if (cloudV > localV) {
+								// Cloud Update
+								if (isValidCloudArticle(cloudArticle))
+									toUpdateLocally.push({
+										...cloudArticle,
+										_rev: localArticle._rev,
+									});
+							} else if (localV > cloudV && !processedUpdates.has(cloudId)) {
+								// Local Update
+								console.log(`Sync: Queuing local update for ${cloudId}`); // Use cloudId
+								toUpdateCloudQueue.push({
+									_id: `queue_update_${cloudId}_${Date.now()}`,
+									type: "update",
+									docId: cloudId,
+									timestamp: Date.now(),
+									retryCount: 0,
+									data: localArticle,
+								}); // Use cloudId
+							} // Else versions match, do nothing
+						}
+					}
+					localArticlesMap.delete(cloudId); // Remove processed entry
+				}
+
+				for (const [localId, localArticle] of localArticlesMap.entries()) {
+					// Remaining local docs
+					if (localArticle.deletedAt) {
+						// Previously soft-deleted
+						if (processedDeletes.has(localId))
+							cloudDeletesToHardDeleteLocally.push(localArticle); // Ensure hard delete
+					} else {
+						// Cloud deleted this item
+						console.log(
+							`Sync: Cloud deleted ${localId}. Soft deleting locally.`,
+						);
+						toSoftDeleteLocally.push(localId);
+					}
+				}
+
+				// Apply Changes
+				console.log(
+					`Sync: Applying changes - Create: ${toCreateLocally.length}, Update: ${toUpdateLocally.length}, SoftDel: ${toSoftDeleteLocally.length}, HardDel: ${cloudDeletesToHardDeleteLocally.length}, QueueCloud: ${toUpdateCloudQueue.length}`,
+				);
+				const saveOps = [...toCreateLocally, ...toUpdateLocally];
+				const hardDeleteOps = cloudDeletesToHardDeleteLocally.map((doc) => ({
+					_id: doc._id,
+					_rev: doc._rev,
+					_deleted: true,
+				}));
+				const localOpsPromises = [];
+				if (saveOps.length > 0)
+					localOpsPromises.push(
+						bulkSaveArticles(saveOps).catch((err) =>
+							console.error("Local Save Error:", err),
 						),
 					);
-				if (successfulOpsCount > 0)
-					console.log(
-						`Sync Hook: Successfully saved/updated ${successfulOpsCount} articles via bulk operation.`,
+				if (hardDeleteOps.length > 0)
+					localOpsPromises.push(
+						articlesDb
+							.bulkDocs(hardDeleteOps as any[])
+							.catch((err) => console.error("Local Hard Delete Error:", err)),
 					);
-			} catch (bulkErr) {
-				console.error(
-					"Sync Hook: Critical error during bulk save operation:",
-					bulkErr,
-				);
+				if (toSoftDeleteLocally.length > 0)
+					localOpsPromises.push(
+						...toSoftDeleteLocally.map((id) =>
+							localSoftDeleteArticle(id).catch((err) =>
+								console.error(`Local Soft Delete Error ${id}:`, err),
+							),
+						),
+					);
+				if (toUpdateCloudQueue.length > 0)
+					localOpsPromises.push(
+						operationsQueueDb
+							.bulkDocs(toUpdateCloudQueue)
+							.catch((err) => console.error("Queue Update Error:", err)),
+					);
+
+				await Promise.all(localOpsPromises);
+
+				// Update UI State only if mounted
+				if (isMountedRef.current) {
+					console.log("Sync: Refetching final state for UI...");
+					const finalLocalArticles = await getAllArticles({
+						userIds: [userId],
+					});
+					const articlesToSet = finalLocalArticles.filter(
+						(doc) => !hidingArticleIds.has(doc._id),
+					);
+					setArticles(articlesToSet);
+					setError(null); // Clear error on success
+				}
+				console.log("Sync: Reconciliation complete.");
+				resolve();
+			} catch (syncErr) {
+				console.error("Sync: Top-level error:", syncErr);
+				if (isMountedRef.current) {
+					const error =
+						syncErr instanceof Error
+							? syncErr
+							: new Error("Failed to sync articles");
+					// Don't modify articles state here on error, keep potentially cached data
+					setError(error); // Set error state
+					toast({
+						title: "Cloud Sync Failed",
+						description: `${error.message}. Displaying local data if available.`,
+						variant: "destructive",
+					});
+				}
+				reject(syncErr);
 			}
+		})().catch(reject); // Catch potential errors from the IIAFE itself and reject the promise
+	});
+
+	// Timeout handling
+	syncTimeoutId = setTimeout(() => {
+		if (isMountedRef.current && fetchLockRef.current) {
+			// Check lock too
+			console.warn("Sync: Timed out.");
+			fetchLockRef.current = false; // Release lock on timeout
+			const timeoutError = new Error("Syncing articles timed out.");
+			if (!loadedFromCache)
+				setError(timeoutError); // Only set error if initial load timed out
+			else
+				toast({
+					title: "Sync Timeout",
+					description: timeoutError.message,
+					variant: "default",
+				});
+			// Ensure loading/refreshing are false on timeout
+			setIsRefreshing(false); // Only manage refreshing state
 		}
+	}, 30000);
 
-		console.log(
-			"Sync Hook: Refetching all local articles after cloud sync and bulk save...",
-		);
-		const allLocalArticles = await getAllArticles({ userIds: [userId] });
-		console.log(
-			`Sync Hook: Fetched ${allLocalArticles.length} articles from local DB after sync.`,
-		);
-
-		const dedupedArticlesAfterSync = deduplicateArticlesById(allLocalArticles);
-		if (dedupedArticlesAfterSync.length < allLocalArticles.length) {
-			console.log(
-				`Sync Hook: Removed ${allLocalArticles.length - dedupedArticlesAfterSync.length} duplicate articles after refetch.`,
-			);
-		}
-
-		const sortedArticlesAfterSync = [...dedupedArticlesAfterSync].sort(
-			(a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0),
-		);
-
-		if (isMounted) {
-			setArticles(sortedArticlesAfterSync);
-			setError(null); // Clear error on successful sync
-		}
-	} catch (syncErr) {
-		syncInProgress = false; // Mark sync as complete on error too
-		if (syncTimeoutId) clearTimeout(syncTimeoutId);
-		console.error("Sync Hook: Failed to sync articles:", syncErr);
-
-		if (isMounted) {
-			const error =
-				syncErr instanceof Error
-					? syncErr
-					: new Error("Failed to sync articles");
-			if (!loadedFromCache) {
-				setError(error);
-				setArticles([]);
-			}
-			toast({
-				title: "Cloud Sync Failed",
-				description: `${error.message}. Displaying local data if available.`,
-				variant: "destructive",
-			});
-		}
+	// Final cleanup
+	try {
+		await syncPromise;
+	} catch (e) {
+		// Error already handled
 	} finally {
-		if (isMounted) {
-			setIsLoading(false);
-			setIsRefreshing(false);
+		if (syncTimeoutId) clearTimeout(syncTimeoutId);
+		if (isMountedRef.current) {
+			setIsRefreshing(false); // Ensure refreshing is false
 		}
-		// Lock is released within the main effect or refresh function that calls this helper
+		fetchLockRef.current = false; // Ensure lock is released
+		console.log("Sync: Process finished.");
 	}
 }
 
 // --- Main Hook ---
-
-export function useArticleSync(isInitialized: boolean) {
+export function useArticleSync(
+	isInitialized: boolean,
+	hidingArticleIds: Set<string>,
+) {
 	const [articles, setArticles] = useState<Article[]>([]);
-	const [isLoading, setIsLoading] = useState<boolean>(true);
-	const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+	const [isLoading, setIsLoading] = useState<boolean>(true); // Manages initial load state
+	const [isRefreshing, setIsRefreshing] = useState<boolean>(false); // Manages sync/refresh state
 	const [error, setError] = useState<Error | null>(null);
 	const fetchLockRef = useRef<boolean>(false);
+	const isMountedRef = useRef<boolean>(false);
 	const { toast } = useToast();
-	const { userId, isSignedIn, isLoaded, getToken } = useAuth();
-	const { user } = useUser();
+	const auth = useAuth();
+	const userResult = useUser();
 
-	// --- Internal Core Logic Functions (Wrapped in useCallback) ---
-
-	const loadArticlesFromCache = useCallback(
-		async (isMounted: boolean): Promise<boolean> => {
-			// Call the standalone helper function
-			return _loadArticlesFromCache(
-				isMounted,
-				isSignedIn,
-				userId,
-				setArticles,
-				setIsLoading,
-				setIsRefreshing,
-			);
-		},
-		[isSignedIn, userId], // Dependencies for the useCallback wrapper
-	);
-
-	const performCloudSync = useCallback(
-		async (isMounted: boolean, loadedFromCache: boolean) => {
-			// Call the standalone helper function
-			await _performCloudSync(
-				isMounted,
-				loadedFromCache,
-				isSignedIn,
-				userId,
-				getToken,
-				user,
-				toast,
-				setArticles,
-				setIsLoading,
-				setIsRefreshing,
-				setError,
-				fetchLockRef, // Pass the ref
-			);
-		},
-		[isSignedIn, userId, getToken, user, toast], // Dependencies for the useCallback wrapper
-	);
-
-	// --- Main Load and Sync Effect ---
+	// Track mount status
 	useEffect(() => {
-		let isMounted = true;
+		isMountedRef.current = true;
+		return () => {
+			isMountedRef.current = false;
+		};
+	}, []);
 
-		const loadData = async () => {
-			if (!isInitialized || !isLoaded) {
-				if (!isInitialized) setIsLoading(true);
-				if (!isLoaded) setIsLoading(true);
-				setArticles([]);
-				setIsRefreshing(false);
-				setError(null);
-				return;
-			}
-
-			if (fetchLockRef.current) {
-				console.log("Sync Hook: Load/Sync already in progress, skipping");
-				return;
-			}
-
-			fetchLockRef.current = true;
-			if (!isRefreshing) {
-				setError(null);
-			}
-
-			try {
-				const loadedFromCache = await loadArticlesFromCache(isMounted);
-				if (isSignedIn && userId) {
-					await performCloudSync(isMounted, loadedFromCache);
-				} else if (isMounted) {
+	// --- Initial Load Effect ---
+	useEffect(() => {
+		let didUnmount = false;
+		const loadInitialData = async () => {
+			if (!isInitialized || !auth.isLoaded) {
+				// If not ready, ensure loading state is true and reset others
+				if (!didUnmount) {
+					setIsLoading(true);
 					setArticles([]);
-					setIsLoading(false);
 					setIsRefreshing(false);
 					setError(null);
 				}
-			} catch (err) {
-				console.error("Sync Hook: Unexpected error during loadData:", err);
-				if (isMounted) {
-					setError(
-						err instanceof Error
-							? err
-							: new Error("An unexpected error occurred"),
-					);
-					setIsLoading(false);
-					setIsRefreshing(false);
-				}
-			} finally {
-				if (isMounted) {
-					setIsLoading(false);
-					// isRefreshing is handled within performCloudSync
-				}
-				fetchLockRef.current = false; // Release lock
+				return;
+			}
+
+			// Only proceed if currently in the loading state to avoid re-triggering
+			if (!isLoading) {
+				console.log(
+					"Initial Load Effect: Skipping cache load, not in initial loading state.",
+				);
+				return;
+			}
+
+			console.log("Initial Load Effect: Triggering cache load...");
+			await _loadArticlesFromCache(
+				!didUnmount, // Pass !didUnmount instead of isMountedRef.current
+				auth.isSignedIn,
+				auth.userId,
+				setArticles,
+			);
+
+			// Set loading false *after* cache load attempt completes
+			if (!didUnmount) {
+				console.log(
+					"Initial Load Effect: Cache load attempt finished. Setting loading state: false.",
+				);
+				setIsLoading(false);
 			}
 		};
 
-		loadData();
+		loadInitialData();
 
 		return () => {
-			isMounted = false;
+			didUnmount = true; // Cleanup flag
 		};
-	}, [
-		isInitialized,
-		isLoaded,
-		isSignedIn,
-		userId,
-		loadArticlesFromCache, // Now depends on the stable useCallback reference
-		performCloudSync, // Now depends on the stable useCallback reference
-		isRefreshing,
-	]);
+	}, [isInitialized, auth.isLoaded, auth.isSignedIn, auth.userId, isLoading]); // Rerun if init/auth status changes, added isLoading
 
-	// --- Refresh Function ---
-	const refreshArticles = useCallback(async () => {
-		let isMounted = true;
-		const cleanup = () => {
-			isMounted = false;
-		};
-
-		if (!isInitialized || !isLoaded) {
-			cleanup();
-			return articles;
-		}
-		if (!isSignedIn || !userId) {
+	// --- Sync Effect (Triggered by auth change AFTER initial load) ---
+	const [syncTrigger, setSyncTrigger] = useState(0);
+	useEffect(() => {
+		// Trigger sync only if initialized, auth loaded, and *not* in initial loading state
+		if (isInitialized && auth.isLoaded && !isLoading) {
 			console.log(
-				"Sync Hook: User not signed in, clearing articles on refresh.",
+				"Sync Trigger Effect: Auth state changed after load, triggering sync.",
 			);
-			setArticles([]);
-			setIsLoading(false);
-			setIsRefreshing(false);
-			setError(null);
-			cleanup();
-			return [];
+			setSyncTrigger((prev) => prev + 1);
 		}
-		if (fetchLockRef.current) {
-			console.log("Sync Hook: Refresh operation already in progress, skipping");
-			cleanup();
-			return articles;
-		}
+	}, [isInitialized, auth.isLoaded, isLoading]); // Re-run when these change *after* isLoading is false
 
-		console.log("Sync Hook: Manual refresh triggered.");
-		setIsRefreshing(true);
-		setError(null);
-		fetchLockRef.current = true;
-
-		try {
-			// Call the standalone sync function directly
-			await _performCloudSync(
-				isMounted,
-				true,
-				isSignedIn,
-				userId,
-				getToken,
-				user,
+	// Actual Syncing Logic Effect
+	useEffect(() => {
+		// Run only when triggered and component is mounted
+		if (syncTrigger > 0 && isMountedRef.current) {
+			console.log(`Sync Effect: Performing sync (Trigger: ${syncTrigger})`);
+			_performCloudSync(
+				auth,
+				userResult,
+				isMountedRef,
 				toast,
 				setArticles,
-				setIsLoading,
+				// Removed setIsLoading (now managed by Initial Load Effect)
 				setIsRefreshing,
 				setError,
 				fetchLockRef,
+				hidingArticleIds,
 			);
-			cleanup();
-			return articles; // Return state before async call, UI updates via state setters
-		} catch (err) {
-			console.error("Sync Hook: Error during refreshArticles wrapper:", err);
-			cleanup();
-			return articles;
-		} finally {
-			fetchLockRef.current = false;
-			if (!isMounted) cleanup();
 		}
-	}, [
-		isInitialized,
-		isLoaded,
-		isSignedIn,
-		userId,
-		getToken,
-		user,
-		toast,
-		articles, // Include articles for return value consistency
-		// No need to depend on performCloudSync useCallback wrapper here, call helper directly
-	]);
+	}, [syncTrigger, auth, userResult, toast, hidingArticleIds]); // Dependencies are auth results + props/stable functions
+
+	// --- Refresh Function ---
+	const refreshArticles = useCallback(async () => {
+		console.log("Refresh Triggered");
+		if (!isInitialized || !auth.isLoaded || !auth.isSignedIn || !auth.userId) {
+			console.log("Refresh Skipped: Not ready");
+			return articles;
+		}
+		// Directly call the sync logic
+		await _performCloudSync(
+			auth,
+			userResult,
+			isMountedRef,
+			toast,
+			setArticles,
+			// Removed setIsLoading (now managed by Initial Load Effect)
+			setIsRefreshing,
+			setError,
+			fetchLockRef,
+			hidingArticleIds,
+		);
+		return articles; // Return current state, UI updates via setters
+	}, [isInitialized, auth, userResult, toast, articles, hidingArticleIds]); // Removed setIsLoading from deps
 
 	// --- Retry Function ---
 	const retryLoading = useCallback(() => {
-		if (fetchLockRef.current) {
-			console.log("Sync Hook: Retry operation already in progress, skipping");
-			return;
-		}
-		console.log("Sync Hook: Retry loading triggered.");
-		setIsLoading(true);
+		console.log("Retry Triggered");
+		if (fetchLockRef.current) return; // Don't retry if already syncing/refreshing
 		setError(null);
-		toast({ title: "Retrying", description: "Retrying to load articles..." });
-		refreshArticles(); // Call the refactored refresh function
-	}, [refreshArticles, toast]);
+		// Reset loading state and trigger initial load/sync sequence
+		setIsLoading(true); // Set loading true to re-trigger initial load effect
+	}, []); // Removed setIsLoading dependency
 
-	return {
-		articles,
-		isLoading,
-		isRefreshing,
-		error,
-		refreshArticles,
-		retryLoading,
-	};
+	// Memoize the returned object
+	const returnedValue = useMemo(
+		() => ({
+			articles,
+			isLoading,
+			isRefreshing,
+			error,
+			refreshArticles,
+			retryLoading,
+		}),
+		[articles, isLoading, isRefreshing, error, refreshArticles, retryLoading],
+	);
+
+	return returnedValue;
 }

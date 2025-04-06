@@ -5,11 +5,18 @@ export {
 	articlesDb,
 	highlightsDb,
 	initializeDatabase,
+	operationsQueueDb, // Added export
 	tagsDb,
 } from "./config";
 
 // --- Types ---
-export type { Article, ArticleCategory, Highlight, Tag } from "./types"; // Add ArticleCategory
+export type {
+	Article,
+	ArticleCategory,
+	Highlight,
+	QueuedOperation,
+	Tag,
+} from "./types"; // Added QueuedOperation export
 
 // --- Utilities ---
 export {
@@ -24,11 +31,14 @@ export {
 	deleteArticle,
 	getAllArticles,
 	getArticle,
-	removeDuplicateArticles,
+	// removeDuplicateArticles moved to ./duplicates export below
 	bulkSaveArticles,
 	saveArticle,
 	updateArticle,
 } from "./articles";
+
+// --- Duplicate Removal ---
+export { removeDuplicateArticles } from "./duplicates";
 
 // --- Highlight Operations ---
 export {

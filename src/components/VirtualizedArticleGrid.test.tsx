@@ -64,6 +64,7 @@ const mockArticles: Article[] = [
 		favorite: false,
 		tags: [],
 		type: "article",
+		version: 1, // Added version
 		// Removed createdAt, updatedAt
 	},
 	{
@@ -79,6 +80,7 @@ const mockArticles: Article[] = [
 		favorite: true,
 		tags: ["tag1"],
 		type: "article",
+		version: 1, // Added version
 		// Removed createdAt, updatedAt
 	},
 ];
@@ -147,6 +149,7 @@ describe("VirtualizedArticleGrid", () => {
 			// estimatedReadTime is optional and missing
 			// author is optional and missing
 			// publishedDate is optional and missing
+			version: 1, // Added version
 		};
 		render(
 			<VirtualizedArticleGrid articles={[articleWithMissingOptionalFields]} />,

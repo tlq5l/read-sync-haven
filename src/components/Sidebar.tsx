@@ -5,7 +5,8 @@ import {
 } from "@/components/ui/transition-group";
 import { useAnimation } from "@/context/AnimationContext";
 import { useArticles } from "@/context/ArticleContext";
-import { useTheme } from "@/context/ThemeContext";
+import { useKeyboard } from "@/context/KeyboardContext"; // Import useKeyboard
+// import { useTheme } from "@/context/ThemeContext"; // Removed as unused after theme toggle moved
 import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
 import type { ArticleCategory } from "@/services/db"; // Import ArticleCategory
@@ -22,29 +23,32 @@ import {
 	Library,
 	LogIn,
 	// MenuIcon, // Removed old icon
-	Moon,
+	// Moon, // Removed as unused after theme toggle moved
 	Newspaper, // Icon for Articles
 	// PanelLeftClose, // Removed old icon
 	// PanelLeftOpen, // Removed old icon
 	Plus,
 	Settings,
 	Shapes, // Icon for Other
-	SidebarClose, // New icon for sidebar collapse
-	SidebarOpen, // New icon for sidebar expand
-	Sun,
-	Video, // Icon for Videos
+	SidebarClose,
+	SidebarOpen,
+	// Sun,
+	Video,
 } from "lucide-react";
-import React, { useState } from "react"; // Add React default import, removed unused useEffect
+import React, { useState } from "react"; // Keep useState for isLibraryOpen
+import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
-	const [collapsed, setCollapsed] = useState(false);
-	const [isLibraryOpen, setIsLibraryOpen] = useState(true); // State for library collapse
+	// const [collapsed, setCollapsed] = useState(false); // Replaced with context state
+	const { isSidebarCollapsed: collapsed, toggleSidebar } = useKeyboard(); // Use context state and toggle
+	const [isLibraryOpen, setIsLibraryOpen] = useState(true);
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { setCurrentView, setSelectedCategory, filters } = useArticles(); // Add category filter state and setter
+	const { setCurrentView, setSelectedCategory, filters } = useArticles();
+	const { t } = useTranslation(); // Added translation hook
 	const currentCategory = filters.category; // Extract current category
-	const { theme, setTheme } = useTheme();
+	// const { theme, setTheme } = useTheme(); // Removed as unused after theme toggle moved
 	const { synchronizeAnimations } = useAnimation();
 	const { isSignedIn } = useAuth();
 	// const { user } = useUser(); // Removed as unused
@@ -81,14 +85,21 @@ export default function Sidebar() {
 	// const isViewActive = (view: "all" | "unread" | "favorites") =>
 	// 	currentView === view; // Removed unused function
 
-	const toggleTheme = () => {
-		setTheme(theme === "dark" ? "light" : "dark");
-	};
+	// const toggleTheme = () => { // Removed as unused after theme toggle moved
+	// 	setTheme(theme === "dark" ? "light" : "dark");
+	// };
 
-	const toggleCollapsed = () => {
-		// Use synchronizeAnimations to ensure smooth transitions
+	// const toggleCollapsed = () => { // Replaced with toggleSidebar from context
+	// 	// Use synchronizeAnimations to ensure smooth transitions
+	// 	synchronizeAnimations(() => {
+	// 		toggleSidebar(); // Call context function
+	// 	});
+	// };
+
+	// Need a wrapper to combine animation sync and context toggle
+	const handleToggleSidebar = () => {
 		synchronizeAnimations(() => {
-			setCollapsed(!collapsed);
+			toggleSidebar();
 		});
 	};
 
@@ -114,7 +125,7 @@ export default function Sidebar() {
 						className="text-xl font-bold transition-opacity duration-200 text-gray-900 dark:text-white" // Corrected: Single className with merged styles
 						// style={styles.header} // Style prop correctly removed
 					>
-						Read Sync Haven
+						{t("appTitle")}
 					</h1>
 				)}
 				<div
@@ -127,7 +138,7 @@ export default function Sidebar() {
 					<Button
 						variant="ghost"
 						size="icon"
-						onClick={toggleCollapsed}
+						onClick={handleToggleSidebar} // Use the new handler
 						className={cn(
 							"transition-transform duration-200",
 							// Removed conditional margin, parent div handles centering/alignment
@@ -167,44 +178,59 @@ export default function Sidebar() {
 						>
 							<Home size={20} />
 							{!collapsed && (
-								<span className="transition-opacity duration-200">Home</span>
+								<span className="transition-opacity duration-200">
+									{t("sidebar.home")}
+								</span>
 							)}
 						</Button>
 					</TransitionItem>
 
 					<TransitionItem showFrom="left" className="w-full">
 						{/* Library Button */}
-						{/* Collapsible Library Trigger */}
-						<Button
-							variant="ghost"
-							className={cn(
-								"w-full flex items-center gap-3 py-2 transition-all duration-200", // Original cn()
-								collapsed ? "justify-center" : "justify-start", // Original cn() arg
-								"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100", // Merged base styles
-							)}
-							onClick={() => {
-								if (!collapsed) {
-									setIsLibraryOpen(!isLibraryOpen); // Only toggle if not collapsed
-								}
-								setSelectedCategory(null); // Clear category filter
-								navigate("/inbox"); // Navigate to the main library view
-							}}
-							// style={styles.link} // Style prop correctly removed
-						>
-							{!collapsed && // Only show chevron when not collapsed
-								(isLibraryOpen ? (
-									<ChevronDown size={16} />
-								) : (
-									<ChevronRight size={16} />
-								))}
-							<Library size={20} className={cn(!collapsed && "ml-1")} />{" "}
-							{/* Adjust icon spacing only when not collapsed */}
+						{/* Collapsible Library Trigger - Restructured to separate chevron and main button */}
+						<div className="flex items-center w-full">
+							{/* Chevron Button - Only for toggling dropdown */}
 							{!collapsed && (
-								<span className="transition-opacity duration-200 font-medium">
-									Library
-								</span>
+								<Button
+									variant="ghost"
+									size="sm"
+									className="p-0 h-8 w-8 mr-1"
+									onClick={(e) => {
+										e.stopPropagation(); // Prevent event bubbling
+										setIsLibraryOpen(!isLibraryOpen);
+									}}
+								>
+									{isLibraryOpen ? (
+										<ChevronDown size={16} />
+									) : (
+										<ChevronRight size={16} />
+									)}
+								</Button>
 							)}
-						</Button>
+							{/* Main Library Button - Only for navigation */}
+							<Button
+								variant="ghost"
+								className={cn(
+									"flex items-center gap-3 py-2 transition-all duration-200", // Original cn()
+									collapsed
+										? "justify-center w-full"
+										: "justify-start flex-grow", // Adjusted width
+									"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100", // Merged base styles
+								)}
+								onClick={() => {
+									setSelectedCategory(null); // Clear category filter
+									navigate("/inbox"); // Navigate to the main library view
+								}}
+								// style={styles.link} // Style prop correctly removed
+							>
+								<Library size={20} />{" "}
+								{!collapsed && (
+									<span className="transition-opacity duration-200 font-medium">
+										{t("sidebar.library")}
+									</span>
+								)}
+							</Button>
+						</div>
 						{/* Collapsible Category List - Render directly below trigger if open */}
 						{isLibraryOpen && !collapsed && (
 							<div className="w-full pl-6 mt-1 space-y-1">
@@ -288,28 +314,12 @@ export default function Sidebar() {
 								<Settings size={20} />
 								{!collapsed && (
 									<span className="transition-opacity duration-200">
-										Settings
+										{t("settings.title")}
 									</span>
 								)}
 							</Link>
 						</Button>
-						{/* Theme Toggle Button */}
-						<Button
-							variant="ghost"
-							className={cn(
-								"w-full flex items-center gap-3 py-2 transition-all duration-200",
-								collapsed ? "justify-center" : "justify-start",
-								"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
-							)}
-							onClick={toggleTheme}
-						>
-							{theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
-							{!collapsed && (
-								<span className="transition-opacity duration-200">
-									{theme === "dark" ? "Dark Mode" : "Light Mode"}
-								</span>
-							)}
-						</Button>
+						{/* Theme Toggle Button - Removed, moved to Settings/Appearance */}
 						{/* Sign In Link (Conditional) */}
 						{!isSignedIn && (
 							<Button
@@ -332,7 +342,7 @@ export default function Sidebar() {
 									<LogIn size={20} />
 									{!collapsed && (
 										<span className="transition-opacity duration-200">
-											Sign In
+											{t("sidebar.signIn")}
 										</span>
 									)}
 								</Link>
@@ -353,7 +363,7 @@ export default function Sidebar() {
 							<Plus size={18} />
 							{!collapsed ? (
 								<span className="transition-opacity duration-200">
-									Add Content
+									{t("sidebar.addContent")}
 								</span>
 							) : null}
 						</Link>
