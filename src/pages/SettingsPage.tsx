@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ThemeToggle } from "@/components/ui/theme-toggle"; // Add import
 
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
@@ -234,6 +235,12 @@ export default function SettingsPage() {
 								<CardContent className="space-y-6">
 									{" "}
 									{/* Increased spacing */}
+									{/* Add Theme Toggle */}
+									<div className="flex items-center justify-between">
+										<Label htmlFor="theme-toggle">Theme</Label>
+										<ThemeToggle showLabel={false} />{" "}
+										{/* Add ThemeToggle component */}
+									</div>
 									{/* [Text Size Slider Removed] */}
 								</CardContent>
 							</Card>
