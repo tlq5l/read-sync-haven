@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "dark" | "light" | "system";
-export type TextSize = 1 | 2 | 3 | 4 | 5; // 5 levels, 3 is default
 
 type ThemeProviderProps = {
 	children: React.ReactNode;
@@ -12,15 +11,11 @@ type ThemeProviderProps = {
 type ThemeProviderState = {
 	theme: Theme;
 	setTheme: (theme: Theme) => void;
-	textSize: TextSize;
-	setTextSize: (size: TextSize) => void;
 };
 
 const initialState: ThemeProviderState = {
 	theme: "system",
 	setTheme: () => null,
-	textSize: 3, // Default text size
-	setTextSize: () => null,
 };
 
 const ThemeContext = createContext<ThemeProviderState>(initialState);
@@ -29,20 +24,10 @@ export function ThemeProvider({
 	children,
 	defaultTheme = "system",
 	storageKey = "bondwise-ui-theme", // Key for theme
-	textSizeStorageKey = "bondwise-ui-text-size", // Key for text size
-	defaultTextSize = 3, // Default text size value
 	...props
-}: ThemeProviderProps & {
-	textSizeStorageKey?: string;
-	defaultTextSize?: TextSize;
-}) {
+}: ThemeProviderProps) {
 	const [theme, setTheme] = useState<Theme>(
 		() => (localStorage.getItem(storageKey) as Theme) || defaultTheme,
-	);
-	const [textSize, setTextSizeState] = useState<TextSize>(
-		() =>
-			(Number(localStorage.getItem(textSizeStorageKey)) as TextSize) ||
-			defaultTextSize,
 	);
 
 	// Effect for Theme
@@ -63,27 +48,11 @@ export function ThemeProvider({
 		root.classList.add(theme);
 	}, [theme]);
 
-	// Effect for Text Size
-	useEffect(() => {
-		const root = window.document.documentElement;
-		// Remove previous size attributes if any (optional, but good practice)
-		for (let i = 1; i <= 5; i++) {
-			root.removeAttribute(`data-text-size-${i}`); // Example if using multiple attributes
-		}
-		// Set the current text size attribute
-		root.setAttribute("data-text-size", textSize.toString());
-	}, [textSize]);
-
 	const value = {
 		theme,
 		setTheme: (newTheme: Theme) => {
 			localStorage.setItem(storageKey, newTheme);
 			setTheme(newTheme);
-		},
-		textSize,
-		setTextSize: (size: TextSize) => {
-			localStorage.setItem(textSizeStorageKey, size.toString());
-			setTextSizeState(size);
 		},
 	};
 

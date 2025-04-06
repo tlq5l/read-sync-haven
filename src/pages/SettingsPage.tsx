@@ -5,11 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
 
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { TextSize } from "@/context/ThemeContext"; // Import TextSize type
 
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
@@ -38,7 +36,7 @@ import { Link } from "react-router-dom";
 
 export default function SettingsPage() {
 	const { toast } = useToast();
-	const { theme, textSize, setTextSize } = useTheme(); // Get theme, textSize, setTextSize
+	const { theme } = useTheme(); // Get theme
 	const [isExportingData, setIsExportingData] = useState(false);
 	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
 	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false); // Add state for metadata update button
@@ -236,32 +234,7 @@ export default function SettingsPage() {
 								<CardContent className="space-y-6">
 									{" "}
 									{/* Increased spacing */}
-									{/* Text Size Slider */}
-									<div className="space-y-3">
-										<Label htmlFor="text-size-slider">Text Size</Label>
-										<p className="text-sm text-muted-foreground">
-											Adjust the application's base text size.
-										</p>
-										<Slider
-											id="text-size-slider"
-											min={1}
-											max={5}
-											step={1}
-											value={[textSize]}
-											onValueChange={(value) =>
-												setTextSize(value[0] as TextSize)
-											}
-											// Removed fixed width className="w-[60%]"
-										/>
-										{/* Optional: Add labels for slider steps */}
-										<div className="flex justify-between text-xs text-muted-foreground pt-1">
-											{" "}
-											{/* Removed fixed width w-[60%] */}
-											<span>Smallest</span>
-											<span>Default</span>
-											<span>Largest</span>
-										</div>
-									</div>
+									{/* [Text Size Slider Removed] */}
 								</CardContent>
 							</Card>
 						</div>
