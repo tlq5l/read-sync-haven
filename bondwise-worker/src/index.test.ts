@@ -68,6 +68,7 @@ describe("Worker Integration Tests", () => {
 		favorite: false,
 		siteName: "Integration",
 		estimatedReadTime: 2,
+		content: "<h1>Integration Test Content</h1><p>More text.</p>", // Added content
 	};
 
 	beforeEach(async () => {
@@ -161,7 +162,7 @@ describe("Worker Integration Tests", () => {
 			const kvValue = await env.SAVED_ITEMS_KV.get(
 				createUserItemKey(testUserId, testArticleId),
 			);
-			expect(kvValue).toBe(JSON.stringify(testArticle));
+			expect(JSON.parse(kvValue ?? "{}")).toEqual(testArticle); // Compare parsed objects
 
 			// GET List
 			const getReq = new Request("http://worker/items");
@@ -174,7 +175,12 @@ describe("Worker Integration Tests", () => {
 
 		it("POST /items should return 400 for invalid data", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			const invalidArticle = { ...testArticle, title: undefined };
+			// Add content to satisfy validation, title is still undefined
+			const invalidArticle = {
+				...testArticle,
+				title: undefined,
+				content: "Some content",
+			};
 			const req = new Request("http://worker/items", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },

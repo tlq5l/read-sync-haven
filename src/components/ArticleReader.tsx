@@ -165,7 +165,7 @@ export default function ArticleReader() {
 			{/* Content Display Area */}
 			<ReaderContentDisplay
 				article={article}
-				contentRef={contentRef} // Pass ref for HTML scroll tracking
+				// contentRef is no longer passed as ReaderContentDisplay uses an internal ref
 				onTextExtracted={handleTextExtracted}
 			/>
 

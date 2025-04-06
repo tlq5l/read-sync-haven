@@ -121,49 +121,5 @@ describe("ThemeContext", () => {
 		expect(document.documentElement.classList.contains("light")).toBe(true);
 	});
 
-	// --- Text Size Tests ---
-
-	it("initializes with default text size 3", () => {
-		const { result } = renderHook(() => useTheme(), { wrapper: HookWrapper });
-		expect(result.current.textSize).toBe(3);
-		expect(document.documentElement.getAttribute("data-text-size")).toBe("3");
-	});
-
-	it("initializes with text size from localStorage", () => {
-		localStorageMock["bondwise-ui-text-size"] = "5";
-		const { result } = renderHook(() => useTheme(), { wrapper: HookWrapper });
-		expect(result.current.textSize).toBe(5);
-		expect(document.documentElement.getAttribute("data-text-size")).toBe("5");
-	});
-
-	it("updates text size and localStorage when setTextSize is called", () => {
-		const { result } = renderHook(() => useTheme(), { wrapper: HookWrapper });
-
-		act(() => {
-			result.current.setTextSize(1);
-		});
-
-		expect(result.current.textSize).toBe(1);
-		expect(localStorageMock["bondwise-ui-text-size"]).toBe("1");
-		expect(document.documentElement.getAttribute("data-text-size")).toBe("1");
-
-		act(() => {
-			result.current.setTextSize(4);
-		});
-
-		expect(result.current.textSize).toBe(4);
-		expect(localStorageMock["bondwise-ui-text-size"]).toBe("4");
-		expect(document.documentElement.getAttribute("data-text-size")).toBe("4");
-	});
-
-	it("handles invalid text size from localStorage by using default", () => {
-		localStorageMock["bondwise-ui-text-size"] = "invalid"; // or "0" or "6"
-		const { result } = renderHook(() => useTheme(), { wrapper: HookWrapper });
-		// The hook logic currently uses Number() which results in NaN for "invalid",
-		// then || defaultTextSize kicks in. For "0" or "6", it would initially set that,
-		// but the type safety should prevent invalid values later.
-		// Let's test the default fallback.
-		expect(result.current.textSize).toBe(3);
-		expect(document.documentElement.getAttribute("data-text-size")).toBe("3");
-	});
+	// --- Text Size Tests Removed (Feature Removed) ---
 });

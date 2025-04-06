@@ -12,12 +12,17 @@ import { renderHook } from "@testing-library/react-hooks";
 // Removed waitFor
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { server } from "../mocks/server"; // MSW server
+import {
+	MOCK_CHAT_RESPONSE, // Import constant
+	MOCK_CLERK_TOKEN, // Import constant
+	WORKER_BASE_URL, // Import constant
+} from "../mocks/constants"; // Import from new constants file
+import { server } from "../mocks/server";
 import {
 	QueryClientWrapper,
 	getTestQueryClient,
-} from "../test-utils/QueryClientWrapper"; // Import the wrapper
-import { useChat } from "./useChat"; // Removed unused ChatMessage type
+} from "../test-utils/QueryClientWrapper";
+import { useChat } from "./useChat";
 
 // Mock the useAuth hook from Clerk
 vi.mock("@clerk/clerk-react", () => ({
@@ -26,15 +31,12 @@ vi.mock("@clerk/clerk-react", () => ({
 
 // Mock console.log/error - Removed as they are unused
 // const mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
-// const mockConsoleError = vi
-// 	.spyOn(console, "error")
-// 	.mockImplementation(() => {});
+// const mockConsoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
-// Constants
-const MOCK_CLERK_TOKEN = "mock-clerk-jwt-token";
-const WORKER_CHAT_URL =
-	"https://bondwise-sync-api.vikione.workers.dev/api/chat";
-const MOCK_CHAT_RESPONSE = "This is a mock AI chat response.";
+// Constants - Use imported constants
+// const MOCK_CLERK_TOKEN = "mock-clerk-jwt-token"; // Replaced
+const WORKER_CHAT_URL = `${WORKER_BASE_URL}/api/chat`; // Use imported base URL
+// const MOCK_CHAT_RESPONSE = "This is a mock AI chat response."; // Replaced
 const MOCK_ARTICLE_CONTENT = "This is the article content for chat.";
 
 // Get the test query client instance
@@ -51,8 +53,8 @@ describe("useChat Hook", () => {
 		(useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
 			getToken: mockGetToken,
 			userId: "test-user-id",
-			isLoaded: true,
-			isSignedIn: true,
+			// Remove isLoaded and isSignedIn as they might not be strictly needed
+			// for these mutation tests and could potentially interfere.
 		});
 		mockGetToken.mockResolvedValue(MOCK_CLERK_TOKEN);
 		window.HTMLElement.prototype.scrollTo = vi.fn();
@@ -159,8 +161,10 @@ describe("useChat Hook", () => {
 	it("should handle unauthorized (401) error from worker", async () => {
 		server.use(
 			http.post(WORKER_CHAT_URL, () => {
+				// Directly return the 401 error without checking auth here
+				console.log("[MSW Override] Returning 401 for /api/chat");
 				return new HttpResponse(
-					JSON.stringify({ error: "Mock Chat Unauthorized" }),
+					JSON.stringify({ error: "Mock Chat Unauthorized" }), // Keep the intended error message
 					{ status: 401 },
 				);
 			}),
@@ -193,6 +197,8 @@ describe("useChat Hook", () => {
 	it("should handle server error (500) from worker", async () => {
 		server.use(
 			http.post(WORKER_CHAT_URL, () => {
+				// Directly return the 500 error
+				console.log("[MSW Override] Returning 500 for /api/chat");
 				return new HttpResponse(
 					JSON.stringify({ error: "Mock Server Error" }),
 					{ status: 500 },
@@ -227,6 +233,8 @@ describe("useChat Hook", () => {
 	it("should handle invalid JSON response from worker", async () => {
 		server.use(
 			http.post(WORKER_CHAT_URL, () => {
+				// Directly return invalid JSON
+				console.log("[MSW Override] Returning invalid JSON for /api/chat");
 				return new HttpResponse("<html>Invalid JSON</html>", { status: 200 });
 			}),
 		);
@@ -258,6 +266,10 @@ describe("useChat Hook", () => {
 	it("should handle response missing response field", async () => {
 		server.use(
 			http.post(WORKER_CHAT_URL, () => {
+				// Directly return response missing 'response' field
+				console.log(
+					"[MSW Override] Returning missing response field for /api/chat",
+				);
 				return HttpResponse.json({ status: "success", otherData: "abc" });
 			}),
 		);

@@ -11,6 +11,10 @@ import {
 import { renderHook } from "@testing-library/react-hooks";
 
 import type { Article } from "@/services/db";
+// Keep the i18n imports from backup-staging-local
+import i18n from "i18next"; // Import i18n
+import { I18nextProvider, initReactI18next } from "react-i18next"; // Import provider and init function
+// The @testing-library/react imports were already present above, so the ones from backup-staging-local are removed.
 import { BrowserRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import ArticleCard from "./ArticleCard";
@@ -38,12 +42,42 @@ vi.mock("@/hooks/use-synchronized-animation", () => ({
 	}),
 }));
 
+// Initialize i18next for testing
+i18n.use(initReactI18next).init({
+	lng: "en",
+	fallbackLng: "en",
+	// Minimal resources needed for the card component
+	resources: {
+		en: {
+			translation: {
+				articleCard: {
+					read: "Read",
+					unread: "Unread",
+					untitled: "Untitled",
+					noExcerpt: "No excerpt available",
+					unknownSource: "Unknown source",
+					minRead: "{{count}} min read",
+					pdfSource: "PDF Document",
+					epubSource: "EPUB Book",
+				},
+			},
+		},
+	},
+	interpolation: {
+		escapeValue: false, // React already does escaping
+	},
+});
+
 describe("ArticleCard", () => {
-	// Helper function to render the component with an article
+	// Helper function to render the component with an article and i18n provider
 	const renderCard = (article: Article) => {
 		render(
 			<BrowserRouter>
-				<ArticleCard article={article} />
+				<I18nextProvider i18n={i18n}>
+					{" "}
+					{/* Wrap with provider */}
+					<ArticleCard article={article} />
+				</I18nextProvider>
 			</BrowserRouter>,
 		);
 	};
@@ -63,6 +97,7 @@ describe("ArticleCard", () => {
 			type: "article",
 			siteName: "Example Website",
 			estimatedReadTime: 5,
+			version: 1,
 		};
 
 		renderCard(webArticle);
@@ -90,6 +125,7 @@ describe("ArticleCard", () => {
 			type: "pdf",
 			siteName: "PDF Document",
 			estimatedReadTime: 10,
+			version: 1,
 		};
 
 		renderCard(pdfArticle);
@@ -126,6 +162,7 @@ describe("ArticleCard", () => {
 			type: "epub",
 			siteName: "EPUB Book",
 			estimatedReadTime: 120,
+			version: 1,
 		};
 
 		renderCard(epubArticle);
@@ -160,13 +197,14 @@ describe("ArticleCard", () => {
 			favorite: false,
 			tags: [],
 			type: "article",
+			version: 1,
 		};
 
 		renderCard(articleWithMissingFields);
 
 		// Check for fallback text directly within the card
 		const card = screen.getByTestId("article-card");
-		expect(within(card).getByText("Unknown source")).toBeInTheDocument();
+		expect(within(card).getByText("Unknown source")).toBeInTheDocument(); // Expect rendered text
 		expect(within(card).getByText("? min read")).toBeInTheDocument();
 	});
 
@@ -185,6 +223,7 @@ describe("ArticleCard", () => {
 			type: "pdf",
 			// siteName intentionally missing
 			estimatedReadTime: 15,
+			version: 1,
 		};
 
 		renderCard(pdfWithoutSiteName);
@@ -202,9 +241,8 @@ describe("ArticleCard", () => {
 		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(
 			":scope > span:first-child",
 		);
-		expect(sourceSpan).toBeInTheDocument(); // Check if the span exists
-		expect(sourceSpan).toHaveTextContent("PDF Document"); // Check its content
-		// Also check the read time (this query seems fine)
+		expect(sourceSpan).toBeInTheDocument();
+		expect(sourceSpan).toHaveTextContent("PDF Document"); // Expect rendered text
 		expect(screen.getByText("15 min read")).toBeInTheDocument();
 	});
 
@@ -223,6 +261,7 @@ describe("ArticleCard", () => {
 			type: "epub",
 			// siteName intentionally missing
 			estimatedReadTime: 90,
+			version: 1,
 		};
 
 		renderCard(epubWithoutSiteName);
@@ -240,9 +279,8 @@ describe("ArticleCard", () => {
 		const sourceSpan = infoDiv.querySelector<HTMLSpanElement>(
 			":scope > span:first-child",
 		);
-		expect(sourceSpan).toBeInTheDocument(); // Check if the span exists
-		expect(sourceSpan).toHaveTextContent("EPUB Book"); // Check its content
-		// Also check the read time (this query seems fine)
+		expect(sourceSpan).toBeInTheDocument();
+		expect(sourceSpan).toHaveTextContent("EPUB Book"); // Expect rendered text
 		expect(screen.getByText("90 min read")).toBeInTheDocument();
 	});
 
@@ -261,6 +299,7 @@ describe("ArticleCard", () => {
 			tags: [],
 			type: "article",
 			siteName: "Style Site",
+			version: 1,
 		};
 		renderCard(webArticle);
 		const cardElement = screen
@@ -287,6 +326,7 @@ describe("ArticleCard", () => {
 			tags: [],
 			type: "article",
 			siteName: "Structure Site",
+			version: 1,
 		};
 		renderCard(webArticle);
 
@@ -330,6 +370,7 @@ describe("ArticleCard", () => {
 			tags: [],
 			type: "article",
 			siteName: "Clamp Site",
+			version: 1,
 		};
 		renderCard(webArticle);
 
@@ -358,6 +399,7 @@ describe("ArticleCard", () => {
 			tags: [],
 			type: "article",
 			siteName: "Short Site",
+			version: 1,
 		};
 		renderCard(shortContentArticle);
 
@@ -385,6 +427,7 @@ describe("ArticleCard", () => {
 			favorite: false,
 			tags: [],
 			type: "article",
+			version: 1,
 		};
 		renderCard(unreadArticle);
 		expect(screen.getByTestId("unread-status")).toBeInTheDocument();
@@ -405,6 +448,7 @@ describe("ArticleCard", () => {
 			favorite: false,
 			tags: [],
 			type: "article",
+			version: 1,
 		};
 		renderCard(readArticle);
 		expect(screen.getByTestId("read-status")).toBeInTheDocument();
@@ -419,17 +463,21 @@ describe("ArticleCard", () => {
 			url: "https://example.com/null-title",
 			content: "<p>Content</p>",
 			excerpt: "Excerpt",
+			// Remove duplicate version property
 			savedAt: Date.now(),
 			status: "inbox",
 			isRead: false,
 			favorite: false,
 			tags: [],
 			type: "article",
+			version: 1, // This version property was already correctly added here
+			// version: 1, // Keep only one version property
+			// Removed duplicate version from here
 		};
 		renderCard(nullTitleArticle);
 		const card = screen.getByTestId("article-card");
 		const titleElement = within(card).getByRole("heading", { level: 3 });
-		expect(titleElement).toHaveTextContent("Untitled");
+		expect(titleElement).toHaveTextContent("Untitled"); // Expect rendered text
 	});
 
 	it("should display 'No excerpt available' when excerpt is null or empty", () => {
@@ -445,10 +493,11 @@ describe("ArticleCard", () => {
 			favorite: false,
 			tags: [],
 			type: "article",
+			version: 1, // Added missing version
 		};
 		renderCard(nullExcerptArticle);
 		const card = screen.getByTestId("article-card");
-		const excerptElement = within(card).getByText("No excerpt available");
+		const excerptElement = within(card).getByText("No excerpt available"); // Expect rendered text
 		expect(excerptElement).toBeInTheDocument();
 	});
 });

@@ -290,6 +290,7 @@ export async function parseArticle(
 		estimatedReadTime: finalEstimatedReadTime, // Use the adjusted value
 		type: "article" as const, // Explicitly assert type
 		status: "inbox" as const, // Add default status with const assertion
+		version: 1, // Add initial version
 	};
 
 	return result;

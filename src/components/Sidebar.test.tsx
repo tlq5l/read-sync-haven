@@ -1,4 +1,5 @@
 import { AnimationProvider } from "@/context/AnimationContext";
+import { KeyboardProvider } from "@/context/KeyboardContext"; // Import KeyboardProvider
 import { ThemeProvider } from "@/context/ThemeContext";
 import {
 	act,
@@ -115,7 +116,10 @@ vi.mock("lucide-react", async (importOriginal) => {
 const MockProviders = ({ children }: { children: React.ReactNode }) => (
 	<MemoryRouter>
 		<ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-			<AnimationProvider>{children}</AnimationProvider>
+			<AnimationProvider>
+				<KeyboardProvider>{children}</KeyboardProvider>{" "}
+				{/* Wrap with KeyboardProvider */}
+			</AnimationProvider>
 		</ThemeProvider>
 	</MemoryRouter>
 );
@@ -178,20 +182,7 @@ describe("Sidebar Component", () => {
 		expect(screen.getByTestId("icon-Settings")).toBeVisible();
 	});
 
-	it("renders the theme toggle button visibly", () => {
-		render(
-			<MockProviders>
-				<Sidebar />
-			</MockProviders>,
-		);
-		// Assert visibility
-		const themeButton = screen.getByRole("button", {
-			name: /light mode|dark mode/i,
-		});
-		expect(themeButton).toBeVisible();
-		// Check for appropriate icon based on default theme (system->light initially)
-		expect(themeButton.querySelector('[data-testid="icon-Sun"]')).toBeVisible();
-	});
+	// Test case for theme toggle button removed as the button was moved to Settings/Appearance page.
 
 	it("renders Add Content button when signed in", () => {
 		render(
@@ -225,4 +216,51 @@ describe("Sidebar Component", () => {
 	});
 
 	// Add more tests as needed for collapse/expand etc.
+
+	it("reveals Library sub-menu on click and sets current view on sub-menu item click", async () => {
+		render(
+			<MockProviders>
+				<Sidebar />
+			</MockProviders>,
+		);
+		const libraryButton = screen.getByRole("button", { name: /library/i });
+
+		// Initially, sub-menu items might not be visible or exist depending on implementation
+		// Using queryByRole which returns null if not found, and checking visibility cautiously
+		// Note: If using Shadcn's Collapsible, items might exist but not be visible.
+		// If they are conditionally rendered, queryByRole returning null is expected.
+		expect(screen.queryByRole("button", { name: /inbox/i })).not.toBeVisible();
+		expect(screen.queryByRole("button", { name: /unread/i })).not.toBeVisible();
+		expect(
+			screen.queryByRole("button", { name: /favorites/i }),
+		).not.toBeVisible();
+
+		// Click the Library button to reveal the sub-menu
+		fireEvent.click(libraryButton);
+
+		// Wait for potential animation/rerender and find the sub-menu items
+		const inboxButton = await screen.findByRole("button", { name: /inbox/i });
+		const unreadButton = screen.getByRole("button", { name: /unread/i });
+		const favoritesButton = screen.getByRole("button", { name: /favorites/i });
+
+		// Assert sub-menu items are now visible
+		expect(inboxButton).toBeVisible();
+		expect(unreadButton).toBeVisible();
+		expect(favoritesButton).toBeVisible();
+
+		// Click Inbox
+		fireEvent.click(inboxButton);
+		expect(mockSetCurrentView).toHaveBeenCalledWith("all"); // Assuming 'Inbox' corresponds to 'all'
+
+		// Click Unread
+		fireEvent.click(unreadButton);
+		expect(mockSetCurrentView).toHaveBeenCalledWith("unread");
+
+		// Click Favorites
+		fireEvent.click(favoritesButton);
+		expect(mockSetCurrentView).toHaveBeenCalledWith("favorites");
+
+		// Verify total calls
+		expect(mockSetCurrentView).toHaveBeenCalledTimes(3);
+	});
 });

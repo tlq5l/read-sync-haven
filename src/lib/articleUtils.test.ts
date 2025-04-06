@@ -24,6 +24,7 @@ const mockArticles: Article[] = [
 		tags: ["tag1", "tag2"],
 		estimatedReadTime: 5,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "2",
@@ -39,6 +40,7 @@ const mockArticles: Article[] = [
 		tags: ["tag2", "tag3"],
 		estimatedReadTime: 15,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "3",
@@ -54,6 +56,7 @@ const mockArticles: Article[] = [
 		tags: ["tag1"],
 		estimatedReadTime: 10,
 		type: "article",
+		version: 1, // Added version
 	},
 	{
 		_id: "4",
@@ -69,6 +72,7 @@ const mockArticles: Article[] = [
 		tags: [], // No tags
 		estimatedReadTime: undefined, // No read time
 		type: "note",
+		version: 1, // Added version
 	},
 	{
 		_id: "5",
@@ -84,6 +88,7 @@ const mockArticles: Article[] = [
 		tags: ["tag3"],
 		estimatedReadTime: 20,
 		type: "pdf",
+		version: 1, // Added version
 	},
 ];
 

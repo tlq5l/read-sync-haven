@@ -15,7 +15,7 @@ export interface Shortcut {
 	name: string;
 	description: string;
 	category: string;
-	keys: ShortcutKey;
+	keys: ShortcutKey[]; // Changed to array
 	action: () => void;
 }
 
@@ -40,50 +40,70 @@ export const shortcutGroups: ShortcutGroup[] = [
 				name: "Go to Home",
 				description: "Navigate to the home page",
 				category: "navigation",
-				keys: {
-					key: "h",
-					modifiers: { alt: true },
-				},
+				keys: [
+					// Changed to array
+					{
+						key: "h",
+						modifiers: { alt: true },
+					},
+					{
+						// Example second shortcut
+						key: "1",
+						modifiers: { ctrl: true },
+					},
+				],
 			},
 			{
 				id: "goto-settings",
 				name: "Go to Settings",
 				description: "Navigate to the settings page",
 				category: "navigation",
-				keys: {
-					key: "s",
-					modifiers: { alt: true },
-				},
+				keys: [
+					// Changed to array
+					{
+						key: "s",
+						modifiers: { alt: true },
+					},
+				],
 			},
 			{
 				id: "goto-add",
 				name: "Go to Add Page",
 				description: "Navigate to the add page",
 				category: "navigation",
-				keys: {
-					key: "a",
-					modifiers: { alt: true },
-				},
+				keys: [
+					// Changed to array
+					{
+						key: "a",
+						modifiers: { alt: true },
+					},
+				],
 			},
 			{
 				id: "goto-search",
 				name: "Go to Search",
 				description: "Navigate to the search page",
 				category: "navigation",
-				keys: {
-					key: "r",
-					modifiers: { alt: true },
-				},
+				keys: [
+					// Changed to array
+					{
+						key: "r",
+						modifiers: { alt: true },
+					},
+				],
 			},
 			{
 				id: "open-search-overlay", // Renamed ID
 				name: "Open Search",
 				description: "Open the global search overlay", // Updated description
 				category: "navigation",
-				keys: {
-					key: "/",
-					modifiers: {},
-				},
+				keys: [
+					// Changed to array
+					{
+						key: "/",
+						modifiers: {},
+					},
+				],
 			},
 		],
 	},
@@ -97,40 +117,64 @@ export const shortcutGroups: ShortcutGroup[] = [
 				name: "Create New Entry",
 				description: "Create a new entry",
 				category: "content",
-				keys: {
-					key: "n",
-					modifiers: { ctrl: true },
-				},
+				keys: [
+					// Changed to array
+					{
+						key: "n",
+						modifiers: { ctrl: true },
+					},
+				],
 			},
 			{
 				id: "save-entry",
 				name: "Save Current Entry",
 				description: "Save the current entry",
 				category: "content",
-				keys: {
-					key: "Enter",
-					modifiers: { ctrl: true },
-				},
+				keys: [
+					// Changed to array
+					{
+						key: "Enter",
+						modifiers: { ctrl: true },
+					},
+				],
 			},
 			{
 				id: "search",
 				name: "Search",
 				description: "Search for content",
 				category: "content",
-				keys: {
-					key: "f",
-					modifiers: { ctrl: true },
-				},
+				keys: [
+					// Changed to array
+					{
+						key: "f",
+						modifiers: { ctrl: true },
+					},
+				],
 			},
 			{
 				id: "delete-article",
 				name: "Delete Article",
 				description: "Delete the currently selected/viewed article",
 				category: "content",
-				keys: {
-					key: "Delete",
-					modifiers: {},
-				},
+				keys: [
+					// Changed to array
+					{
+						key: "Delete",
+						modifiers: {},
+					},
+				],
+			},
+			{
+				id: "sync-articles",
+				name: "Sync Articles",
+				description: "Manually trigger article synchronization",
+				category: "content",
+				keys: [
+					{
+						key: "s",
+						modifiers: { ctrl: true, alt: true },
+					},
+				],
 			},
 		],
 	},
@@ -144,20 +188,38 @@ export const shortcutGroups: ShortcutGroup[] = [
 				name: "Toggle Dark Mode",
 				description: "Switch between light and dark mode",
 				category: "interface",
-				keys: {
-					key: "d",
-					modifiers: { ctrl: true },
-				},
+				keys: [
+					// Changed to array
+					{
+						key: "d",
+						modifiers: { ctrl: true },
+					},
+				],
 			},
 			{
 				id: "show-shortcuts",
 				name: "Show Keyboard Shortcuts",
 				description: "Display a list of all keyboard shortcuts",
 				category: "interface",
-				keys: {
-					key: "/",
-					modifiers: { ctrl: true },
-				},
+				keys: [
+					// Changed to array
+					{
+						key: "/",
+						modifiers: { ctrl: true },
+					},
+				],
+			},
+			{
+				id: "toggle-sidebar",
+				name: "Toggle Sidebar",
+				description: "Show or hide the main sidebar",
+				category: "interface",
+				keys: [
+					{
+						key: "b",
+						modifiers: { ctrl: true },
+					},
+				],
 			},
 		],
 	},
@@ -166,40 +228,57 @@ export const shortcutGroups: ShortcutGroup[] = [
 // Helper function to check if a keyboard event matches a shortcut key
 export function matchesShortcut(
 	event: KeyboardEvent,
-	shortcutKey: ShortcutKey,
+	shortcutKeys: ShortcutKey[], // Changed to accept array
 ): boolean {
-	const { key, modifiers } = shortcutKey;
-	const { ctrlKey, altKey, shiftKey, metaKey } = event;
+	// Check if the event matches ANY of the keys in the array
+	for (const shortcutKey of shortcutKeys) {
+		const { key, modifiers } = shortcutKey;
+		const { ctrlKey, altKey, shiftKey, metaKey } = event;
 
-	// Check if the main key matches (case insensitive for letter keys)
-	const keyMatches = event.key.toLowerCase() === key.toLowerCase();
+		// Check if the main key matches (case insensitive for letter keys)
+		const keyMatches = event.key.toLowerCase() === key.toLowerCase();
 
-	// Check if modifier keys match
-	const ctrlMatches = Boolean(modifiers.ctrl) === ctrlKey;
-	const altMatches = Boolean(modifiers.alt) === altKey;
-	const shiftMatches = Boolean(modifiers.shift) === shiftKey;
-	const metaMatches = Boolean(modifiers.meta) === metaKey;
+		// Check if modifier keys match
+		const ctrlMatches = Boolean(modifiers.ctrl) === ctrlKey;
+		const altMatches = Boolean(modifiers.alt) === altKey;
+		const shiftMatches = Boolean(modifiers.shift) === shiftKey;
+		const metaMatches = Boolean(modifiers.meta) === metaKey;
 
-	return keyMatches && ctrlMatches && altMatches && shiftMatches && metaMatches;
+		if (
+			keyMatches &&
+			ctrlMatches &&
+			altMatches &&
+			shiftMatches &&
+			metaMatches
+		) {
+			return true; // Match found
+		}
+	}
+	return false; // No match found in the array
 }
 
 // Helper function to format shortcut for display
-export function formatShortcut(shortcutKey: ShortcutKey): string {
-	const { key, modifiers } = shortcutKey;
-	const parts: string[] = [];
+export function formatShortcut(shortcutKeys: ShortcutKey[]): string {
+	// Helper function to format a single key
+	const formatSingleKey = (shortcutKey: ShortcutKey): string => {
+		const { key, modifiers } = shortcutKey;
+		const parts: string[] = [];
 
-	if (modifiers.ctrl) parts.push("Ctrl");
-	if (modifiers.alt) parts.push("Alt");
-	if (modifiers.shift) parts.push("Shift");
-	if (modifiers.meta) parts.push("Meta");
+		if (modifiers.ctrl) parts.push("Ctrl");
+		if (modifiers.alt) parts.push("Alt");
+		if (modifiers.shift) parts.push("Shift");
+		if (modifiers.meta) parts.push("Meta");
 
-	// Format key nicely (capitalize, use symbols when appropriate)
-	let formattedKey = key;
-	if (key.length === 1) {
-		formattedKey = key.toUpperCase();
-	}
+		// Format key nicely (capitalize, use symbols when appropriate)
+		let formattedKey = key;
+		if (key.length === 1) {
+			formattedKey = key.toUpperCase();
+		}
 
-	parts.push(formattedKey);
+		parts.push(formattedKey);
+		return parts.join(" + ");
+	};
 
-	return parts.join(" + ");
+	// Format all keys in the array and join with " or "
+	return shortcutKeys.map(formatSingleKey).join(" or ");
 }
