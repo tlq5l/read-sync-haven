@@ -1,5 +1,10 @@
 import type { Article } from "./db"; // Use type-only import
 
+// Determine API base URL based on environment
+const API_BASE_URL = import.meta.env.DEV
+	? "http://127.0.0.1:8787" // Local worker address for development
+	: "https://bondwise-sync-api.vikione.workers.dev"; // Production worker address
+
 // Define possible outcomes for cloud operations
 export type CloudSyncStatus =
 	| "success"
@@ -29,7 +34,7 @@ export async function fetchCloudItems(
 	}
 	try {
 		// Construct URL, adding email query param if available
-		let fetchUrl = "https://bondwise-sync-api.vikione.workers.dev/items";
+		let fetchUrl = `${API_BASE_URL}/items`;
 		if (email) {
 			fetchUrl += `?email=${encodeURIComponent(email)}`;
 		}
@@ -97,19 +102,16 @@ export async function saveItemToCloud(
 	}
 
 	try {
-		const response = await fetch(
-			"https://bondwise-sync-api.vikione.workers.dev/items",
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`, // Add Authorization header
-				},
-				// Send the entire Article object. The worker now expects fields
-				// like _id, savedAt (as number), fileData, and the correct type directly.
-				body: JSON.stringify(article),
+		const response = await fetch(`${API_BASE_URL}/items`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${token}`, // Add Authorization header
 			},
-		);
+			// Send the entire Article object. The worker now expects fields
+			// like _id, savedAt (as number), fileData, and the correct type directly.
+			body: JSON.stringify(article),
+		});
 
 		if (response.ok) {
 			// Status 200 OK or 201 Created typically indicate success
@@ -152,9 +154,7 @@ export async function deleteItemFromCloud(
 
 	try {
 		// Construct the URL with the item ID
-		const deleteUrl = `https://bondwise-sync-api.vikione.workers.dev/items/${encodeURIComponent(
-			articleId,
-		)}`;
+		const deleteUrl = `${API_BASE_URL}/items/${encodeURIComponent(articleId)}`;
 		console.log(
 			`Attempting to delete item ${articleId} from cloud at ${deleteUrl}`,
 		);
