@@ -30,6 +30,8 @@ export function parseUserItemKey(
 
 /**
  * Standard CORS headers for API responses.
+ * These are applied automatically by `jsonResponse` and `errorResponse`.
+ * The `OPTIONS` preflight requests are handled in `index.ts`.
  */
 export const corsHeaders = {
 	"Access-Control-Allow-Origin": "*", // Adjust in production if needed
