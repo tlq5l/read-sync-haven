@@ -20,55 +20,8 @@
 		}
 	},
 	"sidebar": {
-		"home": "Home",
-		"library": "Library",
-		"categories": {
-			"articles": "Articles",
-			"books": "Books",
-			"pdfs": "PDFs",
-			"videos": "Videos",
-			"others": "Others"
-		},
-		"navigation": "Navigation",
-		"settings": "Settings",
-		"darkMode": "Dark Mode",
-		"lightMode": "Light Mode",
-		"signIn": "Sign In",
-		"addContent": "Add Content",
 		"allArticles": "All Articles",
 		"starred": "Starred",
 		"archived": "Archived"
-	},
-	"topbar": {
-		"inbox": "Inbox",
-		"later": "Later",
-		"archive": "Archive",
-		"sortByPlaceholder": "Sort by...",
-		"sortBy": {
-			"dateSaved": "Date Saved",
-			"title": "Title",
-			"source": "Source",
-			"readTime": "Read Time"
-		},
-		"sortDirection": {
-			"ascending": "Ascending",
-			"descending": "Descending"
-		},
-		"sortDirectionAriaLabel": "Sort direction: {{direction}}"
-	},
-	"articleCard": {
-		"statusRead": "Read",
-		"statusUnread": "Unread",
-		"delete": "Delete",
-		"untitled": "Untitled",
-		"noExcerpt": "No excerpt available",
-		"sourcePdf": "PDF Document",
-		"sourceEpub": "EPUB Book",
-		"sourceUnknown": "Unknown source",
-		"dateRecently": "Recently",
-		"readTime": "{{time}} min read",
-		"ariaMoveToLater": "Move to Later",
-		"ariaArchive": "Archive",
-		"ariaMoveToInbox": "Move to Inbox"
 	}
 }

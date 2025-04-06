@@ -35,8 +35,8 @@ import {
 	Video, // Icon for Videos
 } from "lucide-react";
 import React, { useState } from "react"; // Add React default import, removed unused useEffect
-import { useTranslation } from "react-i18next"; // Added useTranslation
 import { Link, useLocation, useNavigate } from "react-router-dom";
+
 export default function Sidebar() {
 	const [collapsed, setCollapsed] = useState(false);
 	const [isLibraryOpen, setIsLibraryOpen] = useState(true); // State for library collapse
@@ -47,7 +47,6 @@ export default function Sidebar() {
 	const { theme, setTheme } = useTheme();
 	const { synchronizeAnimations } = useAnimation();
 	const { isSignedIn } = useAuth();
-	const { t } = useTranslation(); // Instantiate the hook
 	// const { user } = useUser(); // Removed as unused
 	// const [isDarkMode, setIsDarkMode] = useState(false); // Removed: Using Tailwind dark mode variants (Corrected)
 
@@ -67,14 +66,6 @@ export default function Sidebar() {
 		pdf: FileText,
 		video: Video,
 		other: Shapes,
-	};
-	// Map categories to translation keys
-	const categoryTranslationKeys: Record<ArticleCategory, string> = {
-		article: "sidebar.categories.articles",
-		book: "sidebar.categories.books",
-		pdf: "sidebar.categories.pdfs",
-		video: "sidebar.categories.videos",
-		other: "sidebar.categories.others",
 	};
 
 	// Create synchronized animations for the sidebar
@@ -123,7 +114,7 @@ export default function Sidebar() {
 						className="text-xl font-bold transition-opacity duration-200 text-gray-900 dark:text-white" // Corrected: Single className with merged styles
 						// style={styles.header} // Style prop correctly removed
 					>
-						{t("appName")}
+						Read Sync Haven
 					</h1>
 				)}
 				<div
@@ -176,9 +167,7 @@ export default function Sidebar() {
 						>
 							<Home size={20} />
 							{!collapsed && (
-								<span className="transition-opacity duration-200">
-									{t("sidebar.home")}
-								</span>
+								<span className="transition-opacity duration-200">Home</span>
 							)}
 						</Button>
 					</TransitionItem>
@@ -212,7 +201,7 @@ export default function Sidebar() {
 							{/* Adjust icon spacing only when not collapsed */}
 							{!collapsed && (
 								<span className="transition-opacity duration-200 font-medium">
-									{t("sidebar.library")}
+									Library
 								</span>
 							)}
 						</Button>
@@ -220,9 +209,11 @@ export default function Sidebar() {
 						{isLibraryOpen && !collapsed && (
 							<div className="w-full pl-6 mt-1 space-y-1">
 								{categories.map((cat) => {
-									// Get label from translation key map
-									const translationKey = categoryTranslationKeys[cat];
-									const label = t(translationKey);
+									// Handle PDF capitalization specifically
+									const label =
+										cat === "pdf"
+											? "PDFs"
+											: `${cat.charAt(0).toUpperCase() + cat.slice(1)}s`;
 									const isActiveCategory = currentCategory === cat;
 									return (
 										<Button
@@ -267,7 +258,7 @@ export default function Sidebar() {
 							className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 transition-opacity duration-200" // Corrected: Single className with merged styles
 							// style={styles.navLabel} // Style prop correctly removed
 						>
-							{t("sidebar.navigation")}
+							Navigation
 						</h3>
 					)}
 					<div className={cn("space-y-1")}>
@@ -297,7 +288,7 @@ export default function Sidebar() {
 								<Settings size={20} />
 								{!collapsed && (
 									<span className="transition-opacity duration-200">
-										{t("sidebar.settings")}
+										Settings
 									</span>
 								)}
 							</Link>
@@ -315,9 +306,7 @@ export default function Sidebar() {
 							{theme === "dark" ? <Moon size={20} /> : <Sun size={20} />}
 							{!collapsed && (
 								<span className="transition-opacity duration-200">
-									{t(
-										theme === "dark" ? "sidebar.darkMode" : "sidebar.lightMode",
-									)}
+									{theme === "dark" ? "Dark Mode" : "Light Mode"}
 								</span>
 							)}
 						</Button>
@@ -343,7 +332,7 @@ export default function Sidebar() {
 									<LogIn size={20} />
 									{!collapsed && (
 										<span className="transition-opacity duration-200">
-											{t("sidebar.signIn")}
+											Sign In
 										</span>
 									)}
 								</Link>
@@ -364,7 +353,7 @@ export default function Sidebar() {
 							<Plus size={18} />
 							{!collapsed ? (
 								<span className="transition-opacity duration-200">
-									{t("sidebar.addContent")}
+									Add Content
 								</span>
 							) : null}
 						</Link>

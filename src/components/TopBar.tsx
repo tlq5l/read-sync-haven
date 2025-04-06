@@ -10,7 +10,6 @@ import {
 import { useArticles } from "@/context/ArticleContext";
 import type { ArticleSortField } from "@/types/articles";
 import { ArrowDownUp } from "lucide-react"; // Removed Library icon
-import { useTranslation } from "react-i18next"; // Added useTranslation
 import { Link, useLocation } from "react-router-dom";
 
 // Removed unused getSortLabel function
@@ -24,7 +23,6 @@ export default function TopBar() {
 		toggleSortDirection,
 	} = useArticles();
 	const location = useLocation();
-	const { t } = useTranslation(); // Instantiate hook
 	const isActive = (path: string) => location.pathname === path;
 
 	return (
@@ -39,21 +37,21 @@ export default function TopBar() {
 					className={`px-2 ${isActive("/inbox") ? "text-foreground" : "text-muted-foreground"}`}
 					asChild
 				>
-					<Link to="/inbox">{t("topbar.inbox")}</Link>
+					<Link to="/inbox">Inbox</Link>
 				</Button>
 				<Button
 					variant="ghost"
 					className={`px-2 ${isActive("/later") ? "text-foreground" : "text-muted-foreground"}`}
 					asChild
 				>
-					<Link to="/later">{t("topbar.later")}</Link>
+					<Link to="/later">Later</Link>
 				</Button>
 				<Button
 					variant="ghost"
 					className={`px-2 ${isActive("/archive") ? "text-foreground" : "text-muted-foreground"}`}
 					asChild
 				>
-					<Link to="/archive">{t("topbar.archive")}</Link>
+					<Link to="/archive">Archive</Link>
 				</Button>
 			</div>
 
@@ -65,19 +63,13 @@ export default function TopBar() {
 				>
 					<SelectTrigger className="w-auto min-w-[140px] h-8 px-2 border-none shadow-none bg-transparent hover:bg-accent focus:ring-0">
 						<ArrowDownUp size={14} className="mr-1 opacity-50" />
-						<SelectValue placeholder={t("topbar.sortByPlaceholder")} />
+						<SelectValue placeholder="Sort by..." />
 					</SelectTrigger>
 					<SelectContent>
-						<SelectItem value="savedAt">
-							{t("topbar.sortBy.dateSaved")}
-						</SelectItem>
-						<SelectItem value="title">{t("topbar.sortBy.title")}</SelectItem>
-						<SelectItem value="siteName">
-							{t("topbar.sortBy.source")}
-						</SelectItem>
-						<SelectItem value="estimatedReadTime">
-							{t("topbar.sortBy.readTime")}
-						</SelectItem>
+						<SelectItem value="savedAt">Date Saved</SelectItem>
+						<SelectItem value="title">Title</SelectItem>
+						<SelectItem value="siteName">Source</SelectItem>
+						<SelectItem value="estimatedReadTime">Read Time</SelectItem>
 					</SelectContent>
 				</Select>
 				<Button
@@ -85,13 +77,7 @@ export default function TopBar() {
 					size="icon"
 					className="h-8 w-8"
 					onClick={toggleSortDirection}
-					aria-label={t("topbar.sortDirectionAriaLabel", {
-						direction: t(
-							sortCriteria.direction === "asc"
-								? "topbar.sortDirection.ascending"
-								: "topbar.sortDirection.descending",
-						),
-					})}
+					aria-label={`Sort direction: ${sortCriteria.direction === "asc" ? "Ascending" : "Descending"}`}
 				>
 					{sortCriteria.direction === "asc" ? "↑" : "↓"}
 				</Button>
