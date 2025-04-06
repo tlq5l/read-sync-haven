@@ -4,13 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select"; // Added Select imports
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 
@@ -41,11 +34,10 @@ import {
 	// User, // Removed unused User icon
 } from "lucide-react"; // Added ShieldCheck for Account
 import { useState } from "react"; // Remove useEffect import
-import { useTranslation } from "react-i18next"; // Added useTranslation import
 import { Link } from "react-router-dom";
+
 export default function SettingsPage() {
 	const { toast } = useToast();
-	const { t, i18n } = useTranslation(); // Added i18n hook
 	const { theme, textSize, setTextSize } = useTheme(); // Get theme, textSize, setTextSize
 	const [isExportingData, setIsExportingData] = useState(false);
 	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
@@ -175,7 +167,7 @@ export default function SettingsPage() {
 						<ArrowLeft className="h-5 w-5" />
 					</Link>
 				</Button>
-				<h1 className="text-2xl font-bold ml-2">{t("settings.title")}</h1>
+				<h1 className="text-2xl font-bold ml-2">Settings</h1>
 			</div>
 			<Tabs
 				defaultValue="account"
@@ -191,20 +183,20 @@ export default function SettingsPage() {
 						{" "}
 						{/* New Account Tab */}
 						<ShieldCheck className="h-4 w-4" />
-						<span>{t("settings.tabs.account")}</span>
+						<span>Account</span>
 					</TabsTrigger>
 					{/* Removed redundant Profile Tab Trigger */}
 					<TabsTrigger value="appearance" className="flex items-center gap-1">
 						<Palette className="h-4 w-4" />
-						<span>{t("settings.tabs.appearance")}</span>
+						<span>Appearance</span>
 					</TabsTrigger>
 					<TabsTrigger value="data" className="flex items-center gap-1">
 						<Database className="h-4 w-4" />
-						<span>{t("settings.tabs.data")}</span>
+						<span>Data</span>
 					</TabsTrigger>
 					<TabsTrigger value="shortcuts" className="flex items-center gap-1">
 						<Keyboard className="h-4 w-4" />
-						<span>{t("settings.tabs.shortcuts")}</span>
+						<span>Shortcuts</span>
 					</TabsTrigger>
 				</TabsList>
 
@@ -239,18 +231,16 @@ export default function SettingsPage() {
 						<div className="pr-4">
 							<Card>
 								<CardHeader>
-									<CardTitle>{t("settings.appearance.title")}</CardTitle>
+									<CardTitle>Appearance</CardTitle>
 								</CardHeader>
 								<CardContent className="space-y-6">
 									{" "}
 									{/* Increased spacing */}
 									{/* Text Size Slider */}
 									<div className="space-y-3">
-										<Label htmlFor="text-size-slider">
-											{t("settings.appearance.textSizeLabel")}
-										</Label>
+										<Label htmlFor="text-size-slider">Text Size</Label>
 										<p className="text-sm text-muted-foreground">
-											{t("settings.appearance.textSizeDescription")}
+											Adjust the application's base text size.
 										</p>
 										<Slider
 											id="text-size-slider"
@@ -272,31 +262,6 @@ export default function SettingsPage() {
 											<span>Largest</span>
 										</div>
 									</div>
-									<Separator />
-									{/* Language Selector */}
-									<div className="space-y-3">
-										<Label htmlFor="language-select">
-											{t("settings.appearance.languageLabel")}
-										</Label>
-										<p className="text-sm text-muted-foreground">
-											{t("settings.appearance.languageDescription")}
-										</p>
-										<Select
-											value={i18n.language}
-											onValueChange={(value) => i18n.changeLanguage(value)}
-										>
-											<SelectTrigger id="language-select" className="w-[180px]">
-												<SelectValue placeholder="Select language" />
-											</SelectTrigger>
-											<SelectContent>
-												<SelectItem value="en">English</SelectItem>
-												<SelectItem value="vi">Tiếng Việt</SelectItem>
-												<SelectItem value="de">Deutsch</SelectItem>
-												<SelectItem value="fr">Français</SelectItem>
-												<SelectItem value="es">Español</SelectItem>
-											</SelectContent>
-										</Select>
-									</div>
 								</CardContent>
 							</Card>
 						</div>
@@ -311,7 +276,7 @@ export default function SettingsPage() {
 
 							<Card>
 								<CardHeader>
-									<CardTitle>{t("settings.data.title")}</CardTitle>
+									<CardTitle>Data Management</CardTitle> {/* Updated title */}
 								</CardHeader>
 								<CardContent className="space-y-4">
 									<div className="flex items-center justify-between">
