@@ -24,3 +24,8 @@ GCLOUD_SERVICE_ACCOUNT_EMAIL = "frontend-summarizer-invoker@bondwise-455112.iam.
 
 [observability.logs]
 enabled = true
+
+[dev]
+ip = "127.0.0.1"
+port = 8788
+local_protocol = "http"

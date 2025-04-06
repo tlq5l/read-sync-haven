@@ -2,7 +2,7 @@ import type { Article } from "./db"; // Use type-only import
 
 // Determine API base URL based on environment
 const API_BASE_URL = import.meta.env.DEV
-	? "http://127.0.0.1:8787" // Local worker address for development
+	? "http://127.0.0.1:8788" // Local worker address for development
 	: "https://bondwise-sync-api.vikione.workers.dev"; // Production worker address
 
 // Define possible outcomes for cloud operations
