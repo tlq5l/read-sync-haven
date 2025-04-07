@@ -5,9 +5,9 @@ import * as auth from "../auth"; // Import the auth module to mock it
 import type { Env } from "../types";
 import { handleChat, handleSummarize } from "./api";
 
-// Mock global.fetch directly for worker tests as MSW interception might be unreliable here
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+// Spy on global.fetch for worker tests
+// Spy on global.fetch for worker tests
+let fetchSpy: any; // Use 'any' or leave untyped for inference in beforeEach
 
 // Mock the authenticateRequestWithClerk function
 vi.mock("../auth", async (importOriginal) => {
@@ -29,7 +29,7 @@ describe("Worker API Handlers", () => {
 
 	beforeEach(() => {
 		// Reset mocks before each test
-		// mockFetch.mockReset();
+		fetchSpy = vi.spyOn(global, "fetch"); // Initialize spy before each test
 		mockedAuth.mockReset();
 
 		// Mock environment variables
@@ -49,6 +49,7 @@ describe("Worker API Handlers", () => {
 	});
 
 	afterEach(() => {
+		// vi.restoreAllMocks() will handle restoring the fetch spy
 		vi.restoreAllMocks();
 	});
 
@@ -56,8 +57,8 @@ describe("Worker API Handlers", () => {
 	describe("handleSummarize", () => {
 		it("should return summary on successful GCF call", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			// Mock fetch directly for the GCF call
-			mockFetch.mockResolvedValueOnce(
+			// Mock the fetch spy's behavior for the GCF call
+			fetchSpy.mockResolvedValueOnce(
 				new Response(JSON.stringify({ summary: MOCK_SUMMARY_LOCAL }), {
 					status: 200,
 					headers: { "Content-Type": "application/json" },
@@ -81,8 +82,8 @@ describe("Worker API Handlers", () => {
 			};
 			expect(body).toEqual({ status: "success", summary: MOCK_SUMMARY_LOCAL });
 			expect(mockedAuth).toHaveBeenCalledTimes(1);
-			expect(mockFetch).toHaveBeenCalledTimes(1); // Check fetch was called
-			expect(mockFetch).toHaveBeenCalledWith(
+			expect(fetchSpy).toHaveBeenCalledTimes(1); // Check fetch spy was called
+			expect(fetchSpy).toHaveBeenCalledWith(
 				"http://fake-gcf/summarize",
 				expect.anything(),
 			);
@@ -109,7 +110,7 @@ describe("Worker API Handlers", () => {
 
 			const response = await handleSummarize(request, mockEnv);
 			expect(response).toBe(authErrorResponse);
-			expect(mockFetch).not.toHaveBeenCalled();
+			expect(fetchSpy).not.toHaveBeenCalled();
 		});
 
 		it("should return 400 if content is missing", async () => {
@@ -126,7 +127,7 @@ describe("Worker API Handlers", () => {
 			expect(response.status).toBe(400);
 			const body = (await response.json()) as { message?: string };
 			expect(body.message).toBe("Missing 'content' in request body");
-			expect(mockFetch).not.toHaveBeenCalled();
+			expect(fetchSpy).not.toHaveBeenCalled();
 		});
 
 		it("should return 503 if GCF URL is not configured", async () => {
@@ -146,7 +147,7 @@ describe("Worker API Handlers", () => {
 			expect(body.message).toBe(
 				"AI summarization service URL is not configured.",
 			);
-			expect(mockFetch).not.toHaveBeenCalled();
+			expect(fetchSpy).not.toHaveBeenCalled();
 		});
 
 		it("should return 500 if GCF secret is not configured", async () => {
@@ -166,7 +167,7 @@ describe("Worker API Handlers", () => {
 			expect(body.message).toBe(
 				"Worker is missing configuration for backend authentication.",
 			);
-			expect(mockFetch).not.toHaveBeenCalled();
+			expect(fetchSpy).not.toHaveBeenCalled();
 		});
 
 		// Note: Testing specific GCF failures (502 errors) from within this file
@@ -174,8 +175,8 @@ describe("Worker API Handlers", () => {
 		// This test remains largely the same, relying on the direct fetch mock now.
 		it("should return 200 when GCF call succeeds (using direct fetch mock)", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			// Mock fetch directly
-			mockFetch.mockResolvedValueOnce(
+			// Mock the fetch spy's behavior
+			fetchSpy.mockResolvedValueOnce(
 				new Response(JSON.stringify({ summary: MOCK_SUMMARY_LOCAL }), {
 					status: 200,
 					headers: { "Content-Type": "application/json" },
@@ -194,7 +195,8 @@ describe("Worker API Handlers", () => {
 			const response = await handleSummarize(request, mockEnv);
 			expect(response.status).toBe(200);
 			const body = (await response.json()) as { summary?: string };
-			expect(body.summary).toBe(MOCK_SUMMARY_LOCAL); // Use local constant
+			expect(body.summary).toBe(MOCK_SUMMARY_LOCAL);
+			expect(fetchSpy).toHaveBeenCalledTimes(1); // Verify spy call
 		});
 	});
 
@@ -202,8 +204,8 @@ describe("Worker API Handlers", () => {
 	describe("handleChat", () => {
 		it("should return chat response on successful GCF call", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			// Mock fetch directly for the GCF call
-			mockFetch.mockResolvedValueOnce(
+			// Mock the fetch spy's behavior for the GCF call
+			fetchSpy.mockResolvedValueOnce(
 				new Response(JSON.stringify({ response: MOCK_CHAT_RESPONSE_LOCAL }), {
 					status: 200,
 					headers: { "Content-Type": "application/json" },
@@ -230,8 +232,8 @@ describe("Worker API Handlers", () => {
 				response: MOCK_CHAT_RESPONSE_LOCAL, // Use local constant
 			});
 			expect(mockedAuth).toHaveBeenCalledTimes(1);
-			expect(mockFetch).toHaveBeenCalledTimes(1); // Check fetch was called
-			expect(mockFetch).toHaveBeenCalledWith(
+			expect(fetchSpy).toHaveBeenCalledTimes(1); // Check fetch spy was called
+			expect(fetchSpy).toHaveBeenCalledWith(
 				"http://fake-gcf/chat",
 				expect.anything(),
 			);
@@ -258,7 +260,7 @@ describe("Worker API Handlers", () => {
 
 			const response = await handleChat(request, mockEnv);
 			expect(response).toBe(authErrorResponse);
-			expect(mockFetch).not.toHaveBeenCalled();
+			expect(fetchSpy).not.toHaveBeenCalled();
 		});
 
 		it("should return 400 if content or message is missing", async () => {
@@ -277,7 +279,7 @@ describe("Worker API Handlers", () => {
 			expect(body.message).toBe(
 				"Missing 'content' or 'message' in request body",
 			);
-			expect(mockFetch).not.toHaveBeenCalled();
+			expect(fetchSpy).not.toHaveBeenCalled();
 		});
 
 		it("should return 503 if GCF URL is not configured", async () => {
@@ -295,7 +297,7 @@ describe("Worker API Handlers", () => {
 			expect(response.status).toBe(503);
 			const body = (await response.json()) as { message?: string };
 			expect(body.message).toBe("AI chat service URL is not configured.");
-			expect(mockFetch).not.toHaveBeenCalled();
+			expect(fetchSpy).not.toHaveBeenCalled();
 		});
 
 		it("should return 500 if GCF secret is not configured", async () => {
@@ -315,14 +317,14 @@ describe("Worker API Handlers", () => {
 			expect(body.message).toBe(
 				"Worker is missing configuration for backend authentication.",
 			);
-			expect(mockFetch).not.toHaveBeenCalled();
+			expect(fetchSpy).not.toHaveBeenCalled();
 		});
 
 		// This test remains largely the same, relying on the direct fetch mock now.
 		it("should return 200 when GCF call succeeds (using direct fetch mock)", async () => {
 			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
-			// Mock fetch directly
-			mockFetch.mockResolvedValueOnce(
+			// Mock the fetch spy's behavior
+			fetchSpy.mockResolvedValueOnce(
 				new Response(JSON.stringify({ response: MOCK_CHAT_RESPONSE_LOCAL }), {
 					status: 200,
 					headers: { "Content-Type": "application/json" },
@@ -340,7 +342,8 @@ describe("Worker API Handlers", () => {
 			const response = await handleChat(request, mockEnv);
 			expect(response.status).toBe(200);
 			const body = (await response.json()) as { response?: string };
-			expect(body.response).toBe(MOCK_CHAT_RESPONSE_LOCAL); // Use local constant
+			expect(body.response).toBe(MOCK_CHAT_RESPONSE_LOCAL);
+			expect(fetchSpy).toHaveBeenCalledTimes(1); // Verify spy call
 		});
 	});
 });

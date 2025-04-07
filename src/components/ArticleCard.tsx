@@ -113,13 +113,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 			tabIndex={0} // Make card focusable
 			onKeyDown={handleKeyDown} // Add keydown handler
 			className="flex flex-col h-[200px] overflow-hidden transition-all gpu-accelerated duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" // Add focus styles, FIXED height, and flex
-			style={{
-				opacity: 0,
-				transform: "translateY(20px) translateZ(0)",
-				animation: `fadeIn 200ms ${
-					index * 30
-				}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
-			}}
+			// Style removed to prevent flickering with virtualization
 		>
 			<Link to={`/read/${article._id}`} data-testid="article-card">
 				<CardContent className="p-0 flex-grow flex flex-col">

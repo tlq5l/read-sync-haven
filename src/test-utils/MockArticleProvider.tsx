@@ -216,6 +216,7 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			isRefreshing: false,
 			error: null,
 			isDbInitialized: true,
+			syncStatus: "success", // Correctly add default syncStatus for mock once
 			allTags: mockTags,
 			currentView,
 			setCurrentView,
@@ -232,6 +233,7 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			optimisticRemoveArticle: mockOptimisticRemoveArticle,
 		}),
 		[
+			// Keep dependency array clean of static values
 			processedArticles,
 			currentView,
 			filters,

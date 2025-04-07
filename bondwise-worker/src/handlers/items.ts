@@ -216,9 +216,21 @@ export async function handlePostItem(
 			item.savedAt === undefined ||
 			!item.content // Essential field check added
 		) {
-			console.warn("Validation failed for item:", item); // Log invalid item
+			// Detailed validation logging
+			let missingField = "";
+			if (!item) missingField = "item object";
+			else if (!item._id) missingField = "_id";
+			else if (!item.url) missingField = "url";
+			else if (!item.title) missingField = "title";
+			else if (!item.userId) missingField = "userId";
+			else if (!item.type) missingField = "type";
+			else if (item.savedAt === undefined) missingField = "savedAt";
+			else if (!item.content) missingField = "content";
+
+			const logMsg = `Validation failed for incoming item (type: ${item?.type ?? "unknown"}). Missing required field: ${missingField}. Item received: ${JSON.stringify(item)}`;
+			console.warn(logMsg);
 			return errorResponse(
-				"Invalid article data - missing required fields (id, url, title, userId, type, savedAt, content)",
+				`Invalid article data - missing required field: ${missingField}`,
 				400,
 			);
 		}
@@ -251,16 +263,75 @@ export async function handlePostItem(
 			if (existingArticle._id === item._id) {
 				console.log(`Updating existing article with ID: ${item._id}`);
 			} else {
-				// Return success without saving a duplicate
+				// Existing article found with the same URL but different ID. Update the existing entry.
 				console.log(
-					`Preventing duplicate save. Using existing article ID: ${existingArticle._id}`,
+					`Updating existing article (ID: ${existingArticle._id}) with new data from request (New ID was: ${item._id}, URL: ${item.url})`,
 				);
-				return jsonResponse({
-					status: "success",
-					message: "Article already exists",
-					item: existingArticle,
-					duplicatePrevented: true,
-				});
+				const key = createUserItemKey(userId, existingArticle._id); // Use existing article's ID for the key
+
+				// Construct the object to save, using NEW data but EXISTING ID for consistency
+				// Note: We prioritize data from the incoming 'item', falling back to 'existingArticle' only for status fields if not present in 'item'
+				const itemToSave: WorkerArticle = {
+					_id: existingArticle._id, // Keep the original ID for the KV key relation
+					userId: item.userId, // Use new user ID (should match authenticated user)
+					url: item.url, // Use new URL (should be the same)
+					title: item.title, // Use new title
+					type: item.type, // Use new type
+					savedAt: item.savedAt, // Use new savedAt timestamp
+					isRead: item.isRead ?? existingArticle.isRead ?? false, // Prefer new isRead, fallback to existing, then false
+					favorite: item.favorite ?? existingArticle.favorite ?? false, // Prefer new favorite, fallback to existing, then false
+					content: item.content, // Always use new content
+					...(item.fileData && { fileData: item.fileData }),
+					...(item.htmlContent && { htmlContent: item.htmlContent }),
+					...(item.excerpt && { excerpt: item.excerpt }),
+					...(item.author && { author: item.author }),
+					...(item.siteName && { siteName: item.siteName }),
+					...(item.publishedDate && { publishedDate: item.publishedDate }),
+					...(item.tags && { tags: item.tags }),
+					...(item.readingProgress && {
+						readingProgress: item.readingProgress,
+					}),
+					...(item.readAt && { readAt: item.readAt }), // Use new readAt if present
+					...(item.scrollPosition && { scrollPosition: item.scrollPosition }),
+					...(item.coverImage && { coverImage: item.coverImage }),
+					...(item.language && { language: item.language }),
+					...(item.pageCount && { pageCount: item.pageCount }),
+					...(item.estimatedReadTime && {
+						// Use new read time if present
+						estimatedReadTime: item.estimatedReadTime,
+					}),
+					...(item._rev && { _rev: item._rev }), // Use new revision if present
+				};
+
+				console.log(`Attempting to update item in KV with key: ${key}`);
+				const itemString = JSON.stringify(itemToSave);
+				const kvPromise = env.SAVED_ITEMS_KV.put(key, itemString);
+
+				// Ensure the background task completes even if the request is short-lived
+				ctx.waitUntil(
+					kvPromise.catch((err) => {
+						console.error(
+							`KV put (update) failed for key ${key} in waitUntil:`,
+							err,
+						);
+					}),
+				);
+
+				// Wait for the update to complete before sending the response
+				await kvPromise;
+
+				console.log(`Successfully updated item in KV: ${key}`);
+				// Return 200 OK for a successful update
+				return jsonResponse(
+					{
+						status: "success",
+						message: "Article updated successfully",
+						item: itemToSave, // Return the updated item data
+						updatedExisting: true,
+						originalRequestId: item._id, // Signal the ID from the request that triggered the update
+					},
+					200,
+				);
 			}
 		}
 

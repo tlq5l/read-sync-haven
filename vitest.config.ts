@@ -34,5 +34,7 @@ export default defineConfig({
 		// Example:
 		// 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(process.env.VITE_CLERK_PUBLISHABLE_KEY),
 		"import.meta.env.VITEST": "true",
+		// Explicitly set DEV to false for tests to ensure production API URL is used
+		"import.meta.env.DEV": "false",
 	},
 });

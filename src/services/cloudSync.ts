@@ -1,9 +1,11 @@
 import type { Article } from "./db"; // Use type-only import
 
 // Determine API base URL based on environment
-const API_BASE_URL = import.meta.env.DEV
-	? "http://127.0.0.1:8788" // Local worker address for development
-	: "https://bondwise-sync-api.vikione.workers.dev"; // Production worker address
+// Use Dev URL only if DEV is true AND we are NOT in Vitest; otherwise use Prod/Test URL
+const API_BASE_URL =
+	import.meta.env.DEV && !import.meta.env.VITEST
+		? "http://127.0.0.1:8788" // Local worker for actual development
+		: "https://bondwise-sync-api.vikione.workers.dev"; // Production or Testing
 
 // Define possible outcomes for cloud operations
 export type CloudSyncStatus =

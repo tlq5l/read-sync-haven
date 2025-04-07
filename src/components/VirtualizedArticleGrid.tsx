@@ -1,6 +1,7 @@
 import ArticleCard from "@/components/ArticleCard";
 import type { Article } from "@/services/db"; // Assuming Article type path
-import React from "react";
+// Removed unused usePrevious import
+import React from "react"; // Remove unused useEffect import
 import { VirtuosoGrid } from "react-virtuoso";
 
 // Memoize ArticleCard for performance within the virtualized list
@@ -18,6 +19,8 @@ interface VirtualizedArticleGridProps {
 export const VirtualizedArticleGrid: React.FC<VirtualizedArticleGridProps> = ({
 	articles /* other props... */,
 }) => {
+	// const prevArticles = usePrevious(articles); // Removed unused variable declaration
+
 	if (!articles || articles.length === 0) {
 		// Handle empty state if needed, though the parent page might handle this
 		return null; // Or render an empty message

@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/select";
 import { useArticles } from "@/context/ArticleContext";
 import type { ArticleSortField } from "@/types/articles";
-import { ArrowDownUp } from "lucide-react";
+import { ArrowDownUp, WifiOff } from "lucide-react"; // Added WifiOff icon
 import { useTranslation } from "react-i18next"; // Added useTranslation
 import { Link, useLocation } from "react-router-dom";
 
@@ -22,6 +22,7 @@ export default function TopBar() {
 		sortCriteria,
 		setSortField,
 		toggleSortDirection,
+		syncStatus, // Destructure syncStatus
 	} = useArticles();
 	const location = useLocation();
 	const { t } = useTranslation(); // Added translation hook
@@ -55,6 +56,16 @@ export default function TopBar() {
 				>
 					<Link to="/archive">{t("sidebar.archive")}</Link>
 				</Button>
+			</div>
+
+			{/* Center Section: Sync Status */}
+			<div className="flex-grow flex justify-center">
+				{syncStatus === "offline" && (
+					<div className="flex items-center text-xs px-2 py-1 rounded-md bg-destructive/10 text-destructive font-medium">
+						<WifiOff size={14} className="mr-1" />
+						{t("topBar.status.offline")}
+					</div>
+				)}
 			</div>
 
 			{/* Right Section: Sorting */}

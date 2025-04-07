@@ -40,6 +40,7 @@ export default function InboxPage() {
 	const animationFrameRef = useRef(createAnimationFrame());
 
 	// Local state for search input
+	// Local state for search input
 	const [localSearchQuery, setLocalSearchQuery] = useState("");
 	const debouncedSearchQuery = useDebounce(localSearchQuery, 300); // 300ms debounce
 

@@ -108,6 +108,95 @@ export const handlers: RequestHandler[] = [
 		});
 	}),
 
+	// --- Handlers for /items endpoint (cloudSync.ts) ---
+
+	// Handler for GET /items
+	http.get(`${WORKER_BASE_URL}/items`, ({ request }) => {
+		console.log("[MSW] Intercepted GET /items");
+		if (!checkAuthHeader(request)) {
+			console.log("[MSW] Unauthorized GET /items request");
+			return new HttpResponse(JSON.stringify({ error: "Unauthorized" }), {
+				status: 401,
+			});
+		}
+		// Respond with mock data similar to cloudSync.test.ts
+		const mockItems = [
+			{
+				id: "cloud-123",
+				url: "http://example.com/1",
+				title: "Cloud Article 1",
+				content: "Content 1",
+				scrapedAt: "2024-01-01T10:00:00.000Z",
+				type: "article",
+				userId: "user-abc",
+			},
+			{
+				id: "cloud-456",
+				url: "http://example.com/2",
+				title: "Cloud Article 2",
+				content: "Content 2",
+				scrapedAt: "2024-01-02T12:30:00.000Z",
+				type: "article",
+				userId: "user-abc",
+				isRead: true,
+				favorite: false,
+			},
+			{
+				id: "cloud-789",
+				url: "http://example.com/3",
+				title: "Cloud Article 3",
+				content: "Content 3",
+				type: "article",
+				userId: "user-abc",
+			},
+		];
+		console.log("[MSW] Responding successfully to GET /items");
+		return HttpResponse.json(mockItems);
+	}),
+
+	// Handler for POST /items
+	http.post(`${WORKER_BASE_URL}/items`, async ({ request }) => {
+		console.log("[MSW] Intercepted POST /items");
+		if (!checkAuthHeader(request)) {
+			console.log("[MSW] Unauthorized POST /items request");
+			return new HttpResponse(JSON.stringify({ error: "Unauthorized" }), {
+				status: 401,
+			});
+		}
+		// TODO: Add body validation if needed for specific tests
+		try {
+			await request.json(); // Consume body
+		} catch (e) {
+			// Handle invalid JSON if necessary
+			console.log("[MSW] Invalid JSON body for POST /items");
+			return new HttpResponse(
+				JSON.stringify({ error: "Bad Request: Invalid JSON" }),
+				{ status: 400 },
+			);
+		}
+		console.log("[MSW] Responding successfully to POST /items");
+		return new HttpResponse(null, { status: 200 }); // OK status
+	}),
+
+	// Handler for DELETE /items/:id
+	http.delete(`${WORKER_BASE_URL}/items/:id`, ({ request, params }) => {
+		const { id } = params;
+		console.log(`[MSW] Intercepted DELETE /items/${id}`);
+		if (!checkAuthHeader(request)) {
+			console.log(`[MSW] Unauthorized DELETE /items/${id} request`);
+			return new HttpResponse(JSON.stringify({ error: "Unauthorized" }), {
+				status: 401,
+			});
+		}
+		// Example: Mock "not found" for a specific ID if needed by a test
+		// if (id === 'not-real-id') {
+		//   console.log(`[MSW] Responding 404 Not Found to DELETE /items/${id}`);
+		//   return new HttpResponse(null, { status: 404 });
+		// }
+		console.log(`[MSW] Responding successfully to DELETE /items/${id}`);
+		return new HttpResponse(null, { status: 204 }); // No Content status
+	}),
+
 	// --- Handlers for Fake GCF URLs used in Worker Tests ---
 
 	// Handler for POST http://fake-gcf/summarize
@@ -143,7 +232,7 @@ export const handlers: RequestHandler[] = [
 		// Basic success response for worker index tests
 		return HttpResponse.json({ response: "Fake GCF Chat Response (.test)" });
 	}),
-];
+]; // END of main handlers array
 
 // You can add more handlers here for different scenarios (e.g., server errors)
 // Example error handler:

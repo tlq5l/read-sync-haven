@@ -79,6 +79,17 @@ export default function EpubProcessor({
 				const zip = await JSZip.loadAsync(arrayBuffer); // Reload zip instance
 				console.log("[EpubProcessor] Epub book initialized (epubjs & jszip).");
 
+				// --- Case-Insensitive Path Mapping ---
+				const actualFilePaths = Object.keys(zip.files);
+				const pathMap: Record<string, string> = {};
+				for (const path of actualFilePaths) {
+					pathMap[path.toLowerCase()] = path;
+				}
+				console.log(
+					`[EpubProcessor] Created path map with ${Object.keys(pathMap).length} entries for case-insensitive lookup.`,
+				);
+				// --- End Case-Insensitive Path Mapping ---
+
 				await epubBook.ready;
 				console.log("[EpubProcessor] Epub book ready.");
 				// We only need spine, not necessarily archive if we extract text with JSZip
@@ -89,10 +100,17 @@ export default function EpubProcessor({
 				console.log(
 					`[EpubProcessor] Processing ${epubBook.spine.items.length} spine items...`,
 				);
+				console.log(
+					"[EpubProcessor] Spine item hrefs:",
+					epubBook.spine.items.map((i) => i.href),
+				);
 				// Map spine items to promises resolving to processed HTML with embedded images
 				const sectionPromises = epubBook.spine.items.map(async (item) => {
 					// Removed unused 'index' parameter
 					let sectionPath = ""; // Define for error logging
+					console.log(
+						`[EpubProcessor] Attempting to process section: ${item.href}`,
+					);
 					try {
 						// Use item.href directly (usually synchronous) instead of awaiting item.url
 						sectionPath = item.href ? normalize(item.href) : "";
@@ -104,19 +122,28 @@ export default function EpubProcessor({
 							return "";
 						}
 
-						// --- Use JSZip to get raw section HTML instead of epubjs ---
-						const sectionFile = zip.file(sectionPath);
+						// --- Use JSZip to get raw section HTML (case-insensitive) ---
+						const actualSectionPath = pathMap[sectionPath.toLowerCase()];
+						const sectionFile = actualSectionPath
+							? zip.file(actualSectionPath)
+							: null;
+						console.log(
+							`[EpubProcessor DEBUG] Looked for section path "${sectionPath}". Found actual path: "${actualSectionPath || "Not Found"}"`,
+						);
 						if (!sectionFile) {
 							console.warn(
-								`[EpubProcessor] Section file not found in zip: ${sectionPath}`,
+								`[EpubProcessor] FAIL: Section file not found in zip for href "${item.href}" (searched path: ${sectionPath}). Skipping.`, // Enhanced log
 							);
 							return ""; // Skip section if file not found
 						}
 						const sectionHtml = await sectionFile.async("string");
+						console.log(
+							`[EpubProcessor] SUCCESS: Extracted raw HTML for section: ${sectionPath} (href: ${item.href})`,
+						);
 						// --- End JSZip HTML extraction ---
 						if (typeof sectionHtml !== "string" || sectionHtml.length === 0) {
 							console.warn(
-								`[EpubProcessor] Section ${sectionPath} content is not a string or empty.`,
+								`[EpubProcessor] FAIL: Section content is not a string or empty for href "${item.href}" (path: ${sectionPath}). Skipping.`, // Enhanced log
 							);
 							return "";
 						}
@@ -162,17 +189,27 @@ export default function EpubProcessor({
 									console.log(
 										`\t[Epub Img DEBUG]    Attempting zip.file("${imagePath}")`,
 									);
-									const imageFile = imagePath ? zip.file(imagePath) : null; // Find file using JSZip, handle undefined path
+									// --- Case-insensitive image lookup ---
+									const actualImagePath = imagePath
+										? pathMap[imagePath.toLowerCase()]
+										: undefined;
+									const imageFile = actualImagePath
+										? zip.file(actualImagePath)
+										: null;
+									console.log(
+										`\t[Epub Img DEBUG]    Looked for image path "${imagePath}". Found actual path: "${actualImagePath || "Not Found"}"`,
+									);
+									// --- End Case-insensitive image lookup ---
 									console.log(
 										`\t[Epub Img DEBUG]    JSZip found file? ${!!imageFile}`,
 									); // Log if file was found by JSZip
-
 									if (imageFile) {
 										// console.log(`\t[Epub Img DEBUG] Found file in JSZip for path: "${imagePath}"`);
 										const base64Data = await imageFile.async("base64"); // Get base64 from JSZip
 										// console.log(`\t[Epub Img DEBUG] JSZip base64 result length: ${base64Data?.length ?? 'undefined'} for "${imagePath}"`);
-										if (base64Data && imagePath) {
-											const mimeType = getMimeType(imagePath);
+										// Use actualImagePath for MIME type lookup
+										if (base64Data && actualImagePath) {
+											const mimeType = getMimeType(actualImagePath);
 											console.log(
 												`\t[Epub Img DEBUG]    Determined MIME type: "${mimeType}"`,
 											); // Log MIME type
@@ -181,22 +218,24 @@ export default function EpubProcessor({
 													"src",
 													`data:${mimeType};base64,${base64Data}`,
 												);
-												// console.log(`\t[Epub Img] SUCCESS: Embedded image "${imagePath}" using JSZip`);
+												console.log(
+													`\t[Epub Img] SUCCESS: Embedded image "${actualImagePath}" using JSZip`,
+												); // Log actual path
 											} else {
 												console.warn(
-													`\t[Epub Img] FAIL: Could not determine MIME type for "${imagePath}"`,
+													`\t[Epub Img] FAIL: Could not determine MIME type for "${actualImagePath}"`, // Log actual path
 												);
 												img.removeAttribute("src");
 											}
 										} else {
 											console.warn(
-												`\t[Epub Img] FAIL: JSZip returned no data for "${imagePath}"`,
+												`\t[Epub Img] FAIL: JSZip returned no data for "${actualImagePath}"`, // Log actual path
 											);
 											img.removeAttribute("src");
 										}
 									} else {
 										console.warn(
-											`\t[Epub Img] FAIL: Image file not found in JSZip archive at "${imagePath}"`,
+											`\t[Epub Img] FAIL: Image file not found in JSZip archive at "${imagePath}" (looked for "${actualImagePath || "Not Found"}")`, // Log actual path searched
 										);
 										img.removeAttribute("src");
 									}
@@ -207,7 +246,7 @@ export default function EpubProcessor({
 										`\t[Epub Img DEBUG] <- FAIL: Error during JSZip processing for src "${originalSrc}" (resolved path: "${imagePath}"):`,
 										imgErr?.message || imgErr, // Log message first
 										imgErr, // Log full error object
-									);
+									); // Added closing parenthesis and semicolon
 									img.removeAttribute("src");
 								}
 							}
@@ -220,10 +259,11 @@ export default function EpubProcessor({
 					} catch (sectionErr: any) {
 						// Add type 'any' for detailed logging
 						console.error(
-							`[EpubProcessor] Error processing section (href: ${item.href || sectionPath}):`,
-							sectionErr, // Reverted logging
-						);
-						return ""; // Return empty string on error
+							`[EpubProcessor] FAIL: Error processing section href: ${item.href} (path: ${sectionPath}):`, // Enhanced log
+							sectionErr?.message || sectionErr, // Log message
+							sectionErr, // Log full error object
+						); // Added closing parenthesis and semicolon
+						return ""; // Return empty string on error; Added semicolon
 					}
 				}); // End sectionPromises map
 
@@ -264,6 +304,9 @@ export default function EpubProcessor({
 					.filter(Boolean)
 					.join("\n\n<hr/>\n\n"); // Filter out empty strings and join
 
+				console.log(
+					`[EpubProcessor] Final check: Was any content extracted? ${!!combinedHtml}`,
+				);
 				// Check if ALL sections failed (resulted in empty strings)
 				if (!combinedHtml && sectionHtmlArray.every((s) => s === "")) {
 					// If all sections failed (likely caught by individual section catch blocks, but logs might be missing)
@@ -273,7 +316,7 @@ export default function EpubProcessor({
 					);
 					console.error(
 						// Keep original log too
-						"[EpubProcessor] Details: Failed to extract content from any spine section, likely due to internal errors during processing.",
+						"[EpubProcessor] FINAL FAIL: Failed to extract content from ANY spine section, likely due to errors during processing.", // Enhanced log
 					);
 					onContentProcessed(null);
 					setLoading(false);

@@ -11,7 +11,8 @@
 			"tsconfig.app.json",
 			"tsconfig.json",
 			"dist/**/*",
-			"dist/**/*.js"
+			"dist/**/*.js",
+			"bondwise-worker/.wrangler/**"
 		]
 	},
 	"formatter": {

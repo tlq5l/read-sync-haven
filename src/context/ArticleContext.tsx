@@ -35,6 +35,7 @@ interface ArticleContextType {
 	error: Error | null;
 	isDbInitialized: boolean;
 	allTags: Tag[]; // All available tags for filtering UI
+	syncStatus: "idle" | "syncing" | "success" | "offline"; // Add sync status
 
 	// --- View Management ---
 	currentView: ArticleView;
@@ -97,6 +98,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		error: syncError,
 		refreshArticles: syncRefreshArticles, // Rename to avoid conflict
 		retryLoading: syncRetryLoading, // Rename to avoid conflict
+		syncStatus, // Destructure syncStatus from useArticleSync
 	} = useArticleSync(isDbInitialized, hidingArticleIds); // Pass hidingArticleIds state
 	// 4. Tags State
 	const [allTags, setAllTags] = useState<Tag[]>([]);
@@ -243,6 +245,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			error,
 			isDbInitialized,
 			allTags,
+			syncStatus, // Add syncStatus to context value
 			currentView,
 			setCurrentView,
 			filters,
@@ -270,6 +273,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			error,
 			isDbInitialized,
 			allTags,
+			syncStatus, // Add syncStatus dependency
 			currentView,
 			setCurrentView, // Include if view logic affects context value directly elsewhere
 			filters,
