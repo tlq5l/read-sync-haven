@@ -96,13 +96,8 @@ export async function extractEpubMetadata(
 		return result;
 	} catch (error) {
 		console.error("Error extracting EPUB metadata:", error);
-		// Return minimal metadata if extraction fails
-		return {
-			title: "Unknown Title",
-			author: "Unknown Author",
-			description: "No description available",
-			language: "en",
-		};
+		// Propagate the error to the caller
+		throw error; // Re-throw the error
 	}
 }
 
