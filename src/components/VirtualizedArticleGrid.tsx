@@ -1,5 +1,5 @@
 import ArticleCard from "@/components/ArticleCard";
-import type { Article } from "@/services/db"; // Assuming Article type path
+import type { Article } from "@/services/db/types"; // Updated path
 // Removed unused usePrevious import
 import React from "react"; // Remove unused useEffect import
 import { VirtuosoGrid } from "react-virtuoso";

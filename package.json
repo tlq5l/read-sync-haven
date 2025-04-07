@@ -55,7 +55,6 @@
 		"@types/jsdom": "^21.1.7",
 		"@types/jszip": "^3.4.1",
 		"@types/mozilla__readability": "^0.4.2",
-		"@types/pouchdb": "^6.4.2",
 		"@types/turndown": "^5.0.5",
 		"@types/uuid": "^10.0.0",
 		"ajv": "^6.12.3",
@@ -64,6 +63,8 @@
 		"clsx": "^2.1.1",
 		"cmdk": "^1.1.1",
 		"date-fns": "^3.6.0",
+		"dexie": "^4.0.11",
+		"dexie-react-hooks": "^1.1.7",
 		"dompurify": "^3.2.4",
 		"embla-carousel-react": "^8.5.2",
 		"epubjs": "^0.3.93",
@@ -81,9 +82,6 @@
 		"next-themes": "^0.3.0",
 		"node-html-parser": "^7.0.1",
 		"pdfjs-dist": "^5.1.91",
-		"pouchdb": "^9.0.0",
-		"pouchdb-browser": "^9.0.0",
-		"pouchdb-find": "^9.0.0",
 		"react": "^18.3.1",
 		"react-day-picker": "^8.10.1",
 		"react-dom": "^18.3.1",
@@ -125,16 +123,11 @@
 		"husky": "^9.1.7",
 		"msw": "^2.7.3",
 		"postcss": "^8.5.3",
-		"pouchdb-adapter-memory": "^9.0.0",
 		"process": "^0.11.10",
 		"tailwindcss": "^3.4.17",
 		"typescript": "^5.8.2",
 		"vite": "^6.2.4",
 		"vite-plugin-node-polyfills": "^0.23.0",
 		"vitest": "^3.1.1"
-	},
-	"overrides": {
-		"pouchdb-ajax": "^6.4.3",
-		"pouchdb-adapter-http": "^6.4.3"
 	}
 }

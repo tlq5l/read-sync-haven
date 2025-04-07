@@ -1,4 +1,4 @@
-import type { Article } from "@/services/db";
+import type { Article } from "@/services/db/types"; // Updated path
 import type { ArticleFilters, SortCriteria } from "@/types/articles";
 
 /**

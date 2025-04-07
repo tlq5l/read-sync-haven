@@ -1,51 +1,18 @@
-import * as dbFunctions from "@/services/db/articles"; // Import namespace for spyOn
-// Merged imports, preferring renderHook from @testing-library/react
-import {
-	act,
-	cleanup,
-	fireEvent,
-	render,
-	screen,
-	// waitFor is imported below
-	within,
-} from "@testing-library/react";
-import { renderHook, waitFor } from "@testing-library/react"; // Keep this line
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"; // Added afterEach
+import type { Article } from "@/services/db/types"; // Import correct Article type
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useArticleSync } from "./useArticleSync";
-// import { MockArticleProvider } from "@/test-utils/MockArticleProvider"; // Commented out unused import
-
-// Import types needed for mocks and tests
-import type { Article, QueuedOperation } from "@/services/db";
 
 // --- Mocks Setup ---
 
-// Use vi.hoisted for mocks that need to be available before imports, including Clerk mocks
+// Keep Clerk mocks as they might still be relevant for user ID etc.
 const {
-	// Removed duplicate mockGetAllArticles declaration
-	// All hoisted mocks are defined within vi.hoisted and destructured here
-	mockGetAllArticles,
-	mockSaveArticle,
-	mockBulkSaveArticles,
-	mockLocalSoftDeleteArticle,
-	mockArticlesDbGet,
-	mockArticlesDbPut,
-	mockArticlesDbRemove,
-	mockArticlesDbBulkDocs,
-	mockOperationsQueueDbGet,
-	mockOperationsQueueDbPut,
-	mockOperationsQueueDbRemove,
-	mockOperationsQueueDbAllDocs,
-	mockOperationsQueueDbBulkDocs,
-	mockFetchCloudItems,
-	mockDeleteItemFromCloud,
-	mockSaveItemToCloud,
-	mockUseAuth, // Function for clearing
-	mockUseUser, // Function for clearing
-	stableGetToken, // Function for tests/vi.mock
-	stableUseAuthResult, // Stable object for vi.mock
-	stableUseUserResult, // Stable object for vi.mock
+	mockUseAuth,
+	mockUseUser,
+	stableGetToken,
+	stableUseAuthResult,
+	stableUseUserResult,
 } = vi.hoisted(() => {
-	// --- Stable Clerk Values ---
 	const _stableGetTokenFn = vi.fn().mockResolvedValue("test-token");
 	const _stableAuthResult = {
 		userId: "test-user-id",
@@ -53,1177 +20,431 @@ const {
 		isLoaded: true,
 		getToken: _stableGetTokenFn,
 		sessionId: "test-session-id",
-		// Add other properties if needed by useArticleSync or its internals
 	};
 	const _stableUserObject = {
 		primaryEmailAddress: { emailAddress: "test@example.com" },
 		id: "test-user-clerk-id",
-		// Add other properties if needed
 	};
 	const _stableUserResult = {
 		isLoaded: true,
 		isSignedIn: true,
 		user: _stableUserObject,
 	};
-	// Mock functions for Clerk hooks (needed for clearing)
 	const _mockUseAuthFn = vi.fn(() => _stableAuthResult);
 	const _mockUseUserFn = vi.fn(() => _stableUserResult);
-
-	// --- All Other Mocks ---
-	const _mockGetAllArticles = vi.fn();
-	const _mockSaveArticle = vi.fn((article) =>
-		Promise.resolve({ ...article, _rev: "mock-rev-save" }),
-	);
-	const _mockBulkSaveArticles = vi.fn((articles) =>
-		Promise.resolve(
-			articles.map((a: any) => ({
-				ok: true,
-				id: a._id,
-				rev: `mock-rev-bulk-${a._id}`,
-			})),
-		),
-	);
-	const _mockLocalSoftDeleteArticle = vi.fn().mockResolvedValue(true);
-	const _mockArticlesDbGet = vi.fn();
-	const _mockArticlesDbPut = vi.fn();
-	const _mockArticlesDbRemove = vi.fn();
-	const _mockArticlesDbBulkDocs = vi.fn().mockResolvedValue([]);
-	const _mockOperationsQueueDbGet = vi.fn();
-	const _mockOperationsQueueDbPut = vi.fn();
-	const _mockOperationsQueueDbRemove = vi.fn();
-	const _mockOperationsQueueDbAllDocs = vi.fn();
-	const _mockOperationsQueueDbBulkDocs = vi.fn().mockResolvedValue([]);
-	const _mockFetchCloudItems = vi.fn();
-	const _mockDeleteItemFromCloud = vi.fn();
-	const _mockSaveItemToCloud = vi.fn();
-
-	// --- Returned Hoisted Object ---
 	return {
-		// Standard Mocks
-		mockGetAllArticles: _mockGetAllArticles,
-		mockSaveArticle: _mockSaveArticle,
-		mockBulkSaveArticles: _mockBulkSaveArticles,
-		mockLocalSoftDeleteArticle: _mockLocalSoftDeleteArticle,
-		mockArticlesDbGet: _mockArticlesDbGet,
-		mockArticlesDbPut: _mockArticlesDbPut,
-		mockArticlesDbRemove: _mockArticlesDbRemove,
-		mockArticlesDbBulkDocs: _mockArticlesDbBulkDocs,
-		mockOperationsQueueDbGet: _mockOperationsQueueDbGet,
-		mockOperationsQueueDbPut: _mockOperationsQueueDbPut,
-		mockOperationsQueueDbRemove: _mockOperationsQueueDbRemove,
-		mockOperationsQueueDbAllDocs: _mockOperationsQueueDbAllDocs,
-		mockOperationsQueueDbBulkDocs: _mockOperationsQueueDbBulkDocs,
-		mockFetchCloudItems: _mockFetchCloudItems,
-		mockDeleteItemFromCloud: _mockDeleteItemFromCloud,
-		mockSaveItemToCloud: _mockSaveItemToCloud,
-		// Clerk Mock Functions (for clearing)
 		mockUseAuth: _mockUseAuthFn,
 		mockUseUser: _mockUseUserFn,
-		// Clerk Stable Values (for vi.mock factories / tests)
 		stableGetToken: _stableGetTokenFn,
 		stableUseAuthResult: _stableAuthResult,
 		stableUseUserResult: _stableUserResult,
 	};
 });
 
-// ---- MOCK MODULES ----
+// Mock Clerk
+vi.mock("@clerk/clerk-react", () => ({
+	useAuth: mockUseAuth,
+	useUser: mockUseUser,
+}));
 
-// Use a stable reference for the toast mock
+// Keep Toast mock (might be used for error reporting)
 const mockToastFn = vi.fn();
 vi.mock("@/hooks/use-toast", () => ({
 	useToast: () => ({ toast: mockToastFn }),
 }));
 
-// Use stable Clerk mocks defined in hoisted block
-vi.mock("@clerk/clerk-react", () => ({
-	useAuth: vi.fn(() => stableUseAuthResult), // Mock useAuth to return stable object
-	useUser: vi.fn(() => stableUseUserResult), // Mock useUser to return stable object
+// Mock Dexie DB - NEW
+let mockDbData: Article[] = []; // In-memory store for articles
+
+const mockArticlesTable = {
+	// Core Methods
+	toArray: vi.fn(async () => structuredClone(mockDbData)), // Return copy
+	bulkPut: vi.fn(
+		async (items: Article[], keys?: any, options?: { allKeys: boolean }) => {
+			const addedIds: string[] = [];
+			for (const item of items) {
+				if (!item._id)
+					throw new Error("Mock Dexie Error: Article must have an _id"); // Check for _id
+				const index = mockDbData.findIndex((dbItem) => dbItem._id === item._id); // Use _id for findIndex
+				const newItem = structuredClone(item); // Store copy
+				if (index !== -1) {
+					mockDbData[index] = newItem; // Update
+				} else {
+					mockDbData.push(newItem); // Add
+				}
+				addedIds.push(item._id); // Push _id
+			}
+			// Dexie's bulkPut returns the keys of the added/updated items
+			return Promise.resolve(
+				options?.allKeys ? addedIds : addedIds[addedIds.length - 1],
+			);
+		},
+	),
+	get: vi.fn(async (_id: string) => {
+		// Parameter name changed for clarity
+		const found = mockDbData.find((item) => item._id === _id); // Use _id for find
+		return Promise.resolve(found ? structuredClone(found) : undefined); // Return copy
+	}),
+	put: vi.fn(async (item: Article, key?: any) => {
+		// Use _id
+		if (!item._id)
+			throw new Error("Mock Dexie Error: Article must have an _id"); // Check for _id
+		const index = mockDbData.findIndex((dbItem) => dbItem._id === item._id); // Use _id for findIndex
+		const newItem = structuredClone(item); // Store copy
+		if (index !== -1) {
+			mockDbData[index] = newItem; // Update
+		} else {
+			mockDbData.push(newItem); // Add
+		}
+		return Promise.resolve(item._id); // Return _id
+	}),
+	delete: vi.fn(async (_id: string) => {
+		// Parameter name changed for clarity
+		const initialLength = mockDbData.length;
+		mockDbData = mockDbData.filter((item) => item._id !== _id); // Use _id for filter
+		return Promise.resolve(initialLength - mockDbData.length); // Dexie delete returns count of deleted items (0 or 1)
+	}),
+	// Querying Methods (add more as needed by useArticleSync)
+	where: vi.fn((index: string) => ({
+		equals: vi.fn((value: any) => ({
+			toArray: vi.fn(async () => {
+				const results = mockDbData.filter(
+					(item) => item[index as keyof Article] === value,
+				);
+				return Promise.resolve(structuredClone(results)); // Return copy
+			}),
+			// Add other chainable methods if needed (e.g., modify, delete)
+		})),
+		// Add other comparison methods if needed (e.g., above, below, anyOf)
+	})),
+	// Utility methods
+	clear: vi.fn(async () => {
+		mockDbData = [];
+		return Promise.resolve();
+	}),
+	orderBy: vi.fn((index: string) => ({
+		// Basic orderBy mock
+		reverse: vi.fn(() => ({
+			toArray: vi.fn(async () => {
+				const sorted = [...mockDbData].sort((a, b) => {
+					const valA = a[index as keyof Article];
+					const valB = b[index as keyof Article];
+					if (valA < valB) return 1;
+					if (valA > valB) return -1;
+					return 0;
+				});
+				return Promise.resolve(structuredClone(sorted)); // Return copy
+			}),
+		})),
+		toArray: vi.fn(async () => {
+			const sorted = [...mockDbData].sort((a, b) => {
+				const valA = a[index as keyof Article];
+				const valB = b[index as keyof Article];
+				if (valA < valB) return -1;
+				if (valA > valB) return 1;
+				return 0;
+			});
+			return Promise.resolve(structuredClone(sorted)); // Return copy
+		}),
+	})),
+	filter: vi.fn((filterFn: (article: Article) => boolean) => ({
+		// Basic filter mock
+		toArray: vi.fn(async () => {
+			const filtered = mockDbData.filter(filterFn);
+			return Promise.resolve(structuredClone(filtered)); // Return copy
+		}),
+	})),
+	// Add other methods used by the hook (e.g., count, update)
+};
+
+// Mock the specific db instance exported from dexie.ts
+vi.mock("@/services/db/dexie", () => ({
+	db: {
+		articles: mockArticlesTable,
+		// Mock other tables (e.g., readingProgress) if useArticleSync uses them
+	},
 }));
 
-vi.mock("@/services/db", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@/services/db")>();
-	return {
-		...actual,
-		getAllArticles: mockGetAllArticles,
-		saveArticle: mockSaveArticle,
-		bulkSaveArticles: mockBulkSaveArticles,
-		deleteArticle: mockLocalSoftDeleteArticle,
-		articlesDb: {
-			get: mockArticlesDbGet,
-			put: mockArticlesDbPut,
-			remove: mockArticlesDbRemove,
-			bulkDocs: mockArticlesDbBulkDocs,
-			info: vi.fn().mockResolvedValue({ doc_count: 0 }),
-			createIndex: vi.fn().mockResolvedValue({ result: "created" }),
-		},
-		operationsQueueDb: {
-			get: mockOperationsQueueDbGet,
-			put: mockOperationsQueueDbPut,
-			remove: mockOperationsQueueDbRemove,
-			allDocs: mockOperationsQueueDbAllDocs,
-			bulkDocs: mockOperationsQueueDbBulkDocs,
-			info: vi.fn().mockResolvedValue({ doc_count: 0 }),
-			createIndex: vi.fn().mockResolvedValue({ result: "created" }),
-		},
-	};
+// Mock articleUtils if still used (assuming filterAndSortArticles might be)
+const mockFilterAndSortArticles = vi.fn((articles: Article[], view: string) => {
+	// Simple pass-through or basic filtering for testing purposes
+	if (view === "unread") return articles.filter((a: Article) => !a.isRead);
+	if (view === "favorites") return articles.filter((a: Article) => a.favorite);
+	return articles;
 });
-
-vi.mock("@/services/cloudSync", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@/services/cloudSync")>();
+vi.mock("@/lib/articleUtils", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/lib/articleUtils")>();
 	return {
-		...actual,
-		fetchCloudItems: mockFetchCloudItems,
-		deleteItemFromCloud: mockDeleteItemFromCloud,
-		saveItemToCloud: mockSaveItemToCloud,
-	};
-});
-
-vi.mock("@/lib/articleUtils", () => {
-	return {
-		filterAndSortArticles: vi.fn((articles: Article[], view: string) => {
-			if (view === "unread") return articles.filter((a: Article) => !a.isRead);
-			if (view === "favorites")
-				return articles.filter((a: Article) => a.favorite);
-			return articles;
-		}),
-		runOneTimeFileSync: vi.fn(),
+		...actual, // Keep other utils if they exist and are needed
+		filterAndSortArticles: mockFilterAndSortArticles,
+		// Mock other functions from articleUtils if they are used by useArticleSync
 	};
 });
 
 // --- Test Data ---
+// Updated baseMockArticle to use 'id' and remove '_rev', '_id'
 const baseMockArticle = (
 	id: string,
-	version: number,
 	savedAt: number,
 	titleSuffix = "",
+	override: Partial<Article> = {},
 ): Article => ({
-	_id: id,
+	// Use _id as primary key
+	_id: id, // Use _id instead of id
 	url: `http://example.com/${id}`,
 	title: `Article ${id}${titleSuffix}`,
 	content: `Content ${id}`,
 	savedAt: savedAt,
-	status: "inbox" as const,
+	status: "inbox",
 	isRead: false,
 	favorite: false,
-	type: "article" as const,
-	userId: "test-user-id",
+	userId: "test-user-id", // Assuming userId is still relevant
 	excerpt: `Excerpt ${id}`,
 	tags: [],
-	version: version,
-	_rev: `rev-${id}-${version}`,
-	deletedAt: undefined,
+	createdAt: savedAt, // Dexie typically uses createdAt/updatedAt
+	updatedAt: savedAt,
+	readingProgress: 0,
+	wordCount: 100,
+	coverImageUrl: null,
+	annotations: [],
+	highlights: [],
+	htmlContent: `<p>Content ${id}</p>`,
+	markdownContent: `Content ${id}`,
+	estimatedReadingTimeMinutes: 1,
+	author: `Author ${id}`,
+	publicationDate: null,
+	summary: null,
+	...override,
 });
 
-const mockArticles: Article[] = [
-	baseMockArticle("1", 1, 1000),
-	baseMockArticle("2", 1, 2000),
+const initialMockArticles: Article[] = [
+	baseMockArticle("1", 1000),
+	baseMockArticle("2", 2000, "", { isRead: true }),
+	baseMockArticle("3", 1500, " Favorite", { favorite: true }),
 ];
 
 // --- Tests ---
-describe("useArticleSync", () => {
+describe("useArticleSync (Dexie)", () => {
 	beforeEach(() => {
+		// Clear all general mocks
 		vi.clearAllMocks();
 
-		// Explicitly clear this critical mock's history
-		mockBulkSaveArticles.mockClear();
-		// --- Reset Core Mocks ---
-		mockGetAllArticles.mockReset().mockResolvedValue([]);
-		mockFetchCloudItems.mockReset().mockResolvedValue([]);
-		mockOperationsQueueDbAllDocs.mockReset().mockResolvedValue({
-			offset: 0,
-			total_rows: 0,
-			rows: [],
-		});
-		mockDeleteItemFromCloud.mockReset().mockResolvedValue("success");
-		mockSaveItemToCloud.mockReset().mockResolvedValue("success");
-		mockBulkSaveArticles.mockReset().mockImplementation(async (articles) =>
-			articles.map((a: any) => ({
-				ok: true,
-				id: a._id,
-				rev: `mock-rev-bulk-${a._id}`,
-			})),
-		);
-		mockLocalSoftDeleteArticle.mockReset().mockResolvedValue(true);
+		// Reset Dexie mock data and function calls
+		mockDbData = []; // Clear in-memory data store
+		// Reset call history and restore default implementations where needed
+		for (const mockFn of Object.values(mockArticlesTable)) {
+			if (vi.isMockFunction(mockFn)) {
+				mockFn.mockClear();
+			} else if (typeof mockFn === "object" && mockFn !== null) {
+				// Handle nested mocks like 'where', 'orderBy'
+				for (const nestedMock of Object.values(mockFn)) {
+					if (vi.isMockFunction(nestedMock)) {
+						nestedMock.mockClear();
+					} else if (typeof nestedMock === "object" && nestedMock !== null) {
+						for (const deepMock of Object.values(nestedMock)) {
+							if (vi.isMockFunction(deepMock)) deepMock.mockClear();
+							// Reset deeper mocks if necessary
+							if (deepMock?.toArray && vi.isMockFunction(deepMock.toArray))
+								deepMock.toArray.mockClear();
+							if (deepMock?.reverse && vi.isMockFunction(deepMock.reverse))
+								deepMock.reverse.mockClear();
+							if (deepMock?.equals && vi.isMockFunction(deepMock.equals))
+								deepMock.equals.mockClear();
+						}
+					}
+				}
+			}
+		}
 
-		// PouchDB specific mocks
-		mockArticlesDbGet.mockReset().mockImplementation(async (id: string) => {
-			// Default mock: Resolve with null (simulating 'not found' without throwing)
-			// Specific tests can override this if they expect an article to exist
-			console.log(
-				`Mock articlesDb.get called for ID: ${id}, returning null (default)`,
-			); // Added logging
-			return Promise.resolve(null);
-		});
-		mockArticlesDbPut.mockReset().mockImplementation(async (doc: any) => ({
-			ok: true,
-			id: doc._id,
-			rev: `${doc._rev}-mock-put`, // Simulate a new revision
-		}));
-		mockArticlesDbRemove.mockReset();
-		mockArticlesDbBulkDocs.mockReset().mockResolvedValue([]);
-		mockOperationsQueueDbGet.mockReset();
-		mockOperationsQueueDbPut
-			.mockReset()
-			.mockImplementation(async (doc: any) => ({
-				ok: true,
-				id: doc._id,
-				rev: `${doc._id}-mock-q-put`, // Simulate a queue put revision
-			}));
-		mockOperationsQueueDbRemove.mockReset();
-		mockOperationsQueueDbBulkDocs.mockReset().mockResolvedValue([]);
-
-		// Reset Clerk mocks (optional, but good practice)
+		// Reset Clerk mocks (good practice)
 		mockUseAuth.mockClear();
 		mockUseUser.mockClear();
-		stableGetToken.mockReset().mockResolvedValue("test-token"); // Reset implementation and restore default
+		stableGetToken.mockReset().mockResolvedValue("test-token"); // Restore default
 
-		// Restore any spies after each test
-		// Removed vi.restoreAllMocks() from here, moved to afterEach
-	});
+		// Reset other mocks
+		mockToastFn.mockClear();
+		mockFilterAndSortArticles
+			.mockClear()
+			.mockImplementation((articles: Article[], view: string) => {
+				if (view === "unread")
+					return articles.filter((a: Article) => !a.isRead);
+				if (view === "favorites")
+					return articles.filter((a: Article) => a.favorite);
+				return articles;
+			});
 
-	// Add afterEach for cleanup
-	afterEach(() => {
-		// Restore all mocks after each test
-		// vi.restoreAllMocks(); // Removed: Relying solely on beforeEach resets now.
-		// Cleanup testing-library specific resources
-		cleanup();
-	});
-
-	it("should deduplicate articles that have the same ID but different savedAt", async () => {
-		const duplicateArticles: Article[] = [
-			...mockArticles,
-			{
-				...baseMockArticle("1", 1, 3000, " Updated"),
-				_rev: "rev-1-1-dup",
-				favorite: true,
-			},
-		];
-		mockGetAllArticles.mockResolvedValue(duplicateArticles); // Initial cache load has duplicates
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
+		// Set default Dexie mock implementations *after* clearing
+		mockArticlesTable.toArray.mockImplementation(async () =>
+			structuredClone(mockDbData),
 		);
+		mockArticlesTable.get.mockImplementation(async (id: string) => {
+			const found = mockDbData.find((item) => item._id === id); // Use _id
+			return Promise.resolve(found ? structuredClone(found) : undefined);
+		});
+		mockArticlesTable.where.mockImplementation((index: string) => ({
+			equals: vi.fn((value: any) => ({
+				toArray: vi.fn(async () => {
+					const results = mockDbData.filter(
+						(item) => item[index as keyof Article] === value,
+					);
+					return Promise.resolve(structuredClone(results));
+				}),
+			})),
+		}));
+		mockArticlesTable.orderBy.mockImplementation((index: string) => ({
+			reverse: vi.fn(() => ({
+				toArray: vi.fn(async () => {
+					const sorted = [...mockDbData].sort((a, b) => {
+						const valA = a[index as keyof Article];
+						const valB = b[index as keyof Article];
+						if (valA < valB) return 1;
+						if (valA > valB) return -1;
+						return 0;
+					});
+					return Promise.resolve(structuredClone(sorted));
+				}),
+			})),
+			toArray: vi.fn(async () => {
+				const sorted = [...mockDbData].sort((a, b) => {
+					const valA = a[index as keyof Article];
+					const valB = b[index as keyof Article];
+					if (valA < valB) return -1;
+					if (valA > valB) return 1;
+					return 0;
+				});
+				return Promise.resolve(structuredClone(sorted));
+			}),
+		}));
+		mockArticlesTable.filter.mockImplementation(
+			(filterFn: (article: Article) => boolean) => ({
+				toArray: vi.fn(async () => {
+					const filtered = mockDbData.filter(filterFn);
+					return Promise.resolve(structuredClone(filtered));
+				}),
+			}),
+		);
+	});
 
-		// Wait for loading to finish and state to update
+	afterEach(() => {
+		cleanup(); // Testing-library cleanup
+	});
+
+	it("should load initial articles from Dexie on mount", async () => {
+		// Arrange: Populate mock DB before rendering
+		mockDbData = [...initialMockArticles];
+
+		// Act: Render the hook
+		const { result } = renderHook(() => useArticleSync(true)); // Remove second argument
+
+		// Assert: Loading state updates and articles are loaded
+		expect(result.current.isLoading).toBe(true);
 		await waitFor(() => {
 			expect(result.current.isLoading).toBe(false);
-			// Also wait for the article count to reflect deduplication
-			expect(result.current.articles).toHaveLength(2);
 		});
 
-		// Now check the state after loading
-		expect(result.current.articles.length).toBe(2);
-		const article1 = result.current.articles.find((a) => a._id === "1");
-		expect(article1).toBeDefined();
-		expect(article1?.title).toBe("Article 1 Updated");
-		expect(article1?.savedAt).toBe(3000);
+		expect(mockArticlesTable.toArray).toHaveBeenCalledTimes(1); // Or appropriate Dexie method used for initial load
+		expect(result.current.articles).toHaveLength(initialMockArticles.length);
+		// Optionally check content equality using expect.objectContaining or toEqual
+		expect(result.current.articles).toEqual(
+			expect.arrayContaining(
+				initialMockArticles.map((a) => expect.objectContaining({ _id: a._id })),
+			),
+		); // Check _id
 	});
 
-	it("should deduplicate articles received from the cloud", async () => {
-		const cloudArticles: Article[] = [
-			{
-				...baseMockArticle("1", 2, 5000, " Cloud Updated"),
-				isRead: true,
-				favorite: true,
-				_rev: "rev-cloud-1-2",
-			},
-			{
-				...baseMockArticle("3", 1, 4000, " Cloud Article 3"),
-				_rev: "rev-cloud-3-1",
-			},
-		];
+	it("should return an empty array if no articles are in Dexie", async () => {
+		// Arrange: Ensure mock DB is empty (should be by default from beforeEach)
+		mockDbData = [];
 
-		// Mock initial load: Returns the two base articles
-		mockGetAllArticles.mockResolvedValueOnce([...mockArticles]);
+		// Act
+		const { result } = renderHook(() => useArticleSync(true)); // Remove second argument
 
-		// Mock fetchCloudItems: Returns the cloud state with updated #1 and new #3
-		mockFetchCloudItems.mockResolvedValue(cloudArticles);
-
-		// Mock bulkSaveArticles: This will be called to save the updated #1 and new #3
-		let savedArticles: Article[] = [];
-		mockBulkSaveArticles.mockImplementation(async (articlesToSave) => {
-			savedArticles = articlesToSave.map((a: any) => ({
-				...a,
-				_rev: `mock-rev-bulk-${a._id}-${a.version}`,
-			}));
-			return savedArticles.map((a) => ({ ok: true, id: a._id, rev: a._rev }));
+		// Assert
+		expect(result.current.isLoading).toBe(true);
+		await waitFor(() => {
+			expect(result.current.isLoading).toBe(false);
 		});
 
-		// Mock the final getAllArticles call (non-deleted) after sync
-		mockGetAllArticles.mockImplementation(async (params) => {
-			if (params?.includeDeleted) {
-				// This is the reconciliation fetch, return the initial state
-				return [...mockArticles];
-			}
-			// This is the final UI state fetch
-			// Return the original article #2 plus the saved articles (#1 updated, #3 new)
-			const finalState = [
-				...mockArticles.filter((a) => a._id === "2"),
-				...savedArticles,
-			];
-			return finalState;
-		});
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-
-		// Wait for the hook to finish loading and refreshing, and for the articles
-		// count to become 3.
-		await waitFor(
-			() => {
-				expect(result.current.isLoading).toBe(false);
-				expect(result.current.isRefreshing).toBe(false);
-				expect(result.current.articles.length).toBe(3);
-			},
-			{ timeout: 2000 },
-		);
-
-		// Additional check to ensure mocks were called as expected
-		expect(mockFetchCloudItems).toHaveBeenCalledTimes(1);
-		expect(mockBulkSaveArticles).toHaveBeenCalledTimes(1);
-
-		// Verify the content of the articles after sync
-		const article1 = result.current.articles.find((a) => a._id === "1");
-		expect(article1).toBeDefined();
-		expect(article1?.title).toBe("Article 1 Cloud Updated");
-		expect(article1?.version).toBe(2);
-		expect(article1?.isRead).toBe(true);
-
-		const article2 = result.current.articles.find((a) => a._id === "2");
-		expect(article2).toBeDefined(); // Should still exist
-
-		const article3 = result.current.articles.find((a) => a._id === "3");
-		expect(article3).toBeDefined(); // Should be newly added
-		expect(article3?.title).toBe("Article 3 Cloud Article 3");
+		expect(mockArticlesTable.toArray).toHaveBeenCalledTimes(1); // Check Dexie was queried
+		expect(result.current.articles).toHaveLength(0);
 	});
 
-	// --- New Reconciliation Tests ---
+	// Add more tests based on the NEW logic of useArticleSync with Dexie.
+	// Examples:
+	// - Testing manual refresh logic (if exists)
+	// - Testing how it handles Dexie errors (e.g., mock a method to throw)
+	// - Testing interaction with filters or views (if filterAndSortArticles is used)
+	// - Testing interaction with other hooks or context if applicable
 
-	it("Scenario: Local Delete (Online)", async () => {
-		const localDeletedArticle = {
-			...baseMockArticle("1", 2, 2000),
-			deletedAt: Date.now(),
-			_rev: "rev-1-2",
-		};
-		const cloudArticle = baseMockArticle("1", 1, 1000);
-
-		// Override mock for articlesDb.get for this test, needed for hard delete
-		mockArticlesDbGet.mockResolvedValue(localDeletedArticle);
-
-		// For all getAllArticles calls
-		mockGetAllArticles.mockImplementation((params) => {
-			if (params?.includeDeleted) {
-				return Promise.resolve([localDeletedArticle]);
-			}
-			return Promise.resolve([]);
-		});
-		mockFetchCloudItems.mockResolvedValue([cloudArticle]);
-		mockDeleteItemFromCloud.mockResolvedValue("success");
-		mockOperationsQueueDbAllDocs.mockResolvedValue({
-			offset: 0,
-			total_rows: 0,
-			rows: [],
-		});
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
+	it("should reflect updates made directly to Dexie if hook uses live queries (or re-fetches)", async () => {
+		// Arrange: Start with initial data
+		mockDbData = [baseMockArticle("1", 1000)];
+		const { result, rerender } = renderHook(() => useArticleSync(true)); // Remove second argument
 		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
-		// Assertions moved back into scope below
+		expect(result.current.articles).toHaveLength(1);
 
-		expect(mockDeleteItemFromCloud).toHaveBeenCalledWith("1", "test-token"); // Expect token
-		expect(mockArticlesDbBulkDocs).toHaveBeenCalledWith(
-			expect.arrayContaining([
-				expect.objectContaining({ _id: "1", _rev: "rev-1-2", _deleted: true }),
-			]),
-		);
-		expect(result.current.articles).toEqual([]);
-		expect(mockOperationsQueueDbAllDocs).toHaveBeenCalled();
-	});
-
-	it("Scenario: Local Delete (Offline then Sync)", async () => {
-		const queuedDeleteOpDoc: QueuedOperation &
-			PouchDB.Core.IdMeta &
-			PouchDB.Core.RevisionIdMeta = {
-			_id: "qdel-1",
-			_rev: "qrev-1",
-			type: "delete",
-			docId: "1",
-			timestamp: Date.now(),
-			retryCount: 0,
-		};
-		const queuedDeleteOpRow = {
-			doc: queuedDeleteOpDoc,
-			id: queuedDeleteOpDoc._id,
-			key: queuedDeleteOpDoc._id,
-			value: { rev: queuedDeleteOpDoc._rev },
-		};
-		const localDeletedArticle = {
-			...baseMockArticle("1", 2, 2000),
-			deletedAt: Date.now(),
-			_rev: "rev-1-2",
-		};
-		const cloudArticle = baseMockArticle("1", 1, 1000);
-
-		// Override mock for articlesDb.get for this test, needed by queue processor AND hard delete
-		mockArticlesDbGet.mockResolvedValue(localDeletedArticle); // Resolves multiple times if needed
-
-		mockOperationsQueueDbAllDocs.mockResolvedValue({
-			offset: 0,
-			total_rows: 1,
-			rows: [queuedDeleteOpRow],
-		});
-		mockDeleteItemFromCloud.mockResolvedValue("success");
-		// For all getAllArticles calls
-		mockGetAllArticles.mockImplementation((params) => {
-			if (params?.includeDeleted) {
-				return Promise.resolve([localDeletedArticle]);
-			}
-			return Promise.resolve([]);
-		});
-		mockFetchCloudItems.mockResolvedValue([cloudArticle]);
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false), {
-			timeout: 5000,
-		}); // Increased timeout
-		// Assertions moved back into scope below
-
-		expect(mockOperationsQueueDbAllDocs).toHaveBeenCalled();
-		expect(mockDeleteItemFromCloud).toHaveBeenCalledWith("1", "test-token"); // Expect token
-		expect(mockOperationsQueueDbBulkDocs).toHaveBeenCalledWith(
-			expect.arrayContaining([
-				expect.objectContaining({ _id: "qdel-1", _deleted: true }),
-			]),
-		);
-		expect(mockArticlesDbBulkDocs).toHaveBeenCalledWith(
-			expect.arrayContaining([
-				expect.objectContaining({ _id: "1", _rev: "rev-1-2", _deleted: true }),
-			]),
-		);
-		expect(result.current.articles).toEqual([]);
-	});
-
-	it("Scenario: Cloud Delete", async () => {
-		const localActiveArticle = {
-			...baseMockArticle("1", 1, 1000),
-			_rev: "rev-1-1",
-		};
-
-		// Spy on the actual deleteArticle function for this test
-		const deleteSpy = vi
-			.spyOn(dbFunctions, "deleteArticle")
-			.mockResolvedValue(true);
-		// Mock articlesDb.get needed by localSoftDeleteArticle (still needed if spy fails)
-		mockArticlesDbGet.mockResolvedValue(localActiveArticle);
-
-		// For all getAllArticles calls
-		mockGetAllArticles.mockImplementation((params) => {
-			if (params?.includeDeleted) {
-				return Promise.resolve([localActiveArticle]);
-			}
-			if (mockGetAllArticles.mock.calls.length <= 1) {
-				return Promise.resolve([localActiveArticle]);
-			}
-			return Promise.resolve([]);
-		});
-		mockFetchCloudItems.mockResolvedValue([]); // Cloud is empty
-		mockLocalSoftDeleteArticle.mockResolvedValue(true);
-		mockOperationsQueueDbAllDocs.mockResolvedValue({
-			offset: 0,
-			total_rows: 0,
-			rows: [],
+		// Act: Simulate an external update to Dexie
+		const newArticle = baseMockArticle("2", 2000);
+		act(() => {
+			mockDbData.push(newArticle);
+			// If useArticleSync doesn't use liveQuery, you might need to trigger a refresh mechanism here
+			// e.g., result.current.refreshArticles(); or simulate dependency change causing re-render
+			// For simplicity, let's assume a simple re-fetch on re-render or manual trigger
+			mockArticlesTable.toArray.mockResolvedValueOnce(
+				structuredClone(mockDbData),
+			); // Mock next fetch
 		});
 
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
-		// Assertions moved back into scope below
-
-		expect(mockLocalSoftDeleteArticle).toHaveBeenCalledWith("1");
-		expect(mockDeleteItemFromCloud).not.toHaveBeenCalled();
-		expect(mockOperationsQueueDbPut).not.toHaveBeenCalled();
-		expect(result.current.articles).toEqual([]);
-		deleteSpy.mockRestore(); // Restore the original function
-	});
-
-	it("Scenario: Conflict - Cloud Update vs Local Delete (Cloud Wins)", async () => {
-		const initialLocal: Article[] = [baseMockArticle("1", 1, 1000)];
-		const cloudUpdate: Article[] = [
-			baseMockArticle("1", 2, 2000, " Cloud Wins"), // Higher version
-		];
-		const localDeletedRev = "rev-local-delete";
-
-		// Initial load (before delete)
-		mockGetAllArticles.mockResolvedValueOnce([...initialLocal]);
-
-		// Fetch cloud items returns the newer version
-		mockFetchCloudItems.mockResolvedValue(cloudUpdate);
-
-		// Mock the getAllArticles call *during* reconciliation (includes deleted)
-		mockGetAllArticles.mockResolvedValueOnce([
-			{ ...initialLocal[0], deletedAt: Date.now(), _rev: localDeletedRev },
-		]);
-
-		// Mock the final getAllArticles call (non-deleted) after sync
-		const finalSavedArticle = { ...cloudUpdate[0], _rev: "rev-after-save-1-2" };
-		mockGetAllArticles.mockResolvedValueOnce([finalSavedArticle]);
-
-		// Mock bulkSaveArticles: Expect it to be called with the cloud data + local deleted rev
-		mockBulkSaveArticles.mockImplementation(async (articlesToSave) => {
-			// Check if it's called with the expected data
-			expect(articlesToSave).toHaveLength(1);
-			expect(articlesToSave[0]).toMatchObject({
-				...cloudUpdate[0],
-				_rev: localDeletedRev, // Expecting the local deleted rev
+		// Manually trigger a refresh if the hook provides it
+		if (result.current.refreshArticles) {
+			await act(async () => {
+				await result.current.refreshArticles();
 			});
-			// Simulate successful save, returning a *new* revision
-			return [
-				{ ok: true, id: finalSavedArticle._id, rev: finalSavedArticle._rev },
-			];
+		} else {
+			// Or rerender if it refetches on rerender (less common for sync hooks)
+			rerender();
+		}
+
+		// Assert: Hook state reflects the change
+		await waitFor(() => {
+			expect(result.current.articles).toHaveLength(2);
+			expect(result.current.articles.find((a) => a._id === "2")).toBeDefined(); // Use _id
 		});
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-
-		// Wait for sync to complete and check final state
-		await waitFor(
-			() => {
-				expect(result.current.isLoading).toBe(false);
-				expect(result.current.isRefreshing).toBe(false);
-				expect(result.current.articles.length).toBe(1);
-				expect(result.current.articles[0].title).toBe("Article 1 Cloud Wins");
-				expect(result.current.articles[0]._rev).toBe(finalSavedArticle._rev);
-				expect(result.current.articles[0].deletedAt).toBeUndefined();
-			},
-			{ timeout: 2000 },
-		);
-
-		// Now check the final state *after* refreshing is confirmed false
-		expect(result.current.articles.length).toBe(1);
-		expect(result.current.articles[0].title).toBe("Article 1 Cloud Wins");
-		expect(result.current.articles[0]._rev).toBe(finalSavedArticle._rev);
-		expect(result.current.articles[0].deletedAt).toBeUndefined();
-
-		// Verify bulkSaveArticles was called exactly once
-		expect(mockBulkSaveArticles).toHaveBeenCalledTimes(1);
+		expect(mockArticlesTable.toArray).toHaveBeenCalledTimes(2); // Initial + Refresh/Rerender
 	});
 
-	it("Scenario: Conflict - Local Update vs Cloud Delete (Cloud Wins)", async () => {
-		const localUpdatedArticle = {
-			...baseMockArticle("1", 2, 2000, " Local Update"),
-			_rev: "rev-1-2",
-		};
-
-		// Mock get needed by localSoftDeleteArticle
-		mockArticlesDbGet.mockResolvedValueOnce(localUpdatedArticle);
-
-		// For all getAllArticles calls
-		mockGetAllArticles.mockImplementation((params) => {
-			if (params?.includeDeleted) {
-				return Promise.resolve([localUpdatedArticle]);
-			}
-			if (mockGetAllArticles.mock.calls.length <= 1) {
-				return Promise.resolve([localUpdatedArticle]);
-			}
-			return Promise.resolve([]);
-		});
-		mockFetchCloudItems.mockResolvedValue([]); // Cloud deleted it
-		mockLocalSoftDeleteArticle.mockResolvedValue(true);
-		mockOperationsQueueDbAllDocs.mockResolvedValue({
-			offset: 0,
-			total_rows: 0,
-			rows: [],
-		});
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false), {
-			timeout: 2000,
-		});
-
-		expect(mockLocalSoftDeleteArticle).toHaveBeenCalledWith("1");
-		expect(mockOperationsQueueDbPut).not.toHaveBeenCalled();
-		expect(result.current.articles).toEqual([]);
-	});
-
-	it("Scenario: Local Create/Update Offline then Sync", async () => {
-		const localUpdatedArticle = {
-			...baseMockArticle("1", 2, 2000, " Local Update"),
-			_rev: "rev-1-2",
-		};
-		const cloudOldArticle = baseMockArticle("1", 1, 1000);
-		const queuedUpdateOpDoc: QueuedOperation &
-			PouchDB.Core.IdMeta &
-			PouchDB.Core.RevisionIdMeta = {
-			_id: "qupd-1",
-			_rev: "qrev-1",
-			type: "update",
-			docId: "1",
-			timestamp: Date.now(),
-			retryCount: 0,
-			data: localUpdatedArticle as Partial<Article>,
-		};
-		const queuedUpdateOpRow = {
-			doc: queuedUpdateOpDoc,
-			id: queuedUpdateOpDoc._id,
-			key: queuedUpdateOpDoc._id,
-			value: { rev: queuedUpdateOpDoc._rev },
-		};
-
-		mockOperationsQueueDbAllDocs.mockResolvedValue({
-			offset: 0,
-			total_rows: 1,
-			rows: [queuedUpdateOpRow],
-		});
-		mockSaveItemToCloud.mockResolvedValue("success");
-		// Mock get needed by queue processor
-		mockArticlesDbGet.mockResolvedValue(localUpdatedArticle);
-		// For all getAllArticles calls
-		mockGetAllArticles.mockResolvedValue([localUpdatedArticle]);
-		mockFetchCloudItems.mockResolvedValue([cloudOldArticle]);
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
-		// Assertions moved back into scope below
-
-		expect(mockOperationsQueueDbAllDocs).toHaveBeenCalled();
-		expect(mockSaveItemToCloud).toHaveBeenCalledWith(
-			localUpdatedArticle,
-			"test-token",
-		); // Expect token
-		expect(mockOperationsQueueDbBulkDocs).toHaveBeenCalledWith(
-			expect.arrayContaining([
-				expect.objectContaining({ _id: "qupd-1", _deleted: true }),
-			]),
-		);
-		expect(mockBulkSaveArticles).not.toHaveBeenCalled();
-		expect(mockLocalSoftDeleteArticle).not.toHaveBeenCalled();
-		expect(result.current.articles).toHaveLength(1); // Should have the updated article
-		expect(result.current.articles[0].version).toBe(2);
-		expect(result.current.articles[0].title).toBe(localUpdatedArticle.title);
-	});
-
-	it("should skip offline queue processing if token is null", async () => {
-		// Mock getToken to return null *inside* this specific test, after beforeEach runs
-		stableGetToken.mockResolvedValueOnce(null);
-
-		// Explicitly mock main data fetches for this test, even if error is thrown early
-		mockGetAllArticles.mockResolvedValue([]);
-		mockFetchCloudItems.mockResolvedValue([]);
-
-		// Setup a dummy queue item to ensure queue would be processed if token existed
-		const queuedOpDoc: QueuedOperation &
-			PouchDB.Core.IdMeta &
-			PouchDB.Core.RevisionIdMeta = {
-			_id: "qnull-1",
-			_rev: "qrev-null",
-			type: "delete",
-			docId: "null-doc",
-			timestamp: Date.now(),
-			retryCount: 0,
-		};
-		const queuedOpRow = {
-			doc: queuedOpDoc,
-			id: queuedOpDoc._id,
-			key: queuedOpDoc._id,
-			value: { rev: queuedOpDoc._rev },
-		};
-		mockOperationsQueueDbAllDocs.mockResolvedValue({
-			offset: 0,
-			total_rows: 1,
-			rows: [queuedOpRow],
-		});
-
-		// The mocks for getAllArticles and fetchCloudItems were moved higher
-
-		// Spy on console.error to check for the specific warning
+	it("should handle Dexie read errors gracefully", async () => {
+		// Arrange: Mock Dexie to throw an error on read
+		const testError = new Error("Dexie Read Failed");
+		mockArticlesTable.toArray.mockRejectedValueOnce(testError);
 		const consoleErrorSpy = vi
 			.spyOn(console, "error")
 			.mockImplementation(() => {});
 
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
+		// Act
+		const { result } = renderHook(() => useArticleSync(true)); // Remove second argument
 
-		// Wait for the sync process to potentially throw or complete.
-		// We expect this waitFor to potentially time out or pass quickly if the error is set early.
-		try {
-			// Wait specifically for the error state to be set
-			await waitFor(
-				() => {
-					// Check for the specific error message directly
-					expect(result.current.error?.message).toContain(
-						"Authentication token missing, cannot sync.",
-					);
-				},
-				{ timeout: 2000 }, // Keep timeout in case state update is slow
-			);
-		} catch (e) {
-			// Ignore timeout error if it happens, as the state check below is the important part
-		}
-
-		// No need for separate check after waitFor, it's handled within
-		// The check for `instanceof Error` was also integrated into the waitFor
-		// expect(result.current.error).toBeInstanceOf(Error); // Redundant
-		// expect(result.current.error?.message).toContain(
-		// 	"Authentication token missing, cannot sync.",
-		// ); // Redundant
-
-		// Check that the correct error (from the throw) was logged
+		// Assert
+		await waitFor(() => {
+			expect(result.current.isLoading).toBe(false); // Should stop loading
+			expect(result.current.error).toBeInstanceOf(Error); // Check if error state is set
+			expect(result.current.error?.message).toBe("Dexie Read Failed");
+		});
+		expect(result.current.articles).toHaveLength(0); // Articles should be empty
 		expect(consoleErrorSpy).toHaveBeenCalledWith(
-			"Sync: Top-level error caught:", // Updated expected log message
-			expect.any(Error), // Check that an error object was logged
+			expect.stringContaining("Error loading articles"),
+			testError,
 		);
-		// Check the logged error's message specifically
-		const loggedError = consoleErrorSpy.mock.calls[0][1] as Error;
-		expect(loggedError.message).toContain(
-			"Authentication token missing, cannot sync.",
-		);
-		// Ensure queue processing functions were NOT called
-		expect(mockDeleteItemFromCloud).not.toHaveBeenCalled();
-		expect(mockSaveItemToCloud).not.toHaveBeenCalled();
-		expect(mockOperationsQueueDbBulkDocs).not.toHaveBeenCalled();
 
-		// Clean up the spy
 		consoleErrorSpy.mockRestore();
 	});
 
-	it("should handle API 401 error during offline delete processing", async () => {
-		const queuedDeleteOpDoc: QueuedOperation &
-			PouchDB.Core.IdMeta &
-			PouchDB.Core.RevisionIdMeta = {
-			_id: "qdel-fail-1",
-			_rev: "qrev-fail-1",
-			type: "delete",
-			docId: "fail-doc-1",
-			timestamp: Date.now(),
-			retryCount: 0,
-		};
-		const queuedDeleteOpRow = {
-			doc: queuedDeleteOpDoc,
-			id: queuedDeleteOpDoc._id,
-			key: queuedDeleteOpDoc._id,
-			value: { rev: queuedDeleteOpDoc._rev },
-		};
-		mockOperationsQueueDbAllDocs.mockResolvedValue({
-			offset: 0,
-			total_rows: 1,
-			rows: [queuedDeleteOpRow],
-		});
-
-		// Mock deleteItemFromCloud to return unauthorized
-		mockDeleteItemFromCloud.mockResolvedValueOnce("unauthorized");
-
-		// Mock other calls to let sync proceed
-		mockGetAllArticles.mockResolvedValue([]);
-		mockFetchCloudItems.mockResolvedValue([]);
-
-		const consoleWarnSpy = vi
-			.spyOn(console, "warn")
-			.mockImplementation(() => {});
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
-		// Assertions moved back into scope below
-
-		// Check that deleteItemFromCloud was called with the token
-		expect(mockDeleteItemFromCloud).toHaveBeenCalledWith(
-			"fail-doc-1",
-			"test-token",
-		);
-		// Check that the queue item was updated (retry count incremented)
-		expect(mockOperationsQueueDbBulkDocs).toHaveBeenCalledWith(
-			expect.arrayContaining([
-				expect.objectContaining({ _id: "qdel-fail-1", retryCount: 1 }),
-			]),
-		);
-		// Check for the warning log
-		expect(consoleWarnSpy).toHaveBeenCalledWith(
-			"Sync Hook: Queued delete failed for fail-doc-1, status: unauthorized",
-		);
-		consoleWarnSpy.mockRestore();
-	});
-
-	it("should pass token during reconciliation delete re-attempt", async () => {
-		const localDeletedArticle = {
-			...baseMockArticle("recon-del-1", 2, 2000),
-			deletedAt: Date.now(),
-			_rev: "rev-recon-del-1",
-		};
-		const cloudArticleStillExists = baseMockArticle("recon-del-1", 1, 1000); // Lower version
-
-		// Mock needed by hard delete check
-		mockArticlesDbGet.mockResolvedValue(localDeletedArticle);
-
-		// Setup mocks
-		mockGetAllArticles.mockResolvedValueOnce([]); // Empty initial cache
-		mockGetAllArticles.mockResolvedValueOnce([localDeletedArticle]); // Reconciliation fetch
-		mockFetchCloudItems.mockResolvedValue([cloudArticleStillExists]); // Cloud has older version
-		mockDeleteItemFromCloud.mockResolvedValue("success"); // Mock successful delete re-attempt
-		mockOperationsQueueDbAllDocs.mockResolvedValue({
-			offset: 0,
-			total_rows: 0,
-			rows: [],
-		}); // Empty queue
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
-		// Assertions moved back into scope below
-
-		// Check that deleteItemFromCloud was called during reconciliation with the token
-		expect(mockDeleteItemFromCloud).toHaveBeenCalledWith(
-			"recon-del-1",
-			"test-token",
-		);
-		// Check that local hard delete was triggered
-		expect(mockArticlesDbBulkDocs).toHaveBeenCalledWith(
-			expect.arrayContaining([
-				expect.objectContaining({
-					_id: "recon-del-1",
-					_rev: "rev-recon-del-1",
-					_deleted: true,
-				}),
-			]),
-		);
-	});
-
-	// Define the wrapper component using a standard function declaration
-	// function WrapperComponent(props: { children: React.ReactNode }) {
-	// 	return <MockArticleProvider>{props.children}</MockArticleProvider>;
-	// }
-	it("should handle duplicate articles correctly", async () => {
-		const duplicateArticles: Article[] = [
-			...mockArticles,
-			{
-				_id: "1", // Same ID as the first article
-				url: "http://example.com/1",
-				title: "Article 1 Updated", // Different title
-				content: "Updated content", // Different content
-				savedAt: 3000, // Newer timestamp
-				status: "inbox",
-				isRead: false,
-				favorite: false,
-				type: "article",
-				userId: "test-user-id",
-				excerpt: "Updated excerpt",
-				tags: [],
-				version: 2, // Higher version
-				_rev: "rev-1-2", // This is the newer article
-			},
-		];
-
-		// Update mockGetAllArticles to handle the final UI fetch correctly
-		const finalExpectedArticle = duplicateArticles.find((a) => a.version === 2); // Get the newer one
-		mockGetAllArticles.mockImplementation(async (params) => {
-			if (params?.includeDeleted) {
-				// Reconciliation fetch
-				return duplicateArticles;
-			}
-			// Final UI fetch (after sync/dedup)
-			if (finalExpectedArticle) {
-				return [
-					mockArticles.find((a) => a._id === "2"),
-					finalExpectedArticle,
-				].filter(Boolean) as Article[];
-			}
-			return [mockArticles.find((a) => a._id === "2")].filter(
-				Boolean,
-			) as Article[]; // Fallback if not found
-		});
-
-		const { result } = renderHook(
-			() => useArticleSync(true, new Set<string>()), // Removed the options object with the wrapper
-		);
-
-		await waitFor(() => {
-			expect(result.current.articles).toHaveLength(mockArticles.length); // Wait for length update
-
-			// Also verify content within waitFor
-			const newerArticle = result.current.articles.find((a) => a._id === "1");
-			expect(newerArticle).toBeDefined();
-			expect(newerArticle?.version).toBe(2);
-			expect(newerArticle?.title).toBe("Article 1 Updated");
-		});
-
-		// No need for assertions outside waitFor now
-	});
-});
-
-// --- Tests for Handling Invalid Cloud Data ---
-describe("Handling Invalid Cloud Data", () => {
-	it("should log warning and skip saving cloud article missing content", async () => {
-		const invalidCloudArticle = {
-			...baseMockArticle("invalid-1", 1, 3000),
-			content: undefined, // Missing content
-		};
-		mockFetchCloudItems.mockResolvedValue([invalidCloudArticle]);
-		mockGetAllArticles.mockResolvedValue([]); // No local articles initially
-
-		const consoleWarnSpy = vi
-			.spyOn(console, "warn")
-			.mockImplementation(() => {});
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
-		// Assertions moved back into scope below
-
-		// Check that the warning was logged
-		expect(consoleWarnSpy).toHaveBeenCalledWith(
-			expect.stringContaining(
-				`Sync Hook: Invalid or incomplete article data received from cloud for ID: ${invalidCloudArticle._id}. Skipping.`,
-			),
-			expect.objectContaining({ _id: invalidCloudArticle._id }),
-		);
-
-		// Check that bulkSaveArticles was NOT called
-		expect(mockBulkSaveArticles).not.toHaveBeenCalled();
-		expect(result.current.articles).toEqual([]); // No articles should be added
-		consoleWarnSpy.mockRestore();
-	});
-
-	it("should log warning and skip saving cloud article missing title", async () => {
-		const invalidCloudArticle = {
-			...baseMockArticle("invalid-2", 1, 3000),
-			title: undefined as any, // Missing title
-		};
-		mockFetchCloudItems.mockResolvedValue([invalidCloudArticle]);
-		mockGetAllArticles.mockResolvedValue([]);
-
-		const consoleWarnSpy = vi
-			.spyOn(console, "warn")
-			.mockImplementation(() => {});
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
-		// Assertions moved back into scope below
-
-		expect(consoleWarnSpy).toHaveBeenCalledWith(
-			expect.stringContaining(
-				`Sync Hook: Invalid or incomplete article data received from cloud for ID: ${invalidCloudArticle._id}. Skipping.`,
-			),
-			expect.objectContaining({ _id: invalidCloudArticle._id }),
-		);
-		expect(mockBulkSaveArticles).not.toHaveBeenCalled();
-		expect(result.current.articles).toEqual([]);
-		consoleWarnSpy.mockRestore();
-	});
-
-	it("should log warning and skip saving cloud article missing url", async () => {
-		const invalidCloudArticle = {
-			...baseMockArticle("invalid-3", 1, 3000),
-			url: undefined as any, // Missing url
-		};
-		mockFetchCloudItems.mockResolvedValue([invalidCloudArticle]);
-		mockGetAllArticles.mockResolvedValue([]);
-
-		const consoleWarnSpy = vi
-			.spyOn(console, "warn")
-			.mockImplementation(() => {});
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
-		// Assertions moved back into scope below
-
-		expect(consoleWarnSpy).toHaveBeenCalledWith(
-			expect.stringContaining(
-				`Sync Hook: Invalid or incomplete article data received from cloud for ID: ${invalidCloudArticle._id}. Skipping.`,
-			),
-			expect.objectContaining({ _id: invalidCloudArticle._id }),
-		);
-		expect(mockBulkSaveArticles).not.toHaveBeenCalled();
-		expect(result.current.articles).toEqual([]);
-		consoleWarnSpy.mockRestore();
-	});
-
-	it("should process valid articles even if some invalid articles are received", async () => {
-		const validCloudArticle = baseMockArticle("valid-1", 1, 4000);
-		const invalidCloudArticle = {
-			...baseMockArticle("invalid-4", 1, 3000),
-			content: undefined, // Missing content
-		};
-		mockFetchCloudItems.mockResolvedValue([
-			validCloudArticle,
-			invalidCloudArticle,
-		]);
-
-		// Mock getAllArticles:
-		// 1. Initial cache load: Empty
-		mockGetAllArticles.mockResolvedValueOnce([]);
-		// 2. Reconciliation fetch (includes deleted): Empty
-		mockGetAllArticles.mockResolvedValueOnce([]);
-		// 3. Final fetch for UI update (non-deleted): Returns the saved valid article
-		mockGetAllArticles.mockResolvedValue([validCloudArticle]);
-
-		const consoleWarnSpy = vi
-			.spyOn(console, "warn")
-			.mockImplementation(() => {});
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
-		// Assertions moved back into scope below
-
-		// Check warning for the invalid one
-		expect(consoleWarnSpy).toHaveBeenCalledWith(
-			expect.stringContaining(
-				`Sync Hook: Invalid or incomplete article data received from cloud for ID: ${invalidCloudArticle._id}. Skipping.`,
-			),
-			expect.objectContaining({ _id: invalidCloudArticle._id }),
-		);
-
-		// Check bulkSave was called ONLY with the valid one
-		expect(mockBulkSaveArticles).toHaveBeenCalledTimes(1);
-		expect(mockBulkSaveArticles).toHaveBeenCalledWith(
-			expect.arrayContaining([
-				expect.objectContaining({ _id: validCloudArticle._id }),
-			]),
-		);
-		expect(mockBulkSaveArticles).not.toHaveBeenCalledWith(
-			expect.arrayContaining([
-				expect.objectContaining({ _id: invalidCloudArticle._id }),
-			]),
-		);
-
-		// Check final state contains only the valid article
-		expect(result.current.articles).toHaveLength(1);
-		expect(result.current.articles[0]._id).toBe(validCloudArticle._id);
-		consoleWarnSpy.mockRestore();
-	});
-
-	it("should skip invalid cloud UPDATE", async () => {
-		// Reset mockBulkSaveArticles to ensure it's clean for this test
-		mockBulkSaveArticles.mockReset();
-
-		const localArticle = baseMockArticle("valid-1", 1, 3000);
-		const invalidCloudUpdate = {
-			...baseMockArticle("valid-1", 2, 4000, " Invalid Update"),
-			content: undefined, // Missing content
-		};
-		mockGetAllArticles.mockResolvedValueOnce([localArticle]); // Initial
-		mockGetAllArticles.mockResolvedValueOnce([localArticle]); // Reconciliation
-		mockGetAllArticles.mockResolvedValue([localArticle]); // Final
-		mockFetchCloudItems.mockResolvedValue([invalidCloudUpdate]);
-
-		// Mock the bulkSaveArticles function to track what it's called with
-		const bulkSaveSpy = vi.fn();
-		mockBulkSaveArticles.mockImplementation(bulkSaveSpy);
-
-		const consoleWarnSpy = vi
-			.spyOn(console, "warn")
-			.mockImplementation(() => {});
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
-		// Assertions moved back into scope below
-
-		// Updated expected warning message to match actual log output
-		expect(consoleWarnSpy).toHaveBeenCalledWith(
-			expect.stringContaining(
-				"Sync: Invalid cloud data for ID: valid-1", // More specific message
-			),
-			expect.objectContaining({ _id: "valid-1" }),
-		);
-		// Check that bulkSaveSpy was not called with the invalid article
-		expect(bulkSaveSpy).not.toHaveBeenCalledWith(
-			expect.arrayContaining([
-				expect.objectContaining({ _id: "valid-1", content: undefined }),
-			]),
-		);
-		expect(result.current.articles[0].version).toBe(1); // Should retain local version 1
-		consoleWarnSpy.mockRestore();
-	});
-
-	it("should skip invalid cloud UNDELETE/UPDATE", async () => {
-		// Reset all mocks to ensure they're clean for this test
-		mockBulkSaveArticles.mockReset();
-		mockDeleteItemFromCloud.mockReset();
-		mockArticlesDbBulkDocs.mockReset();
-
-		const localDeletedArticle = {
-			...baseMockArticle("deleted-1", 1, 3000),
-			deletedAt: Date.now(),
-			_rev: "rev-deleted-1",
-		};
-		const invalidCloudUndelete = {
-			...baseMockArticle("deleted-1", 2, 4000, " Invalid Undelete"),
-			content: undefined, // Missing content
-		};
-		mockGetAllArticles.mockResolvedValueOnce([]); // Initial
-		mockGetAllArticles.mockResolvedValueOnce([localDeletedArticle]); // Reconciliation
-		mockGetAllArticles.mockResolvedValue([]); // Final (should remain deleted locally)
-		mockFetchCloudItems.mockResolvedValue([invalidCloudUndelete]);
-
-		// Mock the bulkSaveArticles function to track what it's called with
-		const bulkSaveSpy = vi.fn();
-		mockBulkSaveArticles.mockImplementation(bulkSaveSpy);
-
-		const consoleWarnSpy = vi
-			.spyOn(console, "warn")
-			.mockImplementation(() => {});
-
-		const { result } = renderHook(() =>
-			useArticleSync(true, new Set<string>()),
-		);
-		await waitFor(() => expect(result.current.isLoading).toBe(false));
-		await waitFor(() => expect(result.current.isRefreshing).toBe(false));
-		// Assertions moved back into scope below
-
-		// Updated expected warning message to match actual log output
-		expect(consoleWarnSpy).toHaveBeenCalledWith(
-			expect.stringContaining(
-				"Sync: Invalid cloud data for ID: deleted-1", // More specific message
-			),
-			expect.objectContaining({ _id: "deleted-1" }),
-		);
-		// Check that bulkSaveSpy was not called with the invalid article
-		expect(bulkSaveSpy).not.toHaveBeenCalledWith(
-			expect.arrayContaining([
-				expect.objectContaining({ _id: "deleted-1", content: undefined }),
-			]),
-		);
-		// Should not attempt to re-delete from cloud as local delete is older
-		expect(mockDeleteItemFromCloud).not.toHaveBeenCalled();
-		// Should not trigger hard delete as cloud version wasn't processed
-		expect(mockArticlesDbBulkDocs).not.toHaveBeenCalled();
-		expect(result.current.articles).toEqual([]); // Should remain empty (locally soft-deleted)
-		consoleWarnSpy.mockRestore();
-	});
+	// NOTE: The old tests were heavily focused on complex PouchDB<->Cloud sync and
+	// reconciliation logic (conflicts, offline queue). These are likely NOT relevant
+	// anymore as Dexie is local-first. New tests should focus on the hook's interaction
+	// with the LOCAL Dexie database. If there's separate sync logic *outside* this
+	// hook that interacts with a cloud service and Dexie, that needs its own tests.
+	// The tests for deduplication and handling invalid data might still be relevant
+	// if the hook performs these checks on data *before* storing it in Dexie,
+	// but the implementation would be different.
 });

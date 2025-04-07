@@ -7,7 +7,7 @@ import TurndownService from "turndown";
 // No need for Node.js polyfills as we're using browser-native DOMParser
 
 // Import types
-import type { Article } from "./db";
+import type { Article } from "./db/types"; // Changed path
 
 // Create turndown service for HTML to Markdown conversion
 const turndownService = new TurndownService({

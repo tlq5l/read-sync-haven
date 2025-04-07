@@ -1,9 +1,27 @@
-import { useOffline } from "@/hooks/use-offline";
 import { cn } from "@/lib/utils";
 import { WifiOff } from "lucide-react";
+// Removed useOffline import
+import { useEffect, useState } from "react"; // Add hooks for basic online check
 
 export default function OfflineIndicator() {
-	const isOffline = useOffline();
+	// Replace useOffline with navigator.onLine and event listeners
+	const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+	useEffect(() => {
+		const handleOnline = () => setIsOffline(false);
+		const handleOffline = () => setIsOffline(true);
+
+		window.addEventListener("online", handleOnline);
+		window.addEventListener("offline", handleOffline);
+
+		// Initial check
+		setIsOffline(!navigator.onLine);
+
+		return () => {
+			window.removeEventListener("online", handleOnline);
+			window.removeEventListener("offline", handleOffline);
+		};
+	}, []);
 
 	if (!isOffline) return null;
 

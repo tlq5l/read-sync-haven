@@ -2,7 +2,7 @@ import EpubProcessor from "@/components/EpubProcessor"; // Corrected path after 
 import PdfProcessor from "@/components/PdfReader"; // Component refactored, file rename skipped due to git issue
 import { processHtmlWithReadability } from "@/lib/readabilityProcessor"; // Import the processor for HTML type
 import { cn } from "@/lib/utils";
-import type { Article } from "@/services/db";
+import type { Article } from "@/services/db/types"; // Updated path
 import DOMPurify from "dompurify";
 import parse from "html-react-parser";
 import { Loader2 } from "lucide-react";

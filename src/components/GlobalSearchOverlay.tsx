@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useArticles } from "@/context/ArticleContext";
-import type { Article } from "@/services/db";
+import type { Article } from "@/services/db/types"; // Updated path
 import { Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react"; // Removed unused React import
 import { Link } from "react-router-dom";

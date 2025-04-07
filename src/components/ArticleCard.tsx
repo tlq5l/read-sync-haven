@@ -9,7 +9,7 @@ import {
 import { useArticles } from "@/context/ArticleContext";
 import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { useToast } from "@/hooks/use-toast";
-import type { Article } from "@/services/db";
+import type { Article } from "@/services/db/types"; // Updated path
 import { formatDistanceToNow } from "date-fns";
 import {
 	Archive,

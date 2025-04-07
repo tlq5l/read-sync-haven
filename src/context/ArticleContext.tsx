@@ -2,14 +2,19 @@ import { useToast } from "@/hooks/use-toast"; // Ensure useToast is imported onl
 import { useArticleActions } from "@/hooks/useArticleActions";
 import { useArticleSync } from "@/hooks/useArticleSync";
 import { type ArticleView, useArticleView } from "@/hooks/useArticleView";
-import { useDatabaseInit } from "@/hooks/useDatabaseInit";
+// Removed PouchDB init hook import: import { useDatabaseInit } from "@/hooks/useDatabaseInit";
 import { filterArticles, sortArticles } from "@/lib/articleUtils"; // Import utils
 import {
-	type Article,
-	type ArticleCategory,
-	type Tag,
-	getAllTags,
-} from "@/services/db"; // Import Tag, getAllTags, and ArticleCategory
+	type DexieTag,
+	db,
+	initializeDexieDatabase,
+} from "@/services/db/dexie"; // Import Dexie db and init function
+import type {
+	Article,
+	ArticleCategory,
+	Tag,
+	// Removed PouchDB getAllTags: getAllTags,
+} from "@/services/db/types"; // Import original types
 import type {
 	ArticleFilters,
 	ArticleSortField,
@@ -78,8 +83,36 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
 	const { toast } = useToast(); // Add toast hook back
 
-	// 1. Initialize Database
-	const { isInitialized: isDbInitialized, dbError } = useDatabaseInit();
+	// 1. Initialize Database (Using Dexie)
+	const [isDbInitialized, setIsDbInitialized] = useState(false);
+	const [dbError, setDbError] = useState<Error | null>(null);
+
+	useEffect(() => {
+		let isMounted = true;
+		console.log("ArticleContext: Initializing Dexie DB...");
+		initializeDexieDatabase()
+			.then(() => {
+				if (isMounted) {
+					console.log("ArticleContext: Dexie DB Initialized.");
+					setIsDbInitialized(true);
+					setDbError(null);
+				}
+			})
+			.catch((err) => {
+				if (isMounted) {
+					console.error("ArticleContext: Dexie DB Initialization failed:", err);
+					setDbError(
+						err instanceof Error
+							? err
+							: new Error("Database initialization failed"),
+					);
+					setIsDbInitialized(false); // Explicitly set to false on error
+				}
+			});
+		return () => {
+			isMounted = false;
+		};
+	}, []); // Run once on mount
 
 	// 2. Manage View State
 	const { currentView, setCurrentView } = useArticleView("all");
@@ -99,7 +132,7 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		refreshArticles: syncRefreshArticles, // Rename to avoid conflict
 		retryLoading: syncRetryLoading, // Rename to avoid conflict
 		syncStatus, // Destructure syncStatus from useArticleSync
-	} = useArticleSync(isDbInitialized, hidingArticleIds); // Pass hidingArticleIds state
+	} = useArticleSync(isDbInitialized); // Remove hidingArticleIds from call
 	// 4. Tags State
 	const [allTags, setAllTags] = useState<Tag[]>([]);
 
@@ -133,32 +166,58 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 	// --- Derived State & Effects ---
 
-	// Fetch all tags once DB is initialized
+	// Map DexieTag back to original Tag type
+	const mapDexieToTag = useCallback((dexieTag: DexieTag): Tag => {
+		const { id, ...rest } = dexieTag;
+		return {
+			_id: id, // Map id back to _id
+			...rest,
+		};
+	}, []); // Empty dependency array as it doesn't rely on component state/props
+
+	// Fetch all tags once DB is initialized using Dexie
 	useEffect(() => {
 		let isMounted = true;
 		if (isDbInitialized) {
-			getAllTags()
-				.then((tags) => {
-					if (isMounted) setAllTags(tags);
+			console.log("ArticleContext: Fetching tags from Dexie...");
+			db.tags
+				.toArray()
+				.then((dexieTags) => {
+					if (isMounted) {
+						const mappedTags = dexieTags.map(mapDexieToTag);
+						setAllTags(mappedTags);
+						console.log(`ArticleContext: Fetched ${mappedTags.length} tags.`);
+					}
 				})
 				.catch((err) => {
-					console.error("Failed to fetch tags:", err);
+					if (isMounted) {
+						console.error(
+							"ArticleContext: Failed to fetch tags from Dexie:",
+							err,
+						);
+						setAllTags([]); // Clear tags on error
+					}
 					// Optionally set an error state specific to tags
 				});
+		} else {
+			if (isMounted) setAllTags([]); // Clear tags if DB is not ready
 		}
 		return () => {
 			isMounted = false;
 		};
-	}, [isDbInitialized]);
+	}, [isDbInitialized, mapDexieToTag]); // Re-add mapDexieToTag (now wrapped in useCallback)
 
 	// Combine loading and error states
-	const isLoading = !isDbInitialized || (isDbInitialized && isSyncLoading);
-	const error = dbError || syncError;
+	// Combine loading and error states (use isDbInitialized directly)
+	// isSyncLoading now represents Dexie loading state from useArticleSync
+	const isLoading = !isDbInitialized || isSyncLoading;
+	const error = dbError || syncError; // Prioritize DB init error
 
 	// Memoize processed articles (filtering + sorting + optimistic hiding)
 	const processedArticles = useMemo(() => {
 		// Filter out optimistically hidden articles first
 		const visibleArticles = articles.filter(
+			// Use _id from the mapped Article type
 			(a) => !hidingArticleIds.has(a._id),
 		);
 		// Apply user filters
@@ -188,11 +247,14 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	// Revert to original Optimistic remove function
 	const optimisticRemoveArticle = useCallback(
 		async (id: string) => {
+			// id here should be the Article._id
 			// Optimistically hide the article
+			// Still hide based on _id
 			setHidingArticleIds((prev) => new Set(prev).add(id));
 
 			try {
-				const success = await removeArticle(id); // Call the actual remove function
+				// Pass the _id to removeArticle (assuming it will be updated for Dexie)
+				const success = await removeArticle(id);
 
 				if (!success) {
 					// Revert optimistic update on failure

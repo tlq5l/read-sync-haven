@@ -1,7 +1,7 @@
 import { TransitionGroup } from "@/components/ui/transition-group";
 import { useAnimation } from "@/context/AnimationContext";
 // ArticleProvider import removed, will be moved to App.tsx
-import { useOffline } from "@/hooks/use-offline";
+// Removed useOffline import: import { useOffline } from "@/hooks/use-offline";
 
 import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
@@ -9,8 +9,7 @@ import OfflineIndicator from "./OfflineIndicator";
 import Sidebar from "./Sidebar";
 
 export default function Layout() {
-	// isOffline is used by the OfflineIndicator component
-	useOffline();
+	// Removed useOffline hook call
 	const { animateAll } = useAnimation();
 
 	// Trigger animations on route changes

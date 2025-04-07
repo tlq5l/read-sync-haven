@@ -1,6 +1,19 @@
-// import { useArticles } from "@/context/ArticleContext"; // Removed as unused
-import { type Article, getArticle } from "@/services/db";
+import { type DexieArticle, db } from "@/services/db/dexie"; // Import dexie db and type
+import type { Article } from "@/services/db/types"; // Updated path for Article type
 import { useEffect, useState } from "react";
+
+// Define mapping function locally
+const mapDexieToArticleLocal = (
+	dexieArticle: DexieArticle | undefined,
+): Article | null => {
+	if (!dexieArticle) return null;
+	const { id, ...rest } = dexieArticle;
+	return {
+		_id: id,
+		version: 1, // Add a default version or retrieve if stored
+		...rest,
+	};
+};
 
 /**
  * Custom hook to fetch and manage article data.
@@ -27,7 +40,7 @@ export function useArticleData(id: string | undefined) {
 
 			try {
 				console.log("Fetching article with ID:", id);
-				const articleData = await getArticle(id);
+				const articleData = mapDexieToArticleLocal(await db.articles.get(id));
 				console.log("Article data:", articleData);
 
 				if (!articleData) {

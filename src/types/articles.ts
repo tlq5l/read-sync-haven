@@ -1,4 +1,4 @@
-import type { Article, ArticleCategory } from "@/services/db"; // Import Article and ArticleCategory
+import type { Article, ArticleCategory } from "@/services/db/types"; // Import Article and ArticleCategory
 
 // Sorting
 export type ArticleSortField =

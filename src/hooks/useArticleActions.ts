@@ -1,41 +1,72 @@
 import { useToast } from "@/hooks/use-toast";
-// import { debounce } from "@/lib/utils"; // Removed unused import
-import {
-	type CloudSyncStatus, // Import the status type
-	deleteItemFromCloud,
-	saveItemToCloud,
-} from "@/services/cloudSync"; // Import cloud save and delete
-import {
-	type Article,
-	deleteArticle,
-	getArticle,
-	removeDuplicateArticles, // Import the new function
-	saveArticle,
-	updateArticle,
-} from "@/services/db";
-// Removed static imports for dynamic loading below
-// import {
-// 	arrayBufferToBase64 as epubToBase64,
-// 	extractEpubMetadata,
-// 	isValidEpub,
-// } from "@/services/epub";
+import { type DexieArticle, db } from "@/services/db/dexie"; // Import Dexie db instance
+import type { Article } from "@/services/db/types"; // Import original Article type
 import { parseArticle } from "@/services/parser";
-// Removed static imports for dynamic loading below
-// import {
-// 	extractPdfMetadata,
-// 	isValidPdf,
-// 	arrayBufferToBase64 as pdfToBase64,
-// } from "@/services/pdf";
-import { useAuth } from "@clerk/clerk-react"; // Removed useUser as unused
-import { useCallback } from "react"; // Removed unused useMemo
-import { useReadingProgress } from "./useReadingProgress"; // Import the new hook
+import { useAuth } from "@clerk/clerk-react"; // Keep for userId association
+import { useCallback } from "react";
+import { v4 as uuidv4 } from "uuid"; // Import uuid for generating IDs
+// Removed cloudSync imports
+// Removed old db imports
+// Removed useReadingProgress import (handled separately if needed)
 
-// Helper function to process EPUB files
+// Map original Article (using '_id') to DexieArticle (using 'id') for saving/updating
+// Note: Need to generate 'id' if the input Article doesn't have one (_id).
+const mapArticleToDexie = (
+	article: Partial<Article> & { _id?: string },
+): DexieArticle => {
+	// Corrected &amp; to &
+	const { _id, _rev, _deleted, version, ...rest } = article;
+	const id = _id || uuidv4(); // Use existing _id or generate a new UUID for Dexie 'id'
+
+	// Ensure all required fields for DexieArticle are present or have defaults
+	return {
+		id,
+		title: rest.title ?? "Untitled",
+		url: rest.url ?? "",
+		content: rest.content ?? "",
+		excerpt: rest.excerpt ?? "",
+		savedAt: rest.savedAt ?? Date.now(),
+		isRead: rest.isRead ?? false,
+		favorite: rest.favorite ?? false,
+		tags: rest.tags ?? [],
+		type: rest.type ?? "article",
+		status: rest.status ?? "inbox",
+		userId: rest.userId, // Keep userId if present
+		author: rest.author,
+		publishedDate: rest.publishedDate,
+		readAt: rest.readAt,
+		siteName: rest.siteName,
+		estimatedReadTime: rest.estimatedReadTime,
+		readingProgress: rest.readingProgress ?? 0,
+		fileData: rest.fileData,
+		fileSize: rest.fileSize,
+		fileName: rest.fileName,
+		pageCount: rest.pageCount,
+		category: rest.category,
+		htmlContent: rest.htmlContent,
+		scrollPosition: rest.scrollPosition,
+		coverImage: rest.coverImage,
+		language: rest.language,
+		deletedAt: rest.deletedAt, // Keep for potential soft-delete logic
+	};
+};
+
+// Map DexieArticle (using 'id') back to original Article (using '_id') for returning
+const mapDexieToArticle = (dexieArticle: DexieArticle): Article => {
+	const { id, ...rest } = dexieArticle;
+	return {
+		_id: id, // Map id back to _id
+		version: 1, // Add a default version or retrieve if stored
+		...rest, // Spread the rest of the properties
+	};
+};
+
+// Helper function to process EPUB files (Modified to return Dexie compatible structure)
 async function processEpubFile(
 	file: File,
 	userId: string,
-): Promise<Omit<Article, "_id" | "_rev">> {
-	// Dynamically import epub module
+): Promise<DexieArticle> {
+	// Return DexieArticle directly
 	const epubModule = await import("@/services/epub");
 	if (!epubModule.isValidEpub(file)) {
 		throw new Error("Invalid EPUB file.");
@@ -46,13 +77,15 @@ async function processEpubFile(
 	const estimatedReadingTime = await epubModule.getEstimatedReadingTime(
 		fileBuffer.byteLength,
 	);
+	const id = uuidv4(); // Generate ID for Dexie
 
 	return {
+		id, // Use generated ID
 		userId,
 		title: metadata.title || file.name.replace(/\.epub$/i, ""),
 		type: "epub",
 		fileData: base64Content,
-		content: "EPUB content is stored in fileData.",
+		content: "EPUB content is stored in fileData.", // Placeholder
 		url: `local-epub://${file.name}`,
 		savedAt: Date.now(),
 		status: "inbox",
@@ -67,16 +100,16 @@ async function processEpubFile(
 		estimatedReadTime: estimatedReadingTime,
 		fileName: file.name,
 		fileSize: fileBuffer.byteLength,
-		version: 1, // Added version
+		// Remove PouchDB specific fields like _rev, _deleted
 	};
 }
 
-// Helper function to process PDF files
+// Helper function to process PDF files (Modified to return Dexie compatible structure)
 async function processPdfFile(
 	file: File,
 	userId: string,
-): Promise<Omit<Article, "_id" | "_rev">> {
-	// Dynamically import pdf module
+): Promise<DexieArticle> {
+	// Return DexieArticle directly
 	const pdfModule = await import("@/services/pdf");
 	if (!pdfModule.isValidPdf(file)) {
 		throw new Error("Invalid PDF file.");
@@ -88,12 +121,14 @@ async function processPdfFile(
 		fileBuffer.byteLength,
 		metadata.pageCount,
 	);
+	const id = uuidv4(); // Generate ID for Dexie
 
 	return {
+		id, // Use generated ID
 		userId,
 		title: metadata.title || file.name.replace(/\.pdf$/i, ""),
 		type: "pdf",
-		content: base64Content, // Store base64 content for PDF
+		content: base64Content, // Store base64 content
 		url: `local-pdf://${file.name}`,
 		savedAt: Date.now(),
 		status: "inbox",
@@ -109,28 +144,25 @@ async function processPdfFile(
 		estimatedReadTime: estimatedReadingTime,
 		fileName: file.name,
 		fileSize: fileBuffer.byteLength,
-		version: 1, // Added version
+		// Remove PouchDB specific fields like _rev, _deleted
 	};
 }
 
 /**
- * Hook providing functions to perform actions on articles (add, update, delete).
+ * Hook providing functions to perform actions on articles using Dexie.
  *
  * @param refreshArticles - A callback function to trigger a refresh of the article list after an action.
  */
 export function useArticleActions(refreshArticles: () => Promise<void>) {
 	const { toast } = useToast();
-	const { userId, isSignedIn, getToken } = useAuth(); // Add getToken
-	const { updateReadingProgress } = useReadingProgress(); // Use the new hook
-
-	// Removed debouncedSyncProgress logic (moved to useReadingProgress)
+	const { userId, isSignedIn } = useAuth(); // Keep auth for userId association
 
 	// Add article by URL
 	const addArticleByUrl = useCallback(
 		async (url: string): Promise<Article | null> => {
 			if (!isSignedIn || !userId) {
 				toast({
-					title: "Authentication Required",
+					title: "Authentication Required", // Keep auth check for user association
 					description: "Please sign in to save articles.",
 					variant: "destructive",
 				});
@@ -138,64 +170,34 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 			}
 
 			try {
-				const parsedArticle = await parseArticle(url);
+				const parsedArticleData = await parseArticle(url);
 
-				// Add default status when creating article from URL
-				const articleWithUser: Omit<Article, "_id" | "_rev"> & {
-					_id?: string;
-					_rev?: string;
-				} = {
-					...parsedArticle,
-					userId, // Assign the current Clerk user ID
+				// Prepare data for Dexie, generating a new ID
+				const dexieArticle = mapArticleToDexie({
+					...parsedArticleData,
+					userId,
 					savedAt: Date.now(),
-					status: "inbox", // Default status
+					status: "inbox",
 					isRead: false,
 					favorite: false,
 					tags: [],
-					readingProgress: 0, // Initialize progress
-					version: 1, // Add missing version
-				};
+					readingProgress: 0,
+					// version: 1, // Removed version, handled by Dexie if needed
+				});
 
-				const savedArticle = await saveArticle(articleWithUser);
+				// Save using Dexie
+				await db.articles.add(dexieArticle);
+				const savedArticle = mapDexieToArticle(dexieArticle); // Map back for return
 
 				toast({
 					title: "Article saved",
-					description: `"${parsedArticle.title}" has been saved.`,
+					description: `"${savedArticle.title}" has been saved locally.`, // Updated message
 				});
 
-				// Trigger refresh after successful save
+				// Trigger UI refresh
 				await refreshArticles();
 
-				// Sync to Cloud (fire and forget)
-				getToken() // Get token before syncing
-					.then((token) => {
-						if (!token) {
-							console.error("Cannot sync saved article: No token available.");
-							return; // Don't attempt sync without token
-						}
-						saveItemToCloud(savedArticle, token) // Pass token
-							.then((status: CloudSyncStatus) => {
-								if (status === "success") {
-									console.log(
-										`Successfully synced article ${savedArticle._id} to cloud.`,
-									);
-								} else {
-									console.warn(
-										`Sync for article ${savedArticle._id} failed with status: ${status}`,
-									);
-								}
-							})
-							.catch((err) => {
-								console.error(
-									`Error syncing article ${savedArticle._id} to cloud:`,
-									err,
-								);
-							});
-					})
-					.catch((err) => {
-						// Error fetching token
-						console.error("Error fetching token for cloud sync:", err);
-					});
+				// Removed cloud sync logic
 
 				return savedArticle;
 			} catch (err) {
@@ -211,7 +213,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				return null;
 			}
 		},
-		[toast, userId, isSignedIn, getToken, refreshArticles], // Add getToken
+		[toast, userId, isSignedIn, refreshArticles], // Removed getToken
 	);
 
 	// Add article by file (EPUB or PDF)
@@ -227,15 +229,15 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 			}
 
 			try {
-				let articleToSave: Omit<Article, "_id" | "_rev">;
+				let dexieArticle: DexieArticle;
 				let fileType: "epub" | "pdf";
 
-				// Check file type and process using helper functions
+				// Process file using updated helpers returning DexieArticle
 				if (file.name.toLowerCase().endsWith(".epub")) {
-					articleToSave = await processEpubFile(file, userId);
+					dexieArticle = await processEpubFile(file, userId);
 					fileType = "epub";
 				} else if (file.name.toLowerCase().endsWith(".pdf")) {
-					articleToSave = await processPdfFile(file, userId);
+					dexieArticle = await processPdfFile(file, userId);
 					fileType = "pdf";
 				} else {
 					throw new Error(
@@ -243,52 +245,23 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					);
 				}
 
-				// Save the article locally
-				const savedArticle = await saveArticle(articleToSave);
+				// Save using Dexie
+				await db.articles.add(dexieArticle);
+				const savedArticle = mapDexieToArticle(dexieArticle); // Map back for return
 
-				// Sync to Cloud (fire and forget)
-				getToken() // Get token before syncing
-					.then((token) => {
-						if (!token) {
-							console.error("Cannot sync saved file: No token available.");
-							return; // Don't attempt sync without token
-						}
-						saveItemToCloud(savedArticle, token) // Pass token
-							.then((status: CloudSyncStatus) => {
-								if (status === "success") {
-									console.log(
-										`Successfully synced ${fileType} ${savedArticle._id} to cloud.`,
-									);
-								} else {
-									console.warn(
-										`Sync for ${fileType} ${savedArticle._id} failed with status: ${status}`,
-									);
-								}
-							})
-							.catch((err) => {
-								console.error(
-									`Error syncing ${fileType} ${savedArticle._id} to cloud:`,
-									err,
-								);
-							});
-					})
-					.catch((err) => {
-						// Error fetching token
-						console.error("Error fetching token for cloud sync:", err);
-					});
+				// Removed Cloud Sync logic
 
 				// Show success toast
 				toast({
 					title: `${fileType.toUpperCase()} saved`,
-					description: `"${savedArticle.title}" has been saved.`,
+					description: `"${savedArticle.title}" has been saved locally.`, // Updated message
 				});
 
-				// Trigger refresh after successful save
+				// Trigger UI refresh
 				await refreshArticles();
 
-				return savedArticle; // Return the saved article on success
+				return savedArticle;
 			} catch (err) {
-				// Catch any error during the process (validation, processing, save)
 				console.error("Failed to add file:", err);
 				toast({
 					title: "Failed to save file",
@@ -298,22 +271,23 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 							: "An error occurred while saving the file.",
 					variant: "destructive",
 				});
-				return null; // Return null on failure
+				return null;
 			}
-		}, // End of async function passed to useCallback
-		[toast, userId, isSignedIn, getToken, refreshArticles], // Add getToken
-	); // End of useCallback
+		},
+		[toast, userId, isSignedIn, refreshArticles], // Removed getToken
+	);
 
-	// Update article status (isRead, favorite, status)
+	// Update article status (isRead, favorite, status) using Dexie
 	const updateArticleStatus = useCallback(
 		async (
-			id: string,
+			id: string, // This is the Dexie primary key 'id' (same as Article._id)
 			updates: {
 				isRead?: boolean;
 				favorite?: boolean;
 				status?: "inbox" | "later" | "archived";
 			},
 		) => {
+			// Keep auth check for context, though operation is local
 			if (!isSignedIn || !userId) {
 				toast({
 					title: "Authentication Required",
@@ -324,87 +298,64 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 			}
 
 			try {
-				const fetchedArticle = await getArticle(id);
-				if (!fetchedArticle || !fetchedArticle._rev) {
-					throw new Error(
-						"Could not retrieve article details for update. It might have been deleted.",
-					);
-				}
-
-				// Basic permission check (can be enhanced)
-				if (fetchedArticle.userId !== userId) {
-					throw new Error("Permission denied to update this article.");
-				}
-
-				const updatePayload: Partial<Article> & { _id: string; _rev: string } =
-					{
-						_id: id,
-						_rev: fetchedArticle._rev,
-					};
-
+				// Dexie's update handles fetching and merging internally
+				// We just need the ID and the changes object.
+				const changes: Partial<DexieArticle> = {};
 				let statusUpdateMessage = "";
+
 				if (updates.isRead !== undefined) {
-					updatePayload.isRead = updates.isRead;
-					if (updates.isRead && !fetchedArticle.readAt) {
-						updatePayload.readAt = Date.now();
+					changes.isRead = updates.isRead;
+					if (updates.isRead) {
+						// Check if readAt needs setting (only set if not already set)
+						const existing = await db.articles.get(id);
+						if (existing && !existing.readAt) {
+							changes.readAt = Date.now();
+						}
 					}
 					statusUpdateMessage = updates.isRead
 						? "marked as read"
 						: "marked as unread";
 				}
 				if (updates.favorite !== undefined) {
-					updatePayload.favorite = updates.favorite;
+					changes.favorite = updates.favorite;
 					statusUpdateMessage = updates.favorite
 						? "added to favorites"
 						: "removed from favorites";
 				}
 				if (updates.status !== undefined) {
-					updatePayload.status = updates.status;
+					changes.status = updates.status;
 					statusUpdateMessage = `moved to ${updates.status}`;
 				}
 
-				if (Object.keys(updatePayload).length <= 2) {
-					// Only _id and _rev
+				if (Object.keys(changes).length === 0) {
 					console.log("No actual updates provided to updateArticleStatus");
-					return; // No actual updates to perform
+					return;
 				}
 
-				const updatedArticle = await updateArticle(updatePayload);
+				// Use Dexie's update method
+				const updateCount = await db.articles.update(id, changes);
 
-				// Sync update to cloud (fire and forget)
-				getToken() // Get token before syncing
-					.then((token) => {
-						if (!token) {
-							console.error("Cannot sync status update: No token available.");
-							return; // Don't attempt sync without token
-						}
-						saveItemToCloud(updatedArticle, token) // Pass token
-							.then((status: CloudSyncStatus) => {
-								if (status === "success") {
-									console.log(
-										`Successfully synced status update for ${id} to cloud.`,
-									);
-								} else {
-									console.warn(
-										`Sync for status update ${id} failed with status: ${status}`,
-									);
-								}
-							})
-							.catch((err) => {
-								console.error(`Error syncing status update for ${id}:`, err);
-							});
-					})
-					.catch((err) => {
-						// Error fetching token
-						console.error("Error fetching token for cloud sync:", err);
+				if (updateCount === 0) {
+					// This means the article with the given ID was not found
+					console.warn(`Article ${id} not found for update.`);
+					// Optionally throw an error or show a specific toast
+					toast({
+						title: "Update Failed",
+						description: "Article not found.",
+						variant: "destructive",
 					});
+					return; // Exit if not found
+				}
+
+				// Removed Cloud Sync logic
 
 				toast({
 					title: "Article updated",
-					description: `Article ${statusUpdateMessage}.`,
+					description: `Article ${statusUpdateMessage} locally.`, // Updated message
 				});
 
-				// Trigger refresh to reflect changes everywhere
+				// Trigger UI refresh (useLiveQuery in useArticleSync should handle this)
+				// But calling refreshArticles might still be useful for immediate consistency guarantees
 				await refreshArticles();
 			} catch (err) {
 				console.error("Failed to update article status:", err);
@@ -418,93 +369,82 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				});
 			}
 		},
-		[toast, userId, isSignedIn, getToken, refreshArticles], // Add getToken
+		[toast, userId, isSignedIn, refreshArticles], // Removed getToken
 	);
 
-	// Removed updateReadingProgress logic (moved to useReadingProgress hook)
-
-	// Remove article - Returns true on successful DB delete, false otherwise.
-	// Refresh is handled by the caller/context optimistically.
-	const removeArticle = useCallback(
-		async (id: string): Promise<boolean> => {
+	// Update reading progress using Dexie
+	const updateReadingProgress = useCallback(
+		async (id: string, progress: number) => {
 			if (!isSignedIn || !userId) {
 				toast({
 					title: "Authentication Required",
-					description: "Please sign in to remove articles.",
+					description: "Please sign in.",
 					variant: "destructive",
 				});
-				return false; // Indicate failure
+				return;
+			}
+			try {
+				// Update directly using Dexie
+				const count = await db.articles.update(id, {
+					readingProgress: progress,
+				});
+				if (count === 0) {
+					console.warn(`Article ${id} not found for reading progress update.`);
+					// Optional: show toast if article not found
+				} else {
+					console.log(
+						`Updated reading progress for article ${id} to ${progress}`,
+					);
+				}
+				// No need to refresh UI here if useLiveQuery is working correctly
+			} catch (err) {
+				console.error(
+					`Failed to update reading progress for article ${id}:`,
+					err,
+				);
+				toast({
+					title: "Failed to Update Progress",
+					description:
+						err instanceof Error ? err.message : "An error occurred.",
+					variant: "destructive",
+				});
+			}
+		},
+		[toast, userId, isSignedIn], // Only depends on auth state and toast
+	);
+
+	// Remove article using Dexie - Returns true on successful DB delete, false otherwise.
+	const removeArticle = useCallback(
+		async (id: string): Promise<boolean> => {
+			// id is Dexie primary key
+			if (!isSignedIn || !userId) {
+				toast({
+					title: "Authentication Required",
+					description: "Please sign in.",
+					variant: "destructive",
+				});
+				return false;
 			}
 
 			try {
-				// Fetch article first to verify ownership before deleting
-				const articleToDelete = await getArticle(id);
-				if (!articleToDelete) {
-					// Already deleted or doesn't exist locally.
-					// Refresh will reconcile with the cloud state.
-					console.log(`Article ${id} not found locally during remove attempt.`);
-					// Don't refresh here, let the caller handle UI state.
-					// Consider if returning true is appropriate if already deleted locally.
-					// For now, let's return true as the desired state (gone) is achieved locally.
-					return true;
-				}
+				// Optional: Fetch first to check ownership if necessary, though Dexie doesn't require it for delete
+				// const articleToDelete = await db.articles.get(id);
+				// if (!articleToDelete || articleToDelete.userId !== userId) {
+				//     throw new Error("Permission denied or article not found.");
+				// }
 
-				if (articleToDelete.userId !== userId) {
-					throw new Error("Permission denied to remove this article.");
-				}
-
-				// Use the revision from the fetched article for safety, ignore passed 'rev'
-				if (!articleToDelete._rev) {
-					throw new Error("Cannot delete article without revision ID.");
-				}
-
-				// Call updated deleteArticle (soft delete) which only needs the ID
-				await deleteArticle(id);
+				// Use Dexie's delete method
+				await db.articles.delete(id);
 
 				toast({
 					title: "Article removed",
-					description: "The article has been removed.",
+					description: "The article has been removed locally.", // Updated message
 				});
 
-				// Trigger cloud deletion (fire and forget, but log errors)
-				getToken() // Get token before triggering delete
-					.then((token) => {
-						if (!token) {
-							console.error("Cannot trigger cloud delete: No token available.");
-							return; // Don't attempt delete without token
-						}
-						deleteItemFromCloud(id, token) // Pass token
-							.then((status: CloudSyncStatus) => {
-								if (status === "success") {
-									console.log(
-										`Successfully triggered cloud deletion for ${id}.`,
-									);
-								} else if (status === "not_found") {
-									console.log(
-										`Item ${id} already deleted or not found in cloud during deletion trigger.`,
-									);
-								} else {
-									// Log other failures but don't block UI return, as local delete succeeded
-									console.warn(
-										`Cloud deletion trigger for ${id} failed with status: ${status}`,
-									);
-								}
-							})
-							.catch((err) => {
-								// Log error but don't block UI return, as local delete succeeded
-								console.error(
-									`Error triggering cloud deletion for ${id}:`,
-									err,
-								);
-							});
-					})
-					.catch((err) => {
-						// Error fetching token
-						console.error("Error fetching token for cloud deletion:", err);
-					});
+				// Removed Cloud Deletion logic
 
-				// No refresh here - handled optimistically by caller.
-				return true; // Indicate success of local deletion
+				// No refresh here - UI update handled by useLiveQuery via caller/context.
+				return true; // Indicate success
 			} catch (err) {
 				console.error("Failed to remove article:", err);
 				toast({
@@ -518,55 +458,70 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				return false; // Indicate failure
 			}
 		},
-		[toast, userId, isSignedIn, getToken], // Add getToken, removed refreshArticles
+		[toast, userId, isSignedIn], // Removed getToken and refreshArticles
 	);
 
-	// Remove duplicate articles locally
+	// removeDuplicateLocalArticles - This logic needs complete rethinking for Dexie
+	// Dexie doesn't have PouchDB's complex revision handling or built-in conflict resolution.
+	// Duplicates might need to be identified based on URL or title+content hash within the specific userId scope.
+	// This is complex and potentially slow. For now, let's comment it out or provide a placeholder.
 	const removeDuplicateLocalArticles = useCallback(async () => {
-		if (!isSignedIn || !userId) {
-			toast({
-				title: "Authentication Required",
-				description: "Please sign in to manage articles.",
-				variant: "destructive",
-			});
-			return;
-		}
+		toast({
+			title: "Not Implemented",
+			description:
+				"Duplicate removal feature needs reimplementation for local storage.",
+			variant: "default",
+		});
+		console.warn(
+			"removeDuplicateLocalArticles needs reimplementation for Dexie.",
+		);
+		// Placeholder - does nothing for now
+		return;
 
-		try {
-			console.log("Attempting to remove duplicate articles...");
-			const removedCount = await removeDuplicateArticles();
+		// --- Example of potential Dexie logic (needs refinement and testing) ---
+		/*
+        if (!isSignedIn || !userId) { ... return; }
+        try {
+            console.log("Attempting to find and remove duplicate articles (Dexie)...");
+            const allArticles = await db.articles.where({ userId }).toArray();
+            const urlMap = new Map<string, DexieArticle[]>();
+            allArticles.forEach(article => {
+                if (article.url) { // Only consider articles with URLs for simplicity
+                    const existing = urlMap.get(article.url) || [];
+                    existing.push(article);
+                    urlMap.set(article.url, existing);
+                }
+            });
 
-			if (removedCount > 0) {
-				toast({
-					title: "Duplicates Removed",
-					description: `${removedCount} duplicate article(s) removed locally.`,
-				});
-				await refreshArticles(); // Refresh the list
-			} else {
-				toast({
-					title: "No Duplicates Found",
-					description: "No duplicate articles were found locally.",
-				});
-			}
-		} catch (err) {
-			console.error("Failed to remove duplicate articles:", err);
-			toast({
-				title: "Failed to Remove Duplicates",
-				description:
-					err instanceof Error
-						? err.message
-						: "An error occurred while removing duplicates.",
-				variant: "destructive",
-			});
-		}
-	}, [toast, userId, isSignedIn, refreshArticles]);
+            let removedCount = 0;
+            const idsToRemove: string[] = [];
+            for (const articlesWithSameUrl of urlMap.values()) {
+                if (articlesWithSameUrl.length > 1) {
+                    // Keep the one saved most recently (or oldest, depending on preference)
+                    articlesWithSameUrl.sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0)); // Keep newest
+                    const ids = articlesWithSameUrl.slice(1).map(a => a.id); // Mark all but the first for removal
+                    idsToRemove.push(...ids);
+                    removedCount += ids.length;
+                }
+            }
+
+            if (idsToRemove.length > 0) {
+                await db.articles.bulkDelete(idsToRemove);
+                toast({ ... });
+                await refreshArticles(); // Refresh needed after manual bulk delete
+            } else {
+                toast({ ... });
+            }
+        } catch (err) { ... }
+        */
+	}, [toast /*, userId, isSignedIn, refreshArticles */]); // Dependencies removed for placeholder
 
 	return {
 		addArticleByUrl,
 		addArticleByFile,
 		updateArticleStatus,
-		updateReadingProgress, // Return the function from the imported hook
+		updateReadingProgress, // Return the Dexie-based update function
 		removeArticle,
-		removeDuplicateLocalArticles, // Ensure the function is returned
+		removeDuplicateLocalArticles, // Return the placeholder/disabled function
 	};
 }

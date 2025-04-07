@@ -1,6 +1,6 @@
 // Removed unused import: import type { useArticles } from "@/context/ArticleContext";
 import type { ArticleView } from "@/hooks/useArticleView";
-import type { Article, ArticleCategory, Tag } from "@/services/db"; // Import ArticleCategory from db
+import type { Article, ArticleCategory, Tag } from "@/services/db/types"; // Import ArticleCategory from db
 import type {
 	ArticleFilters,
 	ArticleSortField,
@@ -158,7 +158,7 @@ export const MockArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			filtered = filtered.filter((a) => filters.types.includes(a.type));
 		if (filters.tags.length > 0)
 			filtered = filtered.filter((a) =>
-				a.tags?.some((tag) => filters.tags.includes(tag)),
+				a.tags?.some((tag: string) => filters.tags.includes(tag)),
 			);
 		if (filters.category)
 			filtered = filtered.filter((a) => a.category === filters.category);

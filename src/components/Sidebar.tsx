@@ -9,7 +9,7 @@ import { useKeyboard } from "@/context/KeyboardContext"; // Import useKeyboard
 // import { useTheme } from "@/context/ThemeContext"; // Removed as unused after theme toggle moved
 import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
-import type { ArticleCategory } from "@/services/db"; // Import ArticleCategory
+import type { ArticleCategory } from "@/services/db/types"; // Import ArticleCategory - Updated path
 import { useAuth } from "@clerk/clerk-react"; // Removed unused useUser and UserButton
 import {
 	BookOpen, // Icon for Books
