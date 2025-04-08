@@ -1,4 +1,4 @@
-// bondwise-worker/src/handlers/api.test.ts
+// thinkara-worker/src/handlers/api.test.ts
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as auth from "../auth"; // Import the auth module to mock it
@@ -39,6 +39,7 @@ describe("Worker API Handlers", () => {
 			GCF_AUTH_SECRET: "test-secret",
 			SAVED_ITEMS_KV: {} as KVNamespace,
 			CLERK_SECRET_KEY: "test_secret_key",
+			CLERK_WEBHOOK_SECRET: "test_webhook_secret", // Added for test environment
 			CLERK_PUBLISHABLE_KEY: "test_pub_key",
 			GEMINI_API_KEY: "",
 			GCLOUD_PROJECT_NUMBER: "",

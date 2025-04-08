@@ -84,7 +84,7 @@ describe("ThemeContext", () => {
 	});
 
 	it("initializes with theme from localStorage", () => {
-		localStorageMock["bondwise-ui-theme"] = "light";
+		localStorageMock["thinkara-ui-theme"] = "light"; // Use new key
 		const { result } = renderHook(() => useTheme(), { wrapper: HookWrapper });
 		expect(result.current.theme).toBe("light");
 		expect(document.documentElement.classList.contains("light")).toBe(true);
@@ -98,7 +98,7 @@ describe("ThemeContext", () => {
 		});
 
 		expect(result.current.theme).toBe("dark");
-		expect(localStorageMock["bondwise-ui-theme"]).toBe("dark");
+		expect(localStorageMock["thinkara-ui-theme"]).toBe("dark"); // Use new key
 		expect(document.documentElement.classList.contains("dark")).toBe(true);
 		expect(document.documentElement.classList.contains("light")).toBe(false);
 	});

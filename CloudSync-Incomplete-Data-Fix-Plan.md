@@ -11,7 +11,7 @@ The application logs show frequent warnings: `Skipping bulk save for article (ID
 
 **Conclusion:** The primary issue is that incomplete `Article` data is originating from the backend Cloudflare Worker and being propagated by the frontend sync logic.
 
-## 2. Root Cause Analysis (Cloudflare Worker - `bondwise-worker`)
+## 2. Root Cause Analysis (Cloudflare Worker - `thinkara-worker`)
 
 The root cause most likely lies within the Cloudflare Worker backend:
 
@@ -28,7 +28,7 @@ The root cause most likely lies within the Cloudflare Worker backend:
 graph TD
     A[Client: Data Change] --> B{useArticleSync Hook};
     B --> C[Queue/Send to Worker];
-    C --> D{Cloudflare Worker (bondwise-worker)};
+    C --> D{Cloudflare Worker (thinkara-worker)};
     D --> E{KV Storage};
     E --> D;
     D --> F[Return Data to Client];
@@ -55,9 +55,9 @@ graph TD
 
 This plan focuses on addressing the root cause in the backend worker and adding robustness to the frontend sync logic.
 
-### 4.1. Backend Investigation & Fixes (Cloudflare Worker - `bondwise-worker`)
+### 4.1. Backend Investigation & Fixes (Cloudflare Worker - `thinkara-worker`)
 
-*   **(Investigate)** Examine worker code (e.g., `bondwise-worker/src/handlers/items.ts`) handling article CRUD operations with Cloudflare KV.
+*   **(Investigate)** Examine worker code (e.g., `thinkara-worker/src/handlers/items.ts`) handling article CRUD operations with Cloudflare KV.
     *   Verify how `title`, `url`, and `content` are saved and retrieved. Confirm selective saving logic.
     *   Check handling/logging for potential KV errors (size limits).
 *   **(Implement)** Add robust logging:

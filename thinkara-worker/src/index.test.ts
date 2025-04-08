@@ -1,4 +1,4 @@
-// bondwise-worker/src/index.test.ts
+// thinkara-worker/src/index.test.ts
 
 import type { ExecutionContext } from "@cloudflare/workers-types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -90,6 +90,7 @@ describe("Worker Integration Tests", () => {
 			SAVED_ITEMS_KV: mockKV as any,
 			CLERK_SECRET_KEY: "test-clerk-key",
 			CLERK_PUBLISHABLE_KEY: "test-clerk-pub-key",
+			CLERK_WEBHOOK_SECRET: "test-webhook-secret", // Added to fix TS error
 			GEMINI_API_KEY: "test-gemini-key",
 			GCF_SUMMARIZE_URL: "http://fake-gcf.test/summarize",
 			GCF_CHAT_URL: "http://fake-gcf.test/chat",
@@ -112,7 +113,7 @@ describe("Worker Integration Tests", () => {
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as { status?: string; message?: string };
 		expect(body.status).toBe("ok");
-		expect(body.message).toContain("Bondwise Sync API is running");
+		expect(body.message).toContain("Thinkara Sync API is running");
 	});
 
 	// --- /items Endpoints ---

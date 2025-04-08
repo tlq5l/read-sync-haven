@@ -1,4 +1,4 @@
-// bondwise-worker/src/utils.test.ts
+// thinkara-worker/src/utils.test.ts
 
 import { describe, expect, it } from "vitest";
 import type { ApiResponse } from "./types";

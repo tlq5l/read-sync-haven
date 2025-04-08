@@ -1,4 +1,4 @@
-// bondwise-worker/src/auth.test.ts
+// thinkara-worker/src/auth.test.ts
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticateRequestWithClerk } from "./auth";
@@ -25,6 +25,7 @@ describe("Worker Authentication", () => {
 		mockEnv = {
 			CLERK_SECRET_KEY: "test_secret_key",
 			CLERK_PUBLISHABLE_KEY: "test_pub_key",
+			CLERK_WEBHOOK_SECRET: "test_webhook_secret", // Added for test environment
 			// Add other required Env properties, even if empty for this test
 			SAVED_ITEMS_KV: {} as KVNamespace, // Mock KV
 			GCF_SUMMARIZE_URL: "http://example.com/summarize",

@@ -1,4 +1,4 @@
-// bondwise-worker/src/auth.ts
+// thinkara-worker/src/auth.ts
 
 import { createClerkClient } from "@clerk/backend";
 import type { AuthResult, Env } from "./types";

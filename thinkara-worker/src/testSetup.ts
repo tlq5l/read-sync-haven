@@ -1,4 +1,4 @@
-// bondwise-worker/src/testSetup.ts
+// thinkara-worker/src/testSetup.ts
 // Setup file specifically for worker tests (Miniflare environment)
 
 import { afterAll, afterEach, beforeAll } from "vitest";

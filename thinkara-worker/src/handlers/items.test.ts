@@ -1,4 +1,4 @@
-// bondwise-worker/src/handlers/items.test.ts
+// thinkara-worker/src/handlers/items.test.ts
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env, WorkerArticle } from "../types";
@@ -153,6 +153,7 @@ describe("Worker Item Handlers", () => {
 		mockEnv = {
 			SAVED_ITEMS_KV: mockKvNamespace,
 			// Add other required Env properties
+			CLERK_WEBHOOK_SECRET: "test_webhook_secret", // Added for test environment
 			CLERK_SECRET_KEY: "test_secret_key",
 			CLERK_PUBLISHABLE_KEY: "test_pub_key",
 			GCF_SUMMARIZE_URL: "http://example.com/summarize",

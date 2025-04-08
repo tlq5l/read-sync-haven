@@ -34,12 +34,12 @@ bun-path.ps1
 # bun.lockb
 .aider*
 node_modules/
-bondwise-worker/.dev.vars
+thinkara-worker/.dev.vars
 
 # Sentry Config File
 .env.sentry-build-plugin
 
 # Wrangler build artifacts
-bondwise-worker/.wrangler/
+thinkara-worker/.wrangler/
 
 .vercel

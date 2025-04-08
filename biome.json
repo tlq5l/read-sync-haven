@@ -12,7 +12,7 @@
 			"tsconfig.json",
 			"dist/**/*",
 			"dist/**/*.js",
-			"bondwise-worker/.wrangler/**"
+			"thinkara-worker/.wrangler/**"
 		]
 	},
 	"formatter": {

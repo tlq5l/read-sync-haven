@@ -1,4 +1,4 @@
-// bondwise-worker/src/handlers/items.ts
+// thinkara-worker/src/handlers/items.ts
 
 import type { Env, WorkerArticle } from "../types";
 import { createUserItemKey, errorResponse, jsonResponse } from "../utils";

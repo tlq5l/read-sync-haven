@@ -1,4 +1,4 @@
-// bondwise-worker/src/handlers/api.ts
+// thinkara-worker/src/handlers/api.ts
 
 import { authenticateRequestWithClerk } from "../auth"; // Import auth function
 import type { Env } from "../types";

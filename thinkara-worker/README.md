@@ -1,4 +1,4 @@
-# bondwise-worker
+# thinkara-worker
 
 To install dependencies:
 

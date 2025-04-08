@@ -210,7 +210,7 @@ export default {
 				return new Response(
 					JSON.stringify({
 						status: "ok",
-						message: "Bondwise Sync API is running",
+						message: "Thinkara Sync API is running",
 						version: "1.0.0",
 						endpoints: ["/items"],
 					}),

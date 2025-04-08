@@ -1,4 +1,4 @@
-// bondwise-worker/src/types.ts
+// thinkara-worker/src/types.ts
 
 /**
  * Defines the expected environment variables and bindings for the Cloudflare Worker.

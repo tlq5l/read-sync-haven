@@ -1,4 +1,4 @@
-// bondwise-worker/src/utils.ts
+// thinkara-worker/src/utils.ts
 
 import type { ApiResponse } from "./types";
 
