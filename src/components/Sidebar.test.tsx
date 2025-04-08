@@ -89,7 +89,6 @@ vi.mock("lucide-react", async (importOriginal) => {
 	// Create simple mock components for icons used in Sidebar
 	const iconNames = [
 		"Home",
-		"Library",
 		"Settings",
 		"Sun",
 		"Moon",
@@ -202,25 +201,6 @@ describe("Sidebar Component", () => {
 		expect(mockNavigate).toHaveBeenCalledWith("/");
 	});
 
-	it("renders the Library button with Library icon and navigates to '/inbox' on click", () => {
-		render(
-			<MockProviders>
-				<Sidebar />
-			</MockProviders>,
-		);
-		const libraryButton = screen.getByRole("button", { name: /library/i });
-		expect(libraryButton).toBeInTheDocument();
-		// Check for the mocked Library icon within the button
-		expect(
-			libraryButton.querySelector('[data-testid="icon-Library"]'),
-		).toBeInTheDocument();
-
-		fireEvent.click(libraryButton);
-		// setCurrentView is *not* called when clicking the Library button itself
-		expect(mockSetCurrentView).not.toHaveBeenCalled();
-		expect(mockNavigate).toHaveBeenCalledWith("/inbox");
-	});
-
 	it("renders the Settings link visibly", () => {
 		render(
 			<MockProviders>
@@ -267,65 +247,4 @@ describe("Sidebar Component", () => {
 	});
 
 	// Add more tests as needed for collapse/expand etc.
-
-	it("reveals Library category sub-menu and sets selected category on click", () => {
-		// No longer needs async
-		// mockSetSelectedCategory is now defined globally and used in the mock factory
-		render(
-			<MockProviders>
-				<Sidebar />
-			</MockProviders>,
-		);
-		// Use the added data-testid to select the expander button reliably
-		const libraryExpanderButton = screen.getByTestId("library-expander-button");
-		const libraryMainButton = screen.getByRole("button", {
-			name: /^library$/i,
-		}); // Exact match for Library
-
-		// Initially, the library sub-menu (categories) should be visible because default state is open
-		// Test for one category button, e.g., Articles
-		const articlesButtonInitial = screen.getByRole("button", {
-			name: /articles/i,
-		});
-		expect(articlesButtonInitial).toBeVisible();
-
-		// --- Test closing and opening ---
-		// Click the chevron button to close the sub-menu
-		fireEvent.click(libraryExpanderButton);
-		// Now category buttons should NOT be in the DOM
-		expect(screen.queryByRole("button", { name: /articles/i })).toBeNull();
-		expect(screen.queryByRole("button", { name: /pdfs/i })).toBeNull();
-
-		// Click the chevron button again to re-open the sub-menu
-		fireEvent.click(libraryExpanderButton);
-		const articlesButton = screen.getByRole("button", { name: /articles/i });
-		const pdfsButton = screen.getByRole("button", { name: /pdfs/i });
-		const booksButton = screen.getByRole("button", { name: /books/i });
-
-		expect(articlesButton).toBeVisible();
-		expect(pdfsButton).toBeVisible();
-		expect(booksButton).toBeVisible();
-
-		// --- Test setting category ---
-		// Click Articles category button
-		fireEvent.click(articlesButton);
-		expect(mockSetSelectedCategory).toHaveBeenCalledWith("article");
-
-		// Click PDFs category button
-		fireEvent.click(pdfsButton);
-		expect(mockSetSelectedCategory).toHaveBeenCalledWith("pdf");
-
-		// Click Books category button
-		fireEvent.click(booksButton);
-		expect(mockSetSelectedCategory).toHaveBeenCalledWith("book");
-
-		// Click main Library button (should clear category)
-		fireEvent.click(libraryMainButton);
-		expect(mockSetSelectedCategory).toHaveBeenCalledWith(null);
-
-		// Verify total calls
-		// Check the initial state and logic to confirm if clicking the main Library button resets the category
-		// Assuming it does: article, pdf, book, null calls = 4
-		expect(mockSetSelectedCategory).toHaveBeenCalledTimes(4);
-	});
 });
