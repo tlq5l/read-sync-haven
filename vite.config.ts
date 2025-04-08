@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react-swc";
 import { GoogleAuth } from "google-auth-library";
 import { type Plugin, defineConfig, loadEnv } from "vite"; // Use vite's defineConfig
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 // // Custom plugin to provide GCF token during development
@@ -105,6 +106,15 @@ export default defineConfig(({ mode }) => ({
 			},
 			// Removed 'include' array to polyfill all supported modules by default
 			protocolImports: true,
+		}),
+		// Copy the pdf.js worker to the output directory
+		viteStaticCopy({
+			targets: [
+				{
+					src: "node_modules/pdfjs-dist/build/pdf.worker.min.js",
+					dest: ".", // Copy to the root of the dist folder
+				},
+			],
 		}),
 		// Put the Sentry vite plugin after all other plugins
 		sentryVitePlugin({

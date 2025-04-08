@@ -1,12 +1,9 @@
 import * as pdfjsLib from "pdfjs-dist";
+import type { TextItem } from "pdfjs-dist/types/src/display/api"; // Import TextItem type explicitly
 
-// Essential: Configure the worker source for pdf.js
-// This ensures it works correctly in environments like Vite that bundle modules.
-// It needs to resolve the path to the worker script relative to the built output.
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-	"pdfjs-dist/build/pdf.worker.min.js",
-	import.meta.url,
-).toString();
+// Configure the worker source using a static public path.
+// Assumes the worker file is copied to the root of the public/build output directory.
+pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
 
 /**
  * Parses a PDF file buffer/arraybuffer and extracts its text content using pdfjs-dist.
@@ -34,14 +31,35 @@ export async function parsePdf(pdfData: Buffer | ArrayBuffer): Promise<string> {
 		for (let i = 1; i <= pdfDoc.numPages; i++) {
 			const page = await pdfDoc.getPage(i);
 			const textContent = await page.getTextContent();
-			// Concatenate text items on the page, ensuring item is TextItem
-			const pageText = textContent.items
-				.map((item) => ("str" in item ? item.str : ""))
-				.join(" ");
-			fullText += `${pageText}\n`; // Add newline between pages for readability
+			let pageText = "";
+			// Removed unused variables lastY and lastHeight after simplifying logic
+
+			// Sort items based on vertical position primarily, then horizontal.
+			// pdf.js textContent *should* be in reading order, but explicit sort is safer.
+			const sortedItems = textContent.items
+				.filter((item): item is TextItem => "str" in item) // Use the imported TextItem type
+				.sort((a, b) => {
+					// Compare Y first (assuming Y increases downwards in pdf.js coordinate system)
+					const yDiff = a.transform[5] - b.transform[5];
+					// Use a small tolerance for items considered on the same line
+					const tolerance = 1;
+					if (Math.abs(yDiff) > tolerance) {
+						return yDiff; // Sort by Y primarily
+					}
+					// If Y is similar, sort by X (left-to-right)
+					return a.transform[4] - b.transform[4];
+				});
+
+			// Simplified approach: Join all sorted text items with a space.
+			// This reverts the complex paragraph logic to fix the regression.
+			// Assign directly to pageText declared earlier in the loop scope
+			pageText = sortedItems.map((item) => item.str).join(" ");
+
+			// Add double newline between pages for clearer separation
+			fullText += `${pageText.trim()}\n\n`;
 		}
 
-		return fullText.trim(); // Trim trailing newline
+		return fullText.trim(); // Trim leading/trailing whitespace potentially added
 	} catch (error) {
 		console.error("Error parsing PDF with pdfjs-dist:", error);
 		// Return empty string on failure

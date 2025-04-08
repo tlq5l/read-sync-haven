@@ -280,7 +280,15 @@ export async function handlePostItem(
 					savedAt: item.savedAt, // Use new savedAt timestamp
 					isRead: item.isRead ?? existingArticle.isRead ?? false, // Prefer new isRead, fallback to existing, then false
 					favorite: item.favorite ?? existingArticle.favorite ?? false, // Prefer new favorite, fallback to existing, then false
-					content: item.content, // Always use new content
+					// Apply basic cleanup ONLY if it's not already structured HTML from Readability (type 'article')
+					content:
+						item.content && item.type !== "article"
+							? item.content
+									.trim()
+									.replace(/\n{3,}/g, "\n\n") // Collapse excessive newlines
+									.replace(/[ \t]{2,}/g, " ") // Collapse multiple spaces/tabs
+									.replace(/ *\n */g, "\n") // Trim whitespace around newlines
+							: (item.content ?? ""), // Otherwise, use the content as-is (it's sanitized HTML or empty)
 					...(item.fileData && { fileData: item.fileData }),
 					...(item.htmlContent && { htmlContent: item.htmlContent }),
 					...(item.excerpt && { excerpt: item.excerpt }),
@@ -345,7 +353,17 @@ export async function handlePostItem(
 			savedAt: item.savedAt,
 			isRead: item.isRead ?? false,
 			favorite: item.favorite ?? false,
-			...(item.content && { content: item.content }),
+			// Apply basic cleanup ONLY if it's not already structured HTML from Readability (type 'article')
+			...(item.content && {
+				content:
+					item.type !== "article"
+						? item.content
+								.trim()
+								.replace(/\n{3,}/g, "\n\n") // Collapse excessive newlines
+								.replace(/[ \t]{2,}/g, " ") // Collapse multiple spaces/tabs
+								.replace(/ *\n */g, "\n") // Trim whitespace around newlines
+						: item.content, // Otherwise, use the content as-is (it's sanitized HTML)
+			}),
 			...(item.fileData && { fileData: item.fileData }),
 			...(item.htmlContent && { htmlContent: item.htmlContent }),
 			...(item.excerpt && { excerpt: item.excerpt }),
