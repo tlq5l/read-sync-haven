@@ -203,11 +203,10 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 			} catch (err) {
 				console.error("Failed to add article by URL:", err);
 				toast({
-					title: "Failed to save article",
-					description:
-						err instanceof Error
-							? err.message
-							: "An error occurred while saving the article.",
+					title: "Parsing Failed",
+					description: `Could not parse the article from the provided URL. The article was not saved. Error: ${
+						err instanceof Error ? err.message : String(err)
+					}`,
 					variant: "destructive",
 				});
 				return null;
@@ -264,11 +263,10 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 			} catch (err) {
 				console.error("Failed to add file:", err);
 				toast({
-					title: "Failed to save file",
-					description:
-						err instanceof Error
-							? err.message
-							: "An error occurred while saving the file.",
+					title: "Parsing Failed",
+					description: `Could not parse the uploaded file (EPUB/PDF). The file was not saved. Error: ${
+						err instanceof Error ? err.message : String(err)
+					}`,
 					variant: "destructive",
 				});
 				return null;
