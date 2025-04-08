@@ -174,13 +174,13 @@ export default function Sidebar() {
 								"w-full flex items-center gap-3 py-2 transition-all duration-200",
 								collapsed ? "justify-center" : "justify-start",
 								"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
-								isActive("/library") && // Use /library route
+								isActive("/inbox") && // Use /inbox route
 									"bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100",
 							)}
 							onClick={() => {
 								setSelectedCategory(null); // Reset category when navigating to base library
 								setCurrentView("all"); // Reset view when going to library (consistent with Home)
-								navigate("/library"); // Navigate to /library
+								navigate("/inbox"); // Navigate to /inbox
 							}}
 						>
 							<Library size={20} />

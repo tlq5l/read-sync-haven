@@ -237,7 +237,7 @@ describe("Sidebar Component", () => {
 		fireEvent.click(libraryButton);
 		expect(mockSetSelectedCategory).toHaveBeenCalledWith(null); // Check category reset
 		expect(mockSetCurrentView).toHaveBeenCalledWith("all"); // Check view reset
-		expect(mockNavigate).toHaveBeenCalledWith("/library"); // Check navigation
+		expect(mockNavigate).toHaveBeenCalledWith("/inbox"); // Check navigation
 	});
 
 	it("renders the Settings link visibly", () => {
