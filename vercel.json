@@ -1,7 +1,4 @@
 {
-	"env": {
-		"ROLLUP_WASM_NODE": "true"
-	},
 	"rewrites": [
 		{
 			"source": "/(.*)",
