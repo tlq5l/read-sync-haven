@@ -42,7 +42,7 @@ const allowedOrigins = [
 
 // Configure CORS middleware
 const corsOptions: cors.CorsOptions = {
-	origin: (origin, callback) => {
+	origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
 		if (!origin) return callback(null, true);
 		if (allowedOrigins.indexOf(origin) === -1) {
 			const msg =
@@ -160,8 +160,17 @@ Answer:`;
 				.send({ error: "AI service returned empty response." });
 		}
 
-		// Return the AI's response
-		res.status(200).send({ response: aiResponse }); // Changed 'summary' to 'response'
+		// Return the AI's response in OpenAI-compatible format
+		res.status(200).send({
+			choices: [
+				{
+					message: {
+						role: "assistant",
+						content: aiResponse,
+					},
+				},
+			],
+		}); // MODIFIED LINE
 	} catch (error) {
 		console.error("Error calling Gemini API for chat:", error);
 		res
