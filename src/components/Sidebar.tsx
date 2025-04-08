@@ -108,7 +108,7 @@ export default function Sidebar() {
 						className="text-xl font-bold transition-opacity duration-200 text-gray-900 dark:text-white" // Corrected: Single className with merged styles
 						// style={styles.header} // Style prop correctly removed
 					>
-						Read Sync Haven
+						Thinkara
 					</h1>
 				)}
 				<div
