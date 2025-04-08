@@ -56,6 +56,65 @@ global.ResizeObserver = class ResizeObserver {
 	disconnect = vi.fn();
 };
 
+// Mock DOMMatrix for JSDOM environment
+// Based on https://developer.mozilla.org/en-US/docs/Web/API/DOMMatrix
+if (typeof global.DOMMatrix === "undefined") {
+	global.DOMMatrix = class DOMMatrix {
+		m11: number;
+		m12: number;
+		m13: number;
+		m14: number;
+		m21: number;
+		m22: number;
+		m23: number;
+		m24: number;
+		m31: number;
+		m32: number;
+		m33: number;
+		m34: number;
+		m41: number;
+		m42: number;
+		m43: number;
+		m44: number;
+		is2D: boolean;
+		isIdentity: boolean;
+
+		constructor(init?: number[] | string) {
+			// Simplified identity matrix for mocking purposes
+			this.m11 = 1; this.m12 = 0; this.m13 = 0; this.m14 = 0;
+			this.m21 = 0; this.m22 = 1; this.m23 = 0; this.m24 = 0;
+			this.m31 = 0; this.m32 = 0; this.m33 = 1; this.m34 = 0;
+			this.m41 = 0; this.m42 = 0; this.m43 = 0; this.m44 = 1;
+			this.is2D = true; // Assume 2D for simplicity
+			this.isIdentity = true; // Assume identity
+
+			// Basic parsing if needed (very simplified)
+			if (typeof init === 'string') {
+				// TODO: Implement basic string parsing if required by tests
+			} else if (Array.isArray(init)) {
+				// TODO: Implement array initialization if required by tests
+				if (init.length === 6) { // 2D matrix elements
+					this.m11 = init[0]; this.m12 = init[1];
+					this.m21 = init[2]; this.m22 = init[3];
+					this.m41 = init[4]; this.m42 = init[5];
+					this.isIdentity = false; // Assume not identity if initialized
+				} else if (init.length === 16) { // 3D matrix elements
+					// Assign all 16 if needed
+					this.is2D = false;
+					this.isIdentity = false;
+				}
+			}
+		}
+
+		// Add common methods as needed, potentially mocked with vi.fn()
+		translateSelf = vi.fn().mockReturnThis();
+		scaleSelf = vi.fn().mockReturnThis();
+		rotateSelf = vi.fn().mockReturnThis();
+		multiplySelf = vi.fn().mockReturnThis();
+		// ... other methods
+	};
+}
+
 // Add any other global setup logic here if needed.
 
 import { afterAll, afterEach, beforeAll } from "vitest";
