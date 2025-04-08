@@ -4,11 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useReadingProgress } from "./useReadingProgress";
 
 // --- Mocks Setup ---
-// Hoist only necessary mocks
-const { mockGetArticle, mockUpdateArticle } = vi.hoisted(() => {
+// Hoist mocks for Dexie functions
+const { mockDexieGetArticle, mockDexieUpdateArticle } = vi.hoisted(() => {
 	return {
-		mockGetArticle: vi.fn(),
-		mockUpdateArticle: vi.fn(),
+		mockDexieGetArticle: vi.fn(),
+		mockDexieUpdateArticle: vi.fn(),
 	};
 });
 
@@ -26,9 +26,14 @@ vi.mock("@clerk/clerk-react", () => ({
 //  saveItemToCloud: mockSaveItemToCloud,
 // }));
 
-vi.mock("@/services/db", () => ({
-	getArticle: mockGetArticle,
-	updateArticle: mockUpdateArticle,
+// Mock the actual Dexie db object and its methods used by the hook
+vi.mock("@/services/db/dexie", () => ({
+	db: {
+		articles: {
+			get: mockDexieGetArticle,
+			update: mockDexieUpdateArticle,
+		},
+	},
 }));
 
 // Remove debounce mock as it's not used
@@ -45,8 +50,8 @@ describe("useReadingProgress", () => {
 		vi.clearAllMocks();
 		// mockGetTokenFn.mockClear().mockResolvedValue("progress-token"); // Removed
 		// mockSaveItemToCloud.mockClear().mockResolvedValue("success"); // Removed
-		mockGetArticle.mockClear();
-		mockUpdateArticle.mockClear();
+		mockDexieGetArticle.mockClear();
+		mockDexieUpdateArticle.mockClear();
 	});
 
 	afterEach(() => {
@@ -72,12 +77,9 @@ describe("useReadingProgress", () => {
 	};
 
 	it("should update local article progress and mark as read if >= 90%", async () => {
-		mockGetArticle.mockResolvedValue(mockExistingArticle);
-		mockUpdateArticle.mockImplementation(async (updates) => ({
-			...mockExistingArticle,
-			...updates,
-			_rev: "rev-progress-2", // Simulate new revision
-		}));
+		mockDexieGetArticle.mockResolvedValue(mockExistingArticle);
+		// Dexie's update method returns the number of updated records (usually 1)
+		mockDexieUpdateArticle.mockResolvedValue(1);
 
 		const { result } = renderHook(() => useReadingProgress());
 
@@ -85,11 +87,11 @@ describe("useReadingProgress", () => {
 			await result.current.updateReadingProgress("article-progress-1", 95);
 		});
 
-		expect(mockGetArticle).toHaveBeenCalledWith("article-progress-1"); // Reinstated: Hook needs to fetch the article first
-		expect(mockUpdateArticle).toHaveBeenCalledWith(
+		expect(mockDexieGetArticle).toHaveBeenCalledWith("article-progress-1");
+		// Dexie's update method is called with the ID and a partial update object
+		expect(mockDexieUpdateArticle).toHaveBeenCalledWith(
+			"article-progress-1",
 			expect.objectContaining({
-				_id: "article-progress-1",
-				_rev: "rev-progress-1",
 				readingProgress: 95,
 				isRead: true, // Should be marked as read
 				readAt: expect.any(Number), // Should have readAt timestamp
@@ -108,7 +110,7 @@ describe("useReadingProgress", () => {
 	// it("should not call saveItemToCloud if getToken rejects", async () => { ... });
 
 	it("should not call updateArticle or saveItemToCloud if progress hasn't changed significantly", async () => {
-		mockGetArticle.mockResolvedValue(mockExistingArticle); // readingProgress is 10
+		mockDexieGetArticle.mockResolvedValue(mockExistingArticle); // readingProgress is 10
 
 		const { result } = renderHook(() => useReadingProgress());
 
@@ -117,8 +119,8 @@ describe("useReadingProgress", () => {
 			await result.current.updateReadingProgress("article-progress-1", 10.5);
 		});
 
-		expect(mockGetArticle).toHaveBeenCalledWith("article-progress-1"); // Reinstated: Hook needs to fetch the article first
-		expect(mockUpdateArticle).not.toHaveBeenCalled();
+		expect(mockDexieGetArticle).toHaveBeenCalledWith("article-progress-1");
+		expect(mockDexieUpdateArticle).not.toHaveBeenCalled();
 		// expect(mockGetTokenFn).not.toHaveBeenCalled(); // Removed check
 		// expect(mockSaveItemToCloud).not.toHaveBeenCalled(); // Removed check as cloud sync is removed
 	});

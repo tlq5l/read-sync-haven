@@ -16,8 +16,11 @@ const { mockArticlesTable, mockDbData } = vi.hoisted(() => {
 			async (items: Article[], keys?: any, options?: { allKeys: boolean }) => {
 				const addedIds: string[] = [];
 				for (const item of items) {
-					if (!item._id) throw new Error("Mock Dexie Error: Article must have an _id");
-					const index = _mockDbData.findIndex((dbItem: Article) => dbItem._id === item._id); // Add type
+					if (!item._id)
+						throw new Error("Mock Dexie Error: Article must have an _id");
+					const index = _mockDbData.findIndex(
+						(dbItem: Article) => dbItem._id === item._id,
+					); // Add type
 					const newItem = structuredClone(item);
 					if (index !== -1) {
 						_mockDbData[index] = newItem; // Update internal
@@ -26,7 +29,9 @@ const { mockArticlesTable, mockDbData } = vi.hoisted(() => {
 					}
 					addedIds.push(item._id);
 				}
-				return Promise.resolve(options?.allKeys ? addedIds : addedIds[addedIds.length - 1]);
+				return Promise.resolve(
+					options?.allKeys ? addedIds : addedIds[addedIds.length - 1],
+				);
 			},
 		),
 		get: vi.fn(async (_id: string) => {
@@ -34,45 +39,70 @@ const { mockArticlesTable, mockDbData } = vi.hoisted(() => {
 			return Promise.resolve(found ? structuredClone(found) : undefined);
 		}),
 		// Simulates Dexie's add() - takes the full object (DexieArticle has 'id', Article has '_id')
-		add: vi.fn(async (item: any /* DexieArticle passed by hook */, key?: any) => {
-			// Dexie's add requires the object to have the primary key ('id')
-			if (!item.id) throw new Error("Mock Dexie Error: Dexie Article must have an id"); // Check for item.id
-			const index = _mockDbData.findIndex((dbItem: Article) => dbItem._id === item.id); // Compare dbItem._id with item.id
-			if (index !== -1) {
-				// Dexie's add throws if key already exists
-				throw new Error(
-					`ConstraintError: Key ${item.id} already exists in table articles`,
-				);
-			}
-			// Map DexieArticle back to Article type for storage in our mockDbData array
-			// Note: Assuming a mapDexieToArticle function exists or needs to be added/mocked
-			// If mapDexieToArticle isn't available in this scope, adapt storage or mocking.
-			// For now, let's assume we store the raw DexieArticle for simplicity in the mock's array
-			// and handle mapping during assertion if needed. Let's adjust to store Dexie format directly in mock.
-			// Revert: Let's stick to storing 'Article' type in _mockDbData and map here.
-			// Need mapDexieToArticle - it should be defined in useArticleActions.ts, but not exported.
-			// Let's inline a simple mapping for the mock.
-			const newItem: Article = {
+		add: vi.fn(
+			async (item: any /* DexieArticle passed by hook */, key?: any) => {
+				// Dexie's add requires the object to have the primary key ('id')
+				if (!item.id)
+					throw new Error("Mock Dexie Error: Dexie Article must have an id"); // Check for item.id
+				const index = _mockDbData.findIndex(
+					(dbItem: Article) => dbItem._id === item.id,
+				); // Compare dbItem._id with item.id
+				if (index !== -1) {
+					// Dexie's add throws if key already exists
+					throw new Error(
+						`ConstraintError: Key ${item.id} already exists in table articles`,
+					);
+				}
+				// Map DexieArticle back to Article type for storage in our mockDbData array
+				// Note: Assuming a mapDexieToArticle function exists or needs to be added/mocked
+				// If mapDexieToArticle isn't available in this scope, adapt storage or mocking.
+				// For now, let's assume we store the raw DexieArticle for simplicity in the mock's array
+				// and handle mapping during assertion if needed. Let's adjust to store Dexie format directly in mock.
+				// Revert: Let's stick to storing 'Article' type in _mockDbData and map here.
+				// Need mapDexieToArticle - it should be defined in useArticleActions.ts, but not exported.
+				// Let's inline a simple mapping for the mock.
+				const newItem: Article = {
 					_id: item.id,
 					version: 1, // Add default version
 					// Map other fields explicitly from item (DexieArticle) to newItem (Article)
-					title: item.title, url: item.url, content: item.content, excerpt: item.excerpt,
-					savedAt: item.savedAt, isRead: item.isRead, favorite: item.favorite, tags: item.tags,
-					type: item.type, status: item.status, userId: item.userId, author: item.author,
-					publishedDate: item.publishedDate, readAt: item.readAt, siteName: item.siteName,
-					estimatedReadTime: item.estimatedReadTime, readingProgress: item.readingProgress,
-					fileData: item.fileData, fileSize: item.fileSize, fileName: item.fileName,
-					pageCount: item.pageCount, category: item.category, htmlContent: item.htmlContent,
-					scrollPosition: item.scrollPosition, coverImage: item.coverImage, language: item.language,
+					title: item.title,
+					url: item.url,
+					content: item.content,
+					excerpt: item.excerpt,
+					savedAt: item.savedAt,
+					isRead: item.isRead,
+					favorite: item.favorite,
+					tags: item.tags,
+					type: item.type,
+					status: item.status,
+					userId: item.userId,
+					author: item.author,
+					publishedDate: item.publishedDate,
+					readAt: item.readAt,
+					siteName: item.siteName,
+					estimatedReadTime: item.estimatedReadTime,
+					readingProgress: item.readingProgress,
+					fileData: item.fileData,
+					fileSize: item.fileSize,
+					fileName: item.fileName,
+					pageCount: item.pageCount,
+					category: item.category,
+					htmlContent: item.htmlContent,
+					scrollPosition: item.scrollPosition,
+					coverImage: item.coverImage,
+					language: item.language,
 					deletedAt: item.deletedAt,
-			};
+				};
 
-			_mockDbData.push(newItem); // Add the mapped Article to internal store
-			return Promise.resolve(item.id); // Return the Dexie key ('id')
-		}),
+				_mockDbData.push(newItem); // Add the mapped Article to internal store
+				return Promise.resolve(item.id); // Return the Dexie key ('id')
+			},
+		),
 		// Simulates Dexie's update()
 		update: vi.fn(async (id: string, changes: Partial<Article>) => {
-			const index = _mockDbData.findIndex((dbItem: Article) => dbItem._id === id); // Add type
+			const index = _mockDbData.findIndex(
+				(dbItem: Article) => dbItem._id === id,
+			); // Add type
 			if (index !== -1) {
 				_mockDbData[index] = { ..._mockDbData[index], ...changes }; // Update internal
 				return Promise.resolve(1);
@@ -81,8 +111,11 @@ const { mockArticlesTable, mockDbData } = vi.hoisted(() => {
 		}),
 		// Simulates Dexie's put()
 		put: vi.fn(async (item: Article, key?: any) => {
-			if (!item._id) throw new Error("Mock Dexie Error: Article must have an _id");
-			const index = _mockDbData.findIndex((dbItem: Article) => dbItem._id === item._id); // Add type
+			if (!item._id)
+				throw new Error("Mock Dexie Error: Article must have an _id");
+			const index = _mockDbData.findIndex(
+				(dbItem: Article) => dbItem._id === item._id,
+			); // Add type
 			const newItem = structuredClone(item);
 			if (index !== -1) {
 				_mockDbData[index] = newItem; // Update internal
@@ -93,7 +126,9 @@ const { mockArticlesTable, mockDbData } = vi.hoisted(() => {
 		}),
 		delete: vi.fn(async (_id: string) => {
 			const initialLength = _mockDbData.length;
-			const indexToRemove = _mockDbData.findIndex((item: Article) => item._id === _id); // Add type
+			const indexToRemove = _mockDbData.findIndex(
+				(item: Article) => item._id === _id,
+			); // Add type
 			if (indexToRemove !== -1) {
 				_mockDbData.splice(indexToRemove, 1); // Modify internal
 			}
@@ -103,7 +138,9 @@ const { mockArticlesTable, mockDbData } = vi.hoisted(() => {
 		where: vi.fn((index: string) => ({
 			equals: vi.fn((value: any) => ({
 				toArray: vi.fn(async () => {
-					const results = _mockDbData.filter((item: Article) => item[index as keyof Article] === value); // Add type
+					const results = _mockDbData.filter(
+						(item: Article) => item[index as keyof Article] === value,
+					); // Add type
 					return Promise.resolve(structuredClone(results));
 				}),
 			})),
@@ -203,25 +240,26 @@ describe("useArticleActions (Dexie)", () => {
 
 		// Reset Dexie mock data and function calls
 		mockDbData.length = 0; // Clear the *internal* data store via the exported reference
-		// Clear mocks for all functions in mockArticlesTable
-		Object.values(mockArticlesTable).forEach((mockFn) => {
+		// Clear mocks for all functions in mockArticlesTable using for...of
+		for (const mockFn of Object.values(mockArticlesTable)) {
 			if (vi.isMockFunction(mockFn)) {
 				mockFn.mockClear();
-			} else if (typeof mockFn === 'object' && mockFn !== null) {
-				// Clear nested mocks (like for where().equals().toArray())
-				Object.values(mockFn).forEach((nestedMock: any) => {
+			} else if (typeof mockFn === "object" && mockFn !== null) {
+				// Clear nested mocks (like for where().equals().toArray()) using for...of
+				for (const nestedMock of Object.values(mockFn)) {
 					if (vi.isMockFunction(nestedMock)) {
 						nestedMock.mockClear();
-					} else if (typeof nestedMock === 'object' && nestedMock !== null) {
-						Object.values(nestedMock).forEach((deepMock: any) => {
+					} else if (typeof nestedMock === "object" && nestedMock !== null) {
+						// Clear deeply nested mocks using for...of
+						for (const deepMock of Object.values(nestedMock)) {
 							if (vi.isMockFunction(deepMock)) {
 								deepMock.mockClear();
 							}
-						});
+						}
 					}
-				});
+				}
 			}
-		});
+		}
 		// Reset default implementations
 		// No need to reset implementations here if they correctly use the hoisted _mockDbData reference
 		// The mock implementations defined in vi.hoisted() will persist and operate on the _mockDbData array.
@@ -304,9 +342,9 @@ describe("useArticleActions (Dexie)", () => {
 		// First, ensure savedArticle is not null (type guard)
 		expect(savedArticle).not.toBeNull();
 		if (savedArticle) {
-				// Compare relevant fields, casting savedArticle to Article
-				expect((savedArticle as Article)._id).toEqual(savedDexieData.id);
-				expect((savedArticle as Article).title).toEqual(savedDexieData.title);
+			// Compare relevant fields, casting savedArticle to Article
+			expect((savedArticle as Article)._id).toEqual(savedDexieData.id);
+			expect((savedArticle as Article).title).toEqual(savedDexieData.title);
 		}
 		expect(refreshArticlesMock).toHaveBeenCalledTimes(1);
 	});
@@ -345,9 +383,9 @@ describe("useArticleActions (Dexie)", () => {
 		// First, ensure savedArticle is not null (type guard)
 		expect(savedArticle).not.toBeNull();
 		if (savedArticle) {
-				// Compare relevant fields, casting savedArticle to Article
-				expect((savedArticle as Article)._id).toEqual(savedDexieData.id);
-				expect((savedArticle as Article).title).toEqual(savedDexieData.title);
+			// Compare relevant fields, casting savedArticle to Article
+			expect((savedArticle as Article)._id).toEqual(savedDexieData.id);
+			expect((savedArticle as Article).title).toEqual(savedDexieData.title);
 		}
 		expect(refreshArticlesMock).toHaveBeenCalledTimes(1);
 	});
@@ -395,9 +433,9 @@ describe("useArticleActions (Dexie)", () => {
 		// First, ensure savedArticle is not null (type guard)
 		expect(savedArticle).not.toBeNull();
 		if (savedArticle) {
-				// Compare relevant fields, casting savedArticle to Article
-				expect((savedArticle as Article)._id).toEqual(savedDexieData.id);
-				expect((savedArticle as Article).title).toEqual(savedDexieData.title);
+			// Compare relevant fields, casting savedArticle to Article
+			expect((savedArticle as Article)._id).toEqual(savedDexieData.id);
+			expect((savedArticle as Article).title).toEqual(savedDexieData.title);
 		}
 		expect(refreshArticlesMock).toHaveBeenCalledTimes(1);
 	});
@@ -471,14 +509,14 @@ describe("useArticleActions (Dexie)", () => {
 		// Assert only the fields updated by updateArticleStatus (using non-null assertion '!' or checking definition first)
 		// Using check first approach:
 		if (updatedData) {
-				expect(updatedData._id).toBe("update-me");
-				// expect(updatedData.title).toBe("Updated Title"); // Title not updated by this func
-				expect(updatedData.isRead).toBe(true);
-				expect(updatedData.favorite).toBe(true);
-				// expect(updatedData.tags).toEqual(["tag1"]); // Tags not updated by this func
-				// expect(updatedData.updatedAt).toBeGreaterThanOrEqual(initialArticle.savedAt); // updatedAt does not exist on Article type
-				// Check other fields remain unchanged (example)
-				expect(updatedData.content).toBe(initialArticle.content);
+			expect(updatedData._id).toBe("update-me");
+			// expect(updatedData.title).toBe("Updated Title"); // Title not updated by this func
+			expect(updatedData.isRead).toBe(true);
+			expect(updatedData.favorite).toBe(true);
+			// expect(updatedData.tags).toEqual(["tag1"]); // Tags not updated by this func
+			// expect(updatedData.updatedAt).toBeGreaterThanOrEqual(initialArticle.savedAt); // updatedAt does not exist on Article type
+			// Check other fields remain unchanged (example)
+			expect(updatedData.content).toBe(initialArticle.content);
 		}
 
 		expect(refreshArticlesMock).toHaveBeenCalledTimes(1);

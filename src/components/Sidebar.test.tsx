@@ -114,15 +114,22 @@ vi.mock("lucide-react", async (importOriginal) => {
 
 // Mock Animation/Transition Components and Hooks
 vi.mock("@/components/ui/transition-group", () => ({
-	TransitionGroup: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+	TransitionGroup: ({
+		children,
+		className,
+	}: { children: React.ReactNode; className?: string }) => (
 		<div className={className}>{children}</div>
 	),
-	TransitionItem: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+	TransitionItem: ({
+		children,
+		className,
+	}: { children: React.ReactNode; className?: string }) => (
 		<div className={className}>{children}</div>
 	),
 }));
 vi.mock("@/context/AnimationContext", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@/context/AnimationContext")>();
+	const actual =
+		await importOriginal<typeof import("@/context/AnimationContext")>();
 	return {
 		...actual,
 		useAnimation: () => ({
@@ -138,7 +145,8 @@ vi.mock("@/hooks/use-synchronized-animation", () => ({
 // Mock KeyboardContext hook
 const mockToggleSidebar = vi.fn();
 vi.mock("@/context/KeyboardContext", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@/context/KeyboardContext")>();
+	const actual =
+		await importOriginal<typeof import("@/context/KeyboardContext")>();
 	return {
 		...actual,
 		useKeyboard: () => ({
@@ -151,7 +159,6 @@ vi.mock("@/context/KeyboardContext", async (importOriginal) => {
 		}),
 	};
 });
-
 
 // --- Test Setup ---
 
@@ -261,7 +268,8 @@ describe("Sidebar Component", () => {
 
 	// Add more tests as needed for collapse/expand etc.
 
-	it("reveals Library category sub-menu and sets selected category on click", () => { // No longer needs async
+	it("reveals Library category sub-menu and sets selected category on click", () => {
+		// No longer needs async
 		// mockSetSelectedCategory is now defined globally and used in the mock factory
 		render(
 			<MockProviders>
@@ -269,10 +277,10 @@ describe("Sidebar Component", () => {
 			</MockProviders>,
 		);
 		// Use the added data-testid to select the expander button reliably
-		const libraryExpanderButton = screen.getByTestId(
-			"library-expander-button",
-		);
-		const libraryMainButton = screen.getByRole("button", { name: /^library$/i }); // Exact match for Library
+		const libraryExpanderButton = screen.getByTestId("library-expander-button");
+		const libraryMainButton = screen.getByRole("button", {
+			name: /^library$/i,
+		}); // Exact match for Library
 
 		// Initially, the library sub-menu (categories) should be visible because default state is open
 		// Test for one category button, e.g., Articles
