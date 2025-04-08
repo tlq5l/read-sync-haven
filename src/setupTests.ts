@@ -59,7 +59,7 @@ global.ResizeObserver = class ResizeObserver {
 // Mock DOMMatrix for JSDOM environment
 // Based on https://developer.mozilla.org/en-US/docs/Web/API/DOMMatrix
 if (typeof global.DOMMatrix === "undefined") {
-	global.DOMMatrix = class DOMMatrix {
+	global.DOMMatrix = class DOMMatrixMock { // Renamed to avoid confusion in scope
 		m11: number;
 		m12: number;
 		m13: number;
@@ -78,6 +78,19 @@ if (typeof global.DOMMatrix === "undefined") {
 		m44: number;
 		is2D: boolean;
 		isIdentity: boolean;
+
+		// Add 2D properties for compatibility
+		get a() { return this.m11; } set a(val) { this.m11 = val; }
+		get b() { return this.m12; } set b(val) { this.m12 = val; }
+		get c() { return this.m21; } set c(val) { this.m21 = val; }
+		get d() { return this.m22; } set d(val) { this.m22 = val; }
+		get e() { return this.m41; } set e(val) { this.m41 = val; }
+		get f() { return this.m42; } set f(val) { this.m42 = val; }
+
+		// Add missing static methods to satisfy TypeScript interface
+		static fromFloat32Array = vi.fn().mockImplementation((array32: Float32Array) => new DOMMatrix());
+		static fromFloat64Array = vi.fn().mockImplementation((array64: Float64Array) => new DOMMatrix());
+		static fromMatrix = vi.fn().mockImplementation((other?: any) => new DOMMatrix());
 
 		constructor(init?: number[] | string) {
 			// Simplified identity matrix for mocking purposes
@@ -111,8 +124,18 @@ if (typeof global.DOMMatrix === "undefined") {
 		scaleSelf = vi.fn().mockReturnThis();
 		rotateSelf = vi.fn().mockReturnThis();
 		multiplySelf = vi.fn().mockReturnThis();
-		// ... other methods
-	};
+		invertSelf = vi.fn().mockReturnThis();
+		// Add non-modifying versions too if needed by tests
+		translate = vi.fn().mockImplementation(() => new DOMMatrixMock());
+		scale = vi.fn().mockImplementation(() => new DOMMatrixMock());
+		rotate = vi.fn().mockImplementation(() => new DOMMatrixMock());
+		multiply = vi.fn().mockImplementation(() => new DOMMatrixMock());
+		invert = vi.fn().mockImplementation(() => new DOMMatrixMock());
+		transformPoint = vi.fn().mockImplementation((p: { x: number, y: number }) => ({ x: p.x, y: p.y })); // Basic identity transform
+		toFloat32Array = vi.fn().mockImplementation(() => new Float32Array(16).fill(0));
+		toFloat64Array = vi.fn().mockImplementation(() => new Float64Array(16).fill(0));
+		toJSON = vi.fn().mockImplementation(() => ({ /* simplified JSON */ }));
+	} as any; // Use type assertion to bypass strict prototype checks
 }
 
 // Add any other global setup logic here if needed.
