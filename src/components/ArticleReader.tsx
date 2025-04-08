@@ -56,6 +56,10 @@ export default function ArticleReader() {
 			text ? `${text.substring(0, 100)}...` : "null",
 		);
 		setFullTextContent(text);
+		console.log(
+			"Updated fullTextContent:",
+			text ? `${text.substring(0, 100)}...` : text, // Apply fix here
+		);
 	}, []);
 
 	const toggleFavorite = useCallback(() => {
@@ -188,14 +192,19 @@ export default function ArticleReader() {
 						<TabsContent value="summary" className="mt-4 space-y-4">
 							<Button
 								onClick={() => {
-									if (fullTextContent) {
+									// Check if content is valid (not null, not empty, not the placeholder)
+									if (fullTextContent && fullTextContent !== "View Original") {
 										summarize(fullTextContent); // Call hook's mutate function
 									} else {
 										// Handle case where content isn't ready (though button should be disabled)
 										console.warn("Summarize clicked but no content available.");
 									}
 								}}
-								disabled={isSummarizing || !fullTextContent}
+								disabled={
+									isSummarizing ||
+									!fullTextContent ||
+									fullTextContent === "View Original"
+								}
 							>
 								{isSummarizing ? (
 									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -215,7 +224,7 @@ export default function ArticleReader() {
 								</p>
 							)}
 							{summary && (
-								<div className="prose prose-sm max-w-none dark:prose-invert">
+								<div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto max-h-[600px]">
 									<p>{summary}</p>
 								</div>
 							)}

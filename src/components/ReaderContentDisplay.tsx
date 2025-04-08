@@ -99,18 +99,27 @@ export function ReaderContentDisplay({
 		}
 	}, [isHtml, article.content, handleContentProcessed]);
 
-	// Effect to extract text content once processed HTML is ready
+	// Effect to extract text content once parsed content is ready and rendered
 	useEffect(() => {
-		if (processedHtml && internalScrollRef.current) {
+		// Check if parsedContent exists AND the container ref is available
+		if (parsedContent && internalScrollRef.current) {
 			// Extract text content from the container
+			// This now runs *after* the parsed content should have been rendered
 			const text = internalScrollRef.current.textContent;
-			onTextExtracted(text); // Call the prop
+			console.log(
+				"[ReaderContentDisplay] Extracting text content after parsing:",
+				text ? `${text.substring(0, 100)}...` : "null",
+			);
+			onTextExtracted(text); // Call the prop with potentially complete text
 		} else {
-			// If HTML is null or ref isn't ready, ensure null is passed up
+			// If parsedContent is null or ref isn't ready, ensure null is passed up
+			console.log(
+				"[ReaderContentDisplay] No parsed content to extract text from, calling onTextExtracted(null)",
+			);
 			onTextExtracted(null);
 		}
-		// Dependency: run when processedHtml changes or the ref becomes available
-	}, [processedHtml, onTextExtracted]);
+		// Dependency: run when parsedContent changes or the callback changes
+	}, [parsedContent, onTextExtracted]);
 
 	// Effect to sanitize and parse HTML asynchronously when processedHtml is ready
 	useEffect(() => {

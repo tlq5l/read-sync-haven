@@ -31,7 +31,7 @@ export function useChat(fullTextContent: string | null) {
 			// Retrieve custom API settings from localStorage
 			const customApiKey = localStorage.getItem("customApiKey");
 			const customApiEndpoint = localStorage.getItem("customApiEndpoint");
-
+			const customApiModel = localStorage.getItem("customApiModel"); // Retrieve custom model name
 			let response: Response;
 			let requestBody: string;
 			let apiUrl: string;
@@ -40,14 +40,17 @@ export function useChat(fullTextContent: string | null) {
 			if (customApiKey && customApiEndpoint) {
 				// Use custom OpenAI-compatible endpoint
 				console.log("Using custom API endpoint for chat...");
-				apiUrl = `${customApiEndpoint.replace(/\/$/, "")}/v1/chat/completions`; // Standard chat completions path
+				// Construct the final URL robustly, handling potential trailing slashes and existing paths
+				const baseUrl = new URL(customApiEndpoint);
+				// Use a relative path to ensure correct joining with the base pathname
+				apiUrl = new URL("./v1/chat/completions", baseUrl).toString();
 				headers = {
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${customApiKey}`,
 				};
 				// Construct OpenAI-compatible request body for chat
 				requestBody = JSON.stringify({
-					model: "gpt-3.5-turbo", // Default model, can be configured if needed
+					model: customApiModel || "gpt-3.5-turbo", // Use custom model or fallback
 					messages: [
 						{
 							role: "system",

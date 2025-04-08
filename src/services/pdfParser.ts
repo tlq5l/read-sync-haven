@@ -55,8 +55,8 @@ export async function parsePdf(pdfData: Buffer | ArrayBuffer): Promise<string> {
 			// Assign directly to pageText declared earlier in the loop scope
 			pageText = sortedItems.map((item) => item.str).join(" ");
 
-			// Add double newline between pages for clearer separation
-			fullText += `${pageText.trim()}\n\n`;
+			// Add a single newline between pages
+			fullText += `${pageText.trim()}\n`;
 		}
 
 		return fullText.trim(); // Trim leading/trailing whitespace potentially added
