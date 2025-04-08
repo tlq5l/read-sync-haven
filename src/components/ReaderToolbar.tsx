@@ -36,7 +36,7 @@ export function ReaderToolbar({
 			<div className="flex items-center gap-2">
 				<Button variant="ghost" size="icon" onClick={onToggleFavorite}>
 					{isFavorite ? (
-						<BookmarkCheck className="h-5 w-5 text-bondwise-500" />
+						<BookmarkCheck className="h-5 w-5 text-thinkara-500" />
 					) : (
 						<Bookmark className="h-5 w-5" />
 					)}

@@ -130,7 +130,7 @@ const App = () => (
 		signUpUrl="/sign-up"
 		appearance={{ baseTheme: dark }} // Set Clerk theme to dark
 	>
-		<ThemeProvider defaultTheme="dark" storageKey="bondwise-ui-theme">
+		<ThemeProvider defaultTheme="dark" storageKey="thinkara-ui-theme">
 			{" "}
 			{/* Set default app theme to dark */}
 			<ThemeSupport />

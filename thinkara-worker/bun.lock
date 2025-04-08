@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "bondwise-worker",
+      "name": "thinkara-worker",
       "dependencies": {
         "@clerk/backend": "^1.25.8",
         "@google/generative-ai": "^0.24.0",

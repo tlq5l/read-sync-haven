@@ -62,7 +62,7 @@ export default {
 					border: "hsl(var(--sidebar-border))",
 					ring: "hsl(var(--sidebar-ring))",
 				},
-				bondwise: {
+				thinkara: {
 					50: "#f0f7ff",
 					100: "#e0eefe",
 					200: "#bae0fd",
@@ -122,21 +122,21 @@ export default {
 				},
 				"fade-in": {
 					from: {
-						opacity: 0,
+						opacity: "0",
 						transform: "translateZ(0)",
 					},
 					to: {
-						opacity: 1,
+						opacity: "1",
 						transform: "translateZ(0)",
 					},
 				},
 				"fade-out": {
 					from: {
-						opacity: 1,
+						opacity: "1",
 						transform: "translateZ(0)",
 					},
 					to: {
-						opacity: 0,
+						opacity: "0",
 						transform: "translateZ(0)",
 					},
 				},
@@ -174,21 +174,21 @@ export default {
 				},
 				"scale-in": {
 					from: {
-						opacity: 0,
+						opacity: "0",
 						transform: "scale(0.95) translateZ(0)",
 					},
 					to: {
-						opacity: 1,
+						opacity: "1",
 						transform: "scale(1) translateZ(0)",
 					},
 				},
 				"scale-out": {
 					from: {
-						opacity: 1,
+						opacity: "1",
 						transform: "scale(1) translateZ(0)",
 					},
 					to: {
-						opacity: 0,
+						opacity: "0",
 						transform: "scale(0.95) translateZ(0)",
 					},
 				},

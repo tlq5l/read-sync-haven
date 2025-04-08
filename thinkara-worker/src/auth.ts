@@ -69,7 +69,7 @@ export async function authenticateRequestWithClerk(
 					if (
 						sigEmail === email &&
 						sigTimestamp === timestamp &&
-						secret === "bondwise-secure-key-2025"
+						secret === "thinkara-secure-key-2025"
 					) {
 						console.log(
 							`[WorkerAuth] Simplified token authentication SUCCESS for: ${email}`,

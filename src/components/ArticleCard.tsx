@@ -205,7 +205,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 						) : (
 							<div className="flex justify-between items-start mb-2">
 								<span
-									className="text-xs font-medium text-bondwise-500"
+									className="text-xs font-medium text-thinkara-500"
 									data-testid="unread-status"
 								>
 									Unread

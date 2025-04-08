@@ -279,7 +279,7 @@ export function ReaderContentDisplay({
 				{/* Display global loading state while processing is happening */}
 				{isLoading && (
 					<div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-						<Loader2 className="h-8 w-8 animate-spin text-bondwise-500" />
+						<Loader2 className="h-8 w-8 animate-spin text-thinkara-500" />
 						<span className="ml-2">Processing content...</span>
 					</div>
 				)}
@@ -326,7 +326,7 @@ export function ReaderContentDisplay({
 								href={article.url}
 								target="_blank"
 								rel="noopener noreferrer"
-								className="text-bondwise-600 hover:underline"
+								className="text-thinkara-600 hover:underline"
 							>
 								View Original
 							</a>

@@ -124,8 +124,8 @@ export default function FileUpload({
 					className={cn(
 						"border-4 border-dashed rounded-lg p-6 transition-colors flex flex-col items-center justify-center gap-4 cursor-pointer w-full",
 						isDragging
-							? "border-bondwise-400 bg-bondwise-50"
-							: "border-gray-200 hover:border-bondwise-200 hover:bg-gray-50",
+							? "border-thinkara-400 bg-thinkara-50"
+							: "border-gray-200 hover:border-thinkara-200 hover:bg-gray-50",
 					)}
 					onDragOver={handleDragOver}
 					onDragLeave={handleDragLeave}
@@ -155,7 +155,7 @@ export default function FileUpload({
 					<div className="flex items-center justify-between">
 						<div className="flex items-center space-x-3">
 							<div className="rounded-full bg-blue-50 p-2">
-								<FileText className="h-5 w-5 text-bondwise-500" />
+								<FileText className="h-5 w-5 text-thinkara-500" />
 							</div>
 							<div>
 								<p className="text-sm font-medium truncate max-w-[200px] sm:max-w-md">

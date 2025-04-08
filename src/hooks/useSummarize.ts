@@ -17,50 +17,114 @@ export function useSummarize() {
 			if (!fullTextContent) {
 				throw new Error("Article content not available for summarization.");
 			}
-			const requestBody = JSON.stringify({ content: fullTextContent });
 
-			// Check if running in development environment
-			// Note: This relies on Vite's import.meta.env feature.
-			// Ensure your vite-env.d.ts includes `/// <reference types="vite/client" />`
-			// --- Always call Cloudflare Worker Proxy (for both Dev and Prod) ---
-			console.log("Calling Cloudflare Worker proxy for summarize...");
-			// 1. Get Clerk token
-			const clerkToken = await getToken();
-			if (!clerkToken) {
-				throw new Error("User not authenticated (Clerk token missing).");
+			// Retrieve custom API settings from localStorage
+			const customApiKey = localStorage.getItem("customApiKey");
+			const customApiEndpoint = localStorage.getItem("customApiEndpoint");
+
+			let response: Response;
+			let requestBody: string;
+			let apiUrl: string;
+			let headers: HeadersInit;
+
+			if (customApiKey && customApiEndpoint) {
+				// Use custom OpenAI-compatible endpoint
+				console.log("Using custom API endpoint for summarization...");
+				// Assuming customApiEndpoint is the base URL, append a standard path
+				// Using /v1/chat/completions as a placeholder - adjust if needed for summarization standard
+				apiUrl = `${customApiEndpoint.replace(/\/$/, "")}/v1/chat/completions`; // Ensure no double slash
+				headers = {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${customApiKey}`,
+				};
+				// Construct a basic OpenAI-compatible request body for summarization
+				// This might need refinement based on the specific model/API capabilities
+				requestBody = JSON.stringify({
+					model: "gpt-3.5-turbo", // Or a model suitable for summarization
+					messages: [
+						{
+							role: "system",
+							content: "Summarize the following text:",
+						},
+						{ role: "user", content: fullTextContent },
+					],
+					// Add other parameters like max_tokens if needed
+				});
+
+				try {
+					response = await fetch(apiUrl, {
+						method: "POST",
+						headers: headers,
+						body: requestBody,
+					});
+				} catch (error) {
+					console.error("Error calling custom API endpoint:", error);
+					throw new Error(
+						`Failed to connect to custom endpoint: ${apiUrl}. Please check the URL and network connection.`,
+					);
+				}
+			} else {
+				// Fallback to Cloudflare Worker proxy
+				console.log("Using Cloudflare Worker proxy for summarize...");
+				const clerkToken = await getToken();
+				if (!clerkToken) {
+					throw new Error("User not authenticated (Clerk token missing).");
+				}
+				apiUrl = "https://thinkara-sync-api.vikione.workers.dev/api/summarize";
+				headers = {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${clerkToken}`,
+				};
+				requestBody = JSON.stringify({ content: fullTextContent }); // Original body for worker
+
+				try {
+					response = await fetch(apiUrl, {
+						method: "POST",
+						headers: headers,
+						body: requestBody,
+					});
+				} catch (error) {
+					console.error("Error calling Cloudflare Worker proxy:", error);
+					throw new Error(
+						"Failed to connect to the summarization service. Please check your network connection.",
+					);
+				}
 			}
 
-			// 2. Call the worker endpoint
-			const response = await fetch(
-				"https://bondwise-sync-api.vikione.workers.dev/api/summarize", // Use production worker URL always
-				{
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${clerkToken}`, // Use Clerk token
-					},
-					body: requestBody,
-				},
-			);
-
-			// --- Handle Response (Common for Dev/Prod) ---
+			// --- Handle Response (Common Logic) ---
 			const data = await response.json();
 
 			if (!response.ok) {
+				const errorSource =
+					customApiKey && customApiEndpoint
+						? "custom API endpoint"
+						: "summarization service";
 				throw new Error(
-					data?.message ||
-						data?.error ||
-						`Request failed with status ${response.status}`,
+					`Error from ${errorSource}: ${data?.error?.message || data?.message || data?.error || `Request failed with status ${response.status}`}`,
 				);
 			}
 
-			if (!data.summary) {
-				throw new Error(
-					"Invalid response from summarization service (missing summary).",
-				);
+			// --- Extract Summary (Adapts based on source) ---
+			let summaryText: string | null = null;
+			if (customApiKey && customApiEndpoint) {
+				// Extract from OpenAI-compatible response structure
+				summaryText = data?.choices?.[0]?.message?.content ?? null;
+				if (!summaryText) {
+					throw new Error(
+						"Invalid response from custom API endpoint (missing summary content).",
+					);
+				}
+			} else {
+				// Extract from original worker response structure
+				summaryText = data?.summary ?? null;
+				if (!summaryText) {
+					throw new Error(
+						"Invalid response from summarization service (missing summary).",
+					);
+				}
 			}
 
-			return data.summary;
+			return summaryText;
 		},
 		onMutate: () => {
 			setIsSummarizing(true);
@@ -72,7 +136,9 @@ export function useSummarize() {
 			// Note: Opening the sidebar is UI logic, should be handled in the component
 		},
 		onError: (error: Error) => {
-			setSummaryError(error.message);
+			setSummaryError(
+				error.message || "An unknown error occurred during summarization.",
+			); // Provide default
 		},
 		onSettled: () => {
 			setIsSummarizing(false);

@@ -143,7 +143,7 @@ export default function PdfProcessor({
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center h-full p-4">
-				<Loader2 className="h-8 w-8 animate-spin text-bondwise-500" />
+				<Loader2 className="h-8 w-8 animate-spin text-thinkara-500" />
 				<span className="ml-2">Processing {fileName || "PDF file"}...</span>
 			</div>
 		);

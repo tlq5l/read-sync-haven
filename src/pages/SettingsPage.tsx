@@ -2,6 +2,7 @@
 import { KeyboardShortcutsTab } from "@/components/keyboard-shortcuts-tab";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input"; // Added Input import
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -30,7 +31,7 @@ import {
 	ShieldCheck,
 	// User, // Removed unused User icon
 } from "lucide-react"; // Added ShieldCheck for Account
-import { useState } from "react"; // Remove useEffect import
+import { useEffect, useState } from "react"; // Import useEffect
 import { Link } from "react-router-dom";
 
 export default function SettingsPage() {
@@ -41,6 +42,15 @@ export default function SettingsPage() {
 	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
 	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false); // Add state for metadata update button
 	const [activeTab, setActiveTab] = useState("account"); // Default to account tab
+	const [apiKey, setApiKey] = useState(""); // State for API Key input
+	const [endpointUrl, setEndpointUrl] = useState(""); // State for Endpoint URL input
+	const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
+		"idle",
+	); // State for save button feedback
+	const [testStatus, setTestStatus] = useState<
+		"idle" | "testing" | "success" | "error"
+	>("idle");
+	const [testResult, setTestResult] = useState<string | null>(null);
 	// Removed clerkBaseTheme state
 
 	// Get the action function - needs a refresh callback, maybe null for now or a dummy?
@@ -52,6 +62,120 @@ export default function SettingsPage() {
 		// Call hook without destructuring if only needed for setup/side-effects
 		console.log("Dummy refresh called (if needed by action hook internals).");
 	});
+
+	// --- Logic for Custom API Settings ---
+	const STORAGE_KEYS = {
+		API_KEY: "customApiKey",
+		ENDPOINT_URL: "customApiEndpoint",
+	};
+
+	// Load settings from localStorage on mount
+	useEffect(() => {
+		const storedApiKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
+		const storedEndpointUrl = localStorage.getItem(STORAGE_KEYS.ENDPOINT_URL);
+
+		if (storedApiKey) {
+			setApiKey(storedApiKey);
+		}
+		if (storedEndpointUrl) {
+			setEndpointUrl(storedEndpointUrl);
+		}
+	}, []); // Empty dependency array ensures this runs only once on mount
+
+	// Save settings to localStorage
+	const handleSaveSettings = () => {
+		setSaveStatus("saving"); // Indicate saving process start (optional)
+		try {
+			localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
+			localStorage.setItem(STORAGE_KEYS.ENDPOINT_URL, endpointUrl);
+			setSaveStatus("saved");
+			toast({
+				title: "Settings Saved",
+				description: "Your custom AI provider settings have been saved.",
+			});
+			// Revert button text after a short delay
+			setTimeout(() => {
+				setSaveStatus("idle");
+			}, 2000); // Revert after 2 seconds
+		} catch (error) {
+			console.error("Failed to save settings:", error);
+			toast({
+				title: "Save Failed",
+				description: "Could not save settings to local storage.",
+				variant: "destructive",
+			});
+			setSaveStatus("idle"); // Revert button state on error
+		}
+	};
+	// --- End Logic for Custom API Settings ---
+
+	// --- Logic for Test Connection ---
+	const handleTestConnection = async () => {
+		setTestStatus("testing");
+		setTestResult(null); // Clear previous result
+
+		const storedApiKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
+		const storedEndpointUrl = localStorage.getItem(STORAGE_KEYS.ENDPOINT_URL);
+
+		if (!storedApiKey || !storedEndpointUrl) {
+			setTestStatus("error");
+			setTestResult(
+				"Error: API Key and/or Endpoint URL not configured. Please configure and save them in the 'Configuration' tab first.",
+			);
+			return;
+		}
+
+		// Ensure the endpoint doesn't end with a slash, and append /v1/models
+		const baseUrl = storedEndpointUrl.endsWith("/")
+			? storedEndpointUrl.slice(0, -1)
+			: storedEndpointUrl;
+		const testUrl = `${baseUrl}/v1/models`;
+
+		try {
+			const response = await fetch(testUrl, {
+				method: "GET",
+				headers: {
+					Authorization: `Bearer ${storedApiKey}`,
+					"Content-Type": "application/json",
+				},
+			});
+
+			if (response.ok) {
+				const data = await response.json();
+				const modelCount = data?.data?.length || 0; // Adjust based on actual API response structure
+				setTestStatus("success");
+				setTestResult(
+					`Connection successful! Received ${modelCount} model(s).`, // Example: Display model count
+				);
+			} else {
+				let errorMsg = `Connection failed: ${response.status} ${response.statusText}`;
+				try {
+					// Attempt to parse error details from the response body
+					const errorData = await response.json();
+					if (errorData?.error?.message) {
+						errorMsg += ` - ${errorData.error.message}`;
+					} else {
+						// Try to stringify if it's not the expected format
+						errorMsg += ` - ${JSON.stringify(errorData)}`;
+					}
+				} catch (parseError) {
+					// If parsing fails, just use the status text
+					console.warn("Could not parse error response body:", parseError);
+				}
+				setTestStatus("error");
+				setTestResult(errorMsg);
+			}
+		} catch (error) {
+			console.error("Test connection fetch error:", error);
+			setTestStatus("error");
+			let networkErrorMsg = "Network error: Could not reach the endpoint.";
+			if (error instanceof Error) {
+				networkErrorMsg += ` (${error.message})`;
+			}
+			setTestResult(networkErrorMsg);
+		}
+	};
+	// --- End Logic for Test Connection ---
 
 	const exportData = async () => {
 		setIsExportingData(true);
@@ -348,6 +472,107 @@ export default function SettingsPage() {
 									</div>
 								</CardContent>
 							</Card>
+
+							{/* Nested Tabs for AI Provider Settings */}
+							<Tabs defaultValue="configuration" className="space-y-4">
+								<TabsList className="grid w-full grid-cols-2">
+									<TabsTrigger value="configuration">Configuration</TabsTrigger>
+									<TabsTrigger value="test-connection">
+										Test Connection
+									</TabsTrigger>
+								</TabsList>
+								<TabsContent value="configuration">
+									<Card>
+										<CardHeader>
+											<CardTitle>AI Provider Configuration</CardTitle>{" "}
+											{/* Slightly adjust title */}
+										</CardHeader>
+										<CardContent className="space-y-4">
+											<div className="space-y-2">
+												<Label htmlFor="apiKey">API Key</Label>
+												<Input
+													id="apiKey"
+													type="password"
+													placeholder="Enter your API Key"
+													value={apiKey}
+													onChange={(e) => setApiKey(e.target.value)}
+												/>
+												<p className="text-sm text-muted-foreground">
+													Your custom OpenAI-compatible API key.
+												</p>
+											</div>
+											<div className="space-y-2">
+												<Label htmlFor="endpointUrl">Endpoint URL</Label>
+												<Input
+													id="endpointUrl"
+													type="url"
+													placeholder="https://api.example.com/v1"
+													value={endpointUrl}
+													onChange={(e) => setEndpointUrl(e.target.value)}
+												/>
+												<p className="text-sm text-muted-foreground">
+													The base URL for the OpenAI-compatible API endpoint
+													(e.g., https://api.groq.com/openai/v1).
+												</p>
+											</div>
+											<Button
+												onClick={handleSaveSettings}
+												disabled={saveStatus === "saving"}
+											>
+												{saveStatus === "saved"
+													? "Saved!"
+													: saveStatus === "saving"
+														? "Saving..."
+														: "Save Settings"}
+											</Button>
+										</CardContent>
+									</Card>
+								</TabsContent>
+								<TabsContent value="test-connection">
+									<Card>
+										<CardHeader>
+											<CardTitle>Test Connection</CardTitle>
+										</CardHeader>
+										<CardContent className="space-y-4">
+											<p className="text-sm text-muted-foreground">
+												Verify your saved API Key and Endpoint URL by making a
+												test call to the `/v1/models` endpoint.
+											</p>
+											<Button
+												onClick={handleTestConnection}
+												disabled={testStatus === "testing"}
+											>
+												{testStatus === "testing"
+													? "Testing..."
+													: testStatus === "idle"
+														? "Test Connection"
+														: "Test Again"}
+											</Button>
+											<div>
+												<p className="text-sm font-medium">Result:</p>
+												{testResult && (
+													<p
+														className={`text-sm mt-1 ${
+															testStatus === "success"
+																? "text-green-600"
+																: testStatus === "error"
+																	? "text-red-600"
+																	: "text-muted-foreground"
+														}`}
+													>
+														{testResult}
+													</p>
+												)}
+												{testStatus === "idle" && !testResult && (
+													<p className="text-sm text-muted-foreground mt-1">
+														Click the button to test your connection settings.
+													</p>
+												)}
+											</div>
+										</CardContent>
+									</Card>
+								</TabsContent>
+							</Tabs>
 						</div>
 					</ScrollArea>
 				</TabsContent>

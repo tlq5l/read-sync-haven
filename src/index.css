@@ -325,7 +325,7 @@
 }
 
 .reader-content a {
-	@apply text-bondwise-600 hover:underline;
+	@apply text-thinkara-600 hover:underline;
 }
 
 .reader-content img {
@@ -333,7 +333,7 @@
 }
 
 .reader-content blockquote {
-	@apply border-l-4 border-bondwise-200 pl-4 italic my-4;
+	@apply border-l-4 border-thinkara-200 pl-4 italic my-4;
 }
 
 .reader-content pre {

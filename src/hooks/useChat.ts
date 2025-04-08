@@ -28,48 +28,115 @@ export function useChat(fullTextContent: string | null) {
 				throw new Error("Cannot send an empty message.");
 			}
 
-			const requestBody = JSON.stringify({
-				content: fullTextContent,
-				message: userMessage,
-			});
+			// Retrieve custom API settings from localStorage
+			const customApiKey = localStorage.getItem("customApiKey");
+			const customApiEndpoint = localStorage.getItem("customApiEndpoint");
 
-			// Always call the worker proxy
-			console.log("Calling Cloudflare Worker proxy for chat...");
-			const clerkToken = await getToken();
-			if (!clerkToken) {
-				throw new Error("User not authenticated (Clerk token missing).");
-			}
+			let response: Response;
+			let requestBody: string;
+			let apiUrl: string;
+			let headers: HeadersInit;
 
-			// Always use the production worker URL
-			const chatApiUrl =
-				"https://bondwise-sync-api.vikione.workers.dev/api/chat";
+			if (customApiKey && customApiEndpoint) {
+				// Use custom OpenAI-compatible endpoint
+				console.log("Using custom API endpoint for chat...");
+				apiUrl = `${customApiEndpoint.replace(/\/$/, "")}/v1/chat/completions`; // Standard chat completions path
+				headers = {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${customApiKey}`,
+				};
+				// Construct OpenAI-compatible request body for chat
+				requestBody = JSON.stringify({
+					model: "gpt-3.5-turbo", // Default model, can be configured if needed
+					messages: [
+						{
+							role: "system",
+							content: `You are a helpful assistant discussing the following document content:\n\n${fullTextContent}`,
+						}, // Provide context
+						...chatHistory, // Include previous messages for context
+						{ role: "user", content: userMessage },
+					],
+					// Add other parameters like temperature if needed
+				});
 
-			const response = await fetch(chatApiUrl, {
-				method: "POST",
-				headers: {
+				try {
+					response = await fetch(apiUrl, {
+						method: "POST",
+						headers: headers,
+						body: requestBody,
+					});
+				} catch (error) {
+					console.error("Error calling custom API endpoint:", error);
+					throw new Error(
+						`Failed to connect to custom endpoint: ${apiUrl}. Please check the URL and network connection.`,
+					);
+				}
+			} else {
+				// Fallback to Cloudflare Worker proxy
+				console.log("Using Cloudflare Worker proxy for chat...");
+				const clerkToken = await getToken();
+				if (!clerkToken) {
+					throw new Error("User not authenticated (Clerk token missing).");
+				}
+				apiUrl = "https://thinkara-sync-api.vikione.workers.dev/api/chat";
+				headers = {
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${clerkToken}`,
-				},
-				body: requestBody,
-			});
+				};
+				// Original body for worker (only needs current message and content)
+				requestBody = JSON.stringify({
+					content: fullTextContent,
+					message: userMessage,
+				});
 
+				try {
+					response = await fetch(apiUrl, {
+						method: "POST",
+						headers: headers,
+						body: requestBody,
+					});
+				} catch (error) {
+					console.error("Error calling Cloudflare Worker proxy:", error);
+					throw new Error(
+						"Failed to connect to the chat service. Please check your network connection.",
+					);
+				}
+			}
+
+			// --- Handle Response (Common Logic) ---
 			const data = await response.json();
 
 			if (!response.ok) {
+				const errorSource =
+					customApiKey && customApiEndpoint
+						? "custom API endpoint"
+						: "chat service";
 				throw new Error(
-					data?.message ||
-						data?.error ||
-						`Chat request failed with status ${response.status}`,
+					`Error from ${errorSource}: ${data?.error?.message || data?.message || data?.error || `Request failed with status ${response.status}`}`,
 				);
 			}
 
-			if (!data.response) {
-				throw new Error(
-					"Invalid response from chat service (missing response).",
-				);
+			// --- Extract AI Response (Adapts based on source) ---
+			let aiResponseText: string | null = null;
+			if (customApiKey && customApiEndpoint) {
+				// Extract from OpenAI-compatible response structure
+				aiResponseText = data?.choices?.[0]?.message?.content ?? null;
+				if (!aiResponseText) {
+					throw new Error(
+						"Invalid response from custom API endpoint (missing AI response content).",
+					);
+				}
+			} else {
+				// Extract from original worker response structure
+				aiResponseText = data?.response ?? null;
+				if (!aiResponseText) {
+					throw new Error(
+						"Invalid response from chat service (missing response).",
+					);
+				}
 			}
 
-			return data.response; // Return the AI response text
+			return aiResponseText; // Return the AI response text
 		},
 		onMutate: (userMessage: string) => {
 			setIsChatting(true);
@@ -86,12 +153,13 @@ export function useChat(fullTextContent: string | null) {
 			setChatHistory((prev) => [...prev, { sender: "ai", text: aiResponse }]);
 		},
 		onError: (error: Error) => {
-			// error is already type Error
-			setChatError(error); // Set the whole Error object
-			// Add error message to chat history
+			const errorMessage =
+				error.message || "An unknown error occurred during chat.";
+			setChatError(error instanceof Error ? error : new Error(errorMessage)); // Ensure it's an Error object
+			// Add error message to chat history for user visibility
 			setChatHistory((prev) => [
 				...prev,
-				{ sender: "ai", text: `Error: ${error.message}` }, // Display message in history
+				{ sender: "ai", text: `Error: ${errorMessage}` },
 			]);
 		},
 		onSettled: () => {
