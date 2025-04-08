@@ -21,7 +21,7 @@ import { useArticleActions } from "@/hooks/useArticleActions";
 // } from "@/services/db/types";
 import { db, removeDuplicateArticles } from "@/services/db/dexie"; // Import dexie instance and removeDuplicateArticles
 import { UserProfile } from "@clerk/clerk-react"; // Import Clerk's UserProfile
-import { dark } from "@clerk/themes"; // Import Clerk dark theme
+// Removed unused dark theme import
 import {
 	ArrowLeft,
 	Database,
@@ -223,22 +223,12 @@ export default function SettingsPage() {
 					{/* New Account Content */}
 					<ScrollArea className="h-[70vh]">
 						<div className="pr-4">
-							{/* Calculate theme directly before rendering */}
-							{(() => {
-								const isDarkMode =
-									theme === "dark" ||
-									(theme === "system" &&
-										window.matchMedia("(prefers-color-scheme: dark)").matches);
-								const clerkThemeObject = isDarkMode ? dark : undefined;
-
-								return (
-									<UserProfile
-										routing="hash" // Changed from "path" to "hash"
-										// Removed path prop as it's not needed for hash routing
-										appearance={{ baseTheme: clerkThemeObject }}
-									/>
-								);
-							})()}
+							{/* Removed theme calculation IIFE as appearance prop is removed */}
+							<UserProfile
+								routing="hash" // Changed from "path" to "hash"
+								// Removed path prop as it's not needed for hash routing
+								// Removed appearance prop to test default behavior
+							/>
 						</div>
 					</ScrollArea>
 				</TabsContent>
