@@ -18,14 +18,27 @@ import Sidebar from "./Sidebar";
 // --- Mocks ---
 
 // Mock Clerk hooks - Provide a flexible mock setup
-const mockUseAuth = vi.fn(() => ({ isSignedIn: true })); // Default to signed in
+// Mock Clerk hooks - Provide a flexible mock setup
+const mockSignOut = vi.fn(async (callback?: () => void) => {
+	// Simulate async sign out and then call the optional callback
+	await Promise.resolve(); // Simulate async operation
+	if (callback) {
+		callback();
+	}
+});
+const mockUseAuthDefault = {
+	isSignedIn: true, // Default to signed in
+	signOut: mockSignOut,
+};
+const mockUseAuth = vi.fn(() => mockUseAuthDefault); // Default mock values
+
 vi.mock("@clerk/clerk-react", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("@clerk/clerk-react")>();
 	return {
 		...actual, // Keep original exports not explicitly mocked
-		useAuth: () => mockUseAuth(), // Call the mock function defined outside (simplified)
-		useUser: () => ({ user: { firstName: "Test" } }),
-		UserButton: () => <div data-testid="user-button">User Button</div>,
+		useAuth: () => mockUseAuth(), // Use the mock function
+		useUser: () => ({ user: { firstName: "Test" } }), // Keep user mock if needed elsewhere
+		UserButton: () => <div data-testid="user-button">User Button</div>, // Keep button mock
 	};
 });
 
@@ -89,15 +102,17 @@ vi.mock("lucide-react", async (importOriginal) => {
 	// Create simple mock components for icons used in Sidebar
 	const iconNames = [
 		"Home",
-		"Library",
+		"Library", // Added Library icon mock
 		"Settings",
-		"Sun",
+		"Sun", // Keep theme icons if needed elsewhere
 		"Moon",
 		"LogIn",
+		"LogOut", // Add LogOut icon mock
 		"Plus",
-		"ChevronLeft",
-		"MenuIcon",
-		// Add any other icons used if necessary
+		"SidebarClose", // Add Sidebar icons used in toggle
+		"SidebarOpen",
+		"MenuIcon", // Keep MenuIcon if used elsewhere, though maybe not in current Sidebar
+		// ChevronLeft seems removed from Sidebar component, can potentially be removed here too
 	];
 
 	for (const name of iconNames) {
@@ -179,8 +194,12 @@ describe("Sidebar Component", () => {
 	beforeEach(() => {
 		// Reset mocks before each test
 		vi.clearAllMocks();
-		// Reset useAuth mock to default (signed in) before each test
-		mockUseAuth.mockReturnValue({ isSignedIn: true });
+		// Reset useAuth mock to default (signed in with signOut function) before each test
+		mockUseAuth.mockReturnValue({
+			isSignedIn: true,
+			signOut: mockSignOut,
+		});
+		mockSignOut.mockClear(); // Clear calls to signOut
 	});
 
 	it("renders the Home button with Home icon and navigates to '/' on click", () => {
@@ -202,7 +221,7 @@ describe("Sidebar Component", () => {
 		expect(mockNavigate).toHaveBeenCalledWith("/");
 	});
 
-	it("renders the Library button with Library icon and navigates to '/inbox' on click", () => {
+	it("renders the Library button with Library icon and navigates to '/library' on click", () => {
 		render(
 			<MockProviders>
 				<Sidebar />
@@ -216,9 +235,9 @@ describe("Sidebar Component", () => {
 		).toBeInTheDocument();
 
 		fireEvent.click(libraryButton);
-		// setCurrentView is *not* called when clicking the Library button itself
-		expect(mockSetCurrentView).not.toHaveBeenCalled();
-		expect(mockNavigate).toHaveBeenCalledWith("/inbox");
+		expect(mockSetSelectedCategory).toHaveBeenCalledWith(null); // Check category reset
+		expect(mockSetCurrentView).toHaveBeenCalledWith("all"); // Check view reset
+		expect(mockNavigate).toHaveBeenCalledWith("/library"); // Check navigation
 	});
 
 	it("renders the Settings link visibly", () => {
@@ -249,7 +268,7 @@ describe("Sidebar Component", () => {
 
 	it("renders Sign In link visibly when signed out", () => {
 		// Arrange: Mock signed out state
-		mockUseAuth.mockReturnValue({ isSignedIn: false });
+		mockUseAuth.mockReturnValue({ isSignedIn: false, signOut: mockSignOut }); // Add signOut mock here too
 
 		render(
 			<MockProviders>
@@ -266,66 +285,51 @@ describe("Sidebar Component", () => {
 		).not.toBeInTheDocument();
 	});
 
-	// Add more tests as needed for collapse/expand etc.
-
-	it("reveals Library category sub-menu and sets selected category on click", () => {
-		// No longer needs async
-		// mockSetSelectedCategory is now defined globally and used in the mock factory
+	it("renders Sign Out button when signed in", () => {
+		// Arrange: Already signed in by default in beforeEach
 		render(
 			<MockProviders>
 				<Sidebar />
 			</MockProviders>,
 		);
-		// Use the added data-testid to select the expander button reliably
-		const libraryExpanderButton = screen.getByTestId("library-expander-button");
-		const libraryMainButton = screen.getByRole("button", {
-			name: /^library$/i,
-		}); // Exact match for Library
 
-		// Initially, the library sub-menu (categories) should be visible because default state is open
-		// Test for one category button, e.g., Articles
-		const articlesButtonInitial = screen.getByRole("button", {
-			name: /articles/i,
-		});
-		expect(articlesButtonInitial).toBeVisible();
+		// Assert Sign Out button is visible
+		const signOutButton = screen.getByRole("button", { name: /sign out/i });
+		expect(signOutButton).toBeVisible();
+		expect(
+			signOutButton.querySelector('[data-testid="icon-LogOut"]'),
+		).toBeVisible();
 
-		// --- Test closing and opening ---
-		// Click the chevron button to close the sub-menu
-		fireEvent.click(libraryExpanderButton);
-		// Now category buttons should NOT be in the DOM
-		expect(screen.queryByRole("button", { name: /articles/i })).toBeNull();
-		expect(screen.queryByRole("button", { name: /pdfs/i })).toBeNull();
-
-		// Click the chevron button again to re-open the sub-menu
-		fireEvent.click(libraryExpanderButton);
-		const articlesButton = screen.getByRole("button", { name: /articles/i });
-		const pdfsButton = screen.getByRole("button", { name: /pdfs/i });
-		const booksButton = screen.getByRole("button", { name: /books/i });
-
-		expect(articlesButton).toBeVisible();
-		expect(pdfsButton).toBeVisible();
-		expect(booksButton).toBeVisible();
-
-		// --- Test setting category ---
-		// Click Articles category button
-		fireEvent.click(articlesButton);
-		expect(mockSetSelectedCategory).toHaveBeenCalledWith("article");
-
-		// Click PDFs category button
-		fireEvent.click(pdfsButton);
-		expect(mockSetSelectedCategory).toHaveBeenCalledWith("pdf");
-
-		// Click Books category button
-		fireEvent.click(booksButton);
-		expect(mockSetSelectedCategory).toHaveBeenCalledWith("book");
-
-		// Click main Library button (should clear category)
-		fireEvent.click(libraryMainButton);
-		expect(mockSetSelectedCategory).toHaveBeenCalledWith(null);
-
-		// Verify total calls
-		// Check the initial state and logic to confirm if clicking the main Library button resets the category
-		// Assuming it does: article, pdf, book, null calls = 4
-		expect(mockSetSelectedCategory).toHaveBeenCalledTimes(4);
+		// Assert Sign In link is NOT visible
+		expect(
+			screen.queryByRole("link", { name: /sign in/i }),
+		).not.toBeInTheDocument();
 	});
+
+	it("calls signOut and navigates on Sign Out button click", async () => {
+		// Arrange: Already signed in by default
+		render(
+			<MockProviders>
+				<Sidebar />
+			</MockProviders>,
+		);
+		const signOutButton = screen.getByRole("button", { name: /sign out/i });
+
+		// Act
+		await act(async () => {
+			fireEvent.click(signOutButton);
+		});
+
+		// Assert signOut was called (Clerk's signOut is called with a redirect callback)
+		expect(mockSignOut).toHaveBeenCalledTimes(1);
+		// Check that it was called with a function (the callback)
+		expect(mockSignOut).toHaveBeenCalledWith(expect.any(Function));
+
+		// Assert navigation occurred (triggered by the callback inside signOut mock)
+		await waitFor(() => {
+			expect(mockNavigate).toHaveBeenCalledWith("/sign-in");
+		});
+	});
+
+	// Add more tests as needed for collapse/expand etc.
 });
