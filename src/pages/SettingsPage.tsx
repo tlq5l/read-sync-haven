@@ -44,6 +44,7 @@ export default function SettingsPage() {
 	const [activeTab, setActiveTab] = useState("account"); // Default to account tab
 	const [apiKey, setApiKey] = useState(""); // State for API Key input
 	const [endpointUrl, setEndpointUrl] = useState(""); // State for Endpoint URL input
+	const [modelName, setModelName] = useState(""); // State for Model Name input
 	const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
 		"idle",
 	); // State for save button feedback
@@ -67,18 +68,23 @@ export default function SettingsPage() {
 	const STORAGE_KEYS = {
 		API_KEY: "customApiKey",
 		ENDPOINT_URL: "customApiEndpoint",
+		MODEL_NAME: "customApiModel", // Added key for model name
 	};
 
 	// Load settings from localStorage on mount
 	useEffect(() => {
 		const storedApiKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
 		const storedEndpointUrl = localStorage.getItem(STORAGE_KEYS.ENDPOINT_URL);
+		const storedModelName = localStorage.getItem(STORAGE_KEYS.MODEL_NAME); // Load model name
 
 		if (storedApiKey) {
 			setApiKey(storedApiKey);
 		}
 		if (storedEndpointUrl) {
 			setEndpointUrl(storedEndpointUrl);
+		}
+		if (storedModelName) {
+			setModelName(storedModelName); // Set model name state
 		}
 	}, []); // Empty dependency array ensures this runs only once on mount
 
@@ -88,6 +94,7 @@ export default function SettingsPage() {
 		try {
 			localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
 			localStorage.setItem(STORAGE_KEYS.ENDPOINT_URL, endpointUrl);
+			localStorage.setItem(STORAGE_KEYS.MODEL_NAME, modelName); // Save model name
 			setSaveStatus("saved");
 			toast({
 				title: "Settings Saved",
@@ -513,6 +520,21 @@ export default function SettingsPage() {
 												<p className="text-sm text-muted-foreground">
 													The base URL for the OpenAI-compatible API endpoint
 													(e.g., https://api.groq.com/openai/v1).
+												</p>
+											</div>
+											{/* Added Model Name Input */}
+											<div className="space-y-2">
+												<Label htmlFor="modelName">Model Name</Label>
+												<Input
+													id="modelName"
+													type="text"
+													placeholder="Enter model name (e.g., gpt-4o)"
+													value={modelName}
+													onChange={(e) => setModelName(e.target.value)}
+												/>
+												<p className="text-sm text-muted-foreground">
+													Specify the exact model to use with the custom
+													provider.
 												</p>
 											</div>
 											<Button
