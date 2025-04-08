@@ -6,80 +6,88 @@ import { useArticleActions } from "./useArticleActions";
 
 // --- Mocks Setup ---
 
-// Reuse Dexie mock structure from useArticleSync.test.ts
-let mockDbData: Article[] = []; // In-memory store for articles
-
-const mockArticlesTable = {
-	// Core Methods
-	toArray: vi.fn(async () => structuredClone(mockDbData)), // Return copy
-	bulkPut: vi.fn(
-		async (items: Article[], keys?: any, options?: { allKeys: boolean }) => {
-			const addedIds: string[] = [];
-			for (const item of items) {
-				if (!item._id)
-					throw new Error("Mock Dexie Error: Article must have an _id"); // Check for _id
-				const index = mockDbData.findIndex((dbItem) => dbItem._id === item._id); // Use _id for findIndex
-				const newItem = structuredClone(item); // Store copy
-				if (index !== -1) {
-					mockDbData[index] = newItem; // Update
-				} else {
-					mockDbData.push(newItem); // Add
+// Hoist the Dexie mock variables and definition
+const { mockArticlesTable, mockDbData } = vi.hoisted(() => {
+	const _mockDbData: Article[] = []; // In-memory store for articles
+	const _mockArticlesTable = {
+		// Core Methods
+		toArray: vi.fn(async () => structuredClone(mockDbData)), // Return copy
+		bulkPut: vi.fn(
+			async (items: Article[], keys?: any, options?: { allKeys: boolean }) => {
+				const addedIds: string[] = [];
+				for (const item of items) {
+					if (!item._id)
+						throw new Error("Mock Dexie Error: Article must have an _id"); // Check for _id
+					const index = mockDbData.findIndex(
+						(dbItem) => dbItem._id === item._id,
+					); // Use _id for findIndex
+					const newItem = structuredClone(item); // Store copy
+					if (index !== -1) {
+						mockDbData[index] = newItem; // Update
+					} else {
+						mockDbData.push(newItem); // Add
+					}
+					addedIds.push(item._id); // Push _id
 				}
-				addedIds.push(item._id); // Push _id
-			}
-			// Dexie's bulkPut returns the keys of the added/updated items
-			return Promise.resolve(
-				options?.allKeys ? addedIds : addedIds[addedIds.length - 1],
-			);
-		},
-	),
-	get: vi.fn(async (_id: string) => {
-		// Parameter name changed for clarity
-		const found = mockDbData.find((item) => item._id === _id); // Use _id for find
-		return Promise.resolve(found ? structuredClone(found) : undefined); // Return copy
-	}),
-	put: vi.fn(async (item: Article, key?: any) => {
-		// Use _id
-		if (!item._id)
-			throw new Error("Mock Dexie Error: Article must have an _id"); // Check for _id
-		const index = mockDbData.findIndex((dbItem) => dbItem._id === item._id); // Use _id for findIndex
-		const newItem = structuredClone(item); // Store copy
-		if (index !== -1) {
-			mockDbData[index] = newItem; // Update
-		} else {
-			mockDbData.push(newItem); // Add
-		}
-		return Promise.resolve(item._id); // Return _id
-	}),
-	delete: vi.fn(async (_id: string) => {
-		// Parameter name changed for clarity
-		const initialLength = mockDbData.length;
-		mockDbData = mockDbData.filter((item) => item._id !== _id); // Use _id for filter
-		return Promise.resolve(initialLength - mockDbData.length); // Dexie delete returns count of deleted items (0 or 1)
-	}),
-	// Querying Methods (add more as needed by useArticleActions)
-	where: vi.fn((index: string) => ({
-		equals: vi.fn((value: any) => ({
-			toArray: vi.fn(async () => {
-				const results = mockDbData.filter(
-					(item) => item[index as keyof Article] === value,
+				// Dexie's bulkPut returns the keys of the added/updated items
+				return Promise.resolve(
+					options?.allKeys ? addedIds : addedIds[addedIds.length - 1],
 				);
-				return Promise.resolve(structuredClone(results)); // Return copy
-			}),
+			},
+		),
+		get: vi.fn(async (_id: string) => {
+			// Parameter name changed for clarity
+			const found = mockDbData.find((item) => item._id === _id); // Use _id for find
+			return Promise.resolve(found ? structuredClone(found) : undefined); // Return copy
+		}),
+		put: vi.fn(async (item: Article, key?: any) => {
+			// Use _id
+			if (!item._id)
+				throw new Error("Mock Dexie Error: Article must have an _id"); // Check for _id
+			const index = mockDbData.findIndex((dbItem) => dbItem._id === item._id); // Use _id for findIndex
+			const newItem = structuredClone(item); // Store copy
+			if (index !== -1) {
+				mockDbData[index] = newItem; // Update
+			} else {
+				mockDbData.push(newItem); // Add
+			}
+			return Promise.resolve(item._id); // Return _id
+		}),
+		delete: vi.fn(async (_id: string) => {
+			// Parameter name changed for clarity
+			const initialLength = _mockDbData.length; // Use internal variable
+			// Filter in place: Find index and splice
+			const indexToRemove = _mockDbData.findIndex((item) => item._id === _id); // Use internal variable
+			if (indexToRemove !== -1) {
+				_mockDbData.splice(indexToRemove, 1); // Modify internal array
+			}
+			return Promise.resolve(initialLength - mockDbData.length); // Dexie delete returns count of deleted items (0 or 1)
+		}),
+		// Querying Methods (add more as needed by useArticleActions)
+		where: vi.fn((index: string) => ({
+			equals: vi.fn((value: any) => ({
+				toArray: vi.fn(async () => {
+					const results = mockDbData.filter(
+						(item) => item[index as keyof Article] === value,
+					);
+					return Promise.resolve(structuredClone(results)); // Return copy
+				}),
+			})),
 		})),
-	})),
-	// Utility methods
-	clear: vi.fn(async () => {
-		mockDbData = [];
-		return Promise.resolve();
-	}),
-	// Add other methods if useArticleActions interacts with them
-};
+		// Utility methods
+		clear: vi.fn(async () => {
+			_mockDbData.length = 0; // Clear internal array in place
+			return Promise.resolve();
+		}),
+		// Add other methods if useArticleActions interacts with them
+	};
+	return { mockArticlesTable: _mockArticlesTable, mockDbData: _mockDbData };
+});
 
 // Mock the specific db instance exported from dexie.ts
 vi.mock("@/services/db/dexie", () => ({
 	db: {
-		articles: mockArticlesTable,
+		articles: mockArticlesTable, // Use the hoisted mock
 		// Mock other tables if useArticleActions uses them
 	},
 }));
@@ -160,7 +168,7 @@ describe("useArticleActions (Dexie)", () => {
 		vi.clearAllMocks();
 
 		// Reset Dexie mock data and function calls
-		mockDbData = [];
+		mockDbData.length = 0; // Clear the hoisted array in place
 		for (const mockFn of Object.values(mockArticlesTable)) {
 			if (vi.isMockFunction(mockFn)) {
 				mockFn.mockClear();
@@ -181,17 +189,18 @@ describe("useArticleActions (Dexie)", () => {
 			}
 		}
 		// Reset default implementations
-		mockArticlesTable.toArray.mockImplementation(async () =>
-			structuredClone(mockDbData),
+		mockArticlesTable.toArray.mockImplementation(
+			async () => structuredClone(mockDbData), // Use hoisted array
 		);
 		mockArticlesTable.get.mockImplementation(async (_id: string) => {
-			const found = mockDbData.find((item) => item._id === _id);
+			const found = mockDbData.find((item) => item._id === _id); // Use hoisted array
 			return Promise.resolve(found ? structuredClone(found) : undefined);
 		});
 		mockArticlesTable.where.mockImplementation((index: string) => ({
 			equals: vi.fn((value: any) => ({
 				toArray: vi.fn(async () => {
 					const results = mockDbData.filter(
+						// Use hoisted array
 						(item) => item[index as keyof Article] === value,
 					);
 					return Promise.resolve(structuredClone(results));
@@ -202,16 +211,21 @@ describe("useArticleActions (Dexie)", () => {
 			async (item: Article, key?: any) => {
 				if (!item._id)
 					throw new Error("Mock Dexie Error: Article must have an _id");
-				const index = mockDbData.findIndex((dbItem) => dbItem._id === item._id);
+				const index = mockDbData.findIndex((dbItem) => dbItem._id === item._id); // Use hoisted array
 				const newItem = structuredClone(item);
-				if (index !== -1) mockDbData[index] = newItem;
-				else mockDbData.push(newItem);
+				if (index !== -1)
+					mockDbData[index] = newItem; // Use hoisted array
+				else mockDbData.push(newItem); // Use hoisted array
 				return Promise.resolve(item._id);
 			},
 		);
 		mockArticlesTable.delete.mockImplementation(async (_id: string) => {
-			const initialLength = mockDbData.length;
-			mockDbData = mockDbData.filter((item) => item._id !== _id);
+			const initialLength = mockDbData.length; // Use hoisted array
+			// Filter in place: Find index and splice
+			const indexToRemove = mockDbData.findIndex((item) => item._id === _id); // Use hoisted array
+			if (indexToRemove !== -1) {
+				mockDbData.splice(indexToRemove, 1); // Modify hoisted array
+			}
 			return Promise.resolve(initialLength - mockDbData.length);
 		});
 
@@ -368,7 +382,8 @@ describe("useArticleActions (Dexie)", () => {
 	it("should remove article via removeArticle", async () => {
 		// Arrange: Add an article to the mock DB first
 		const articleToDelete = baseMockArticleData("delete-me", "article");
-		mockDbData = [articleToDelete as Article]; // Assume baseMockArticleData provides enough fields
+		mockDbData.length = 0; // Clear hoisted array
+		mockDbData.push(articleToDelete as Article); // Add to hoisted array
 
 		const { result } = renderHook(() => useArticleActions(refreshArticlesMock));
 
@@ -380,7 +395,7 @@ describe("useArticleActions (Dexie)", () => {
 		// Assert
 		expect(mockArticlesTable.delete).toHaveBeenCalledTimes(1);
 		expect(mockArticlesTable.delete).toHaveBeenCalledWith("delete-me");
-		expect(mockDbData.find((a) => a._id === "delete-me")).toBeUndefined(); // Check it's removed from mock data
+		expect(mockDbData.find((a) => a._id === "delete-me")).toBeUndefined(); // Check it's removed from hoisted mock data
 		expect(refreshArticlesMock).toHaveBeenCalledTimes(1);
 	});
 
@@ -394,7 +409,8 @@ describe("useArticleActions (Dexie)", () => {
 			favorite: false,
 			tags: [],
 		} as Article;
-		mockDbData = [initialArticle];
+		mockDbData.length = 0; // Clear hoisted array
+		mockDbData.push(initialArticle); // Add to hoisted array
 
 		const { result } = renderHook(() => useArticleActions(refreshArticlesMock));
 		// Only update fields supported by updateArticleStatus
@@ -457,7 +473,8 @@ describe("useArticleActions (Dexie)", () => {
 	it("should NOT attempt cloud sync if getToken returns null (example: remove article)", async () => {
 		mockGetTokenFn.mockResolvedValueOnce(null);
 		const articleToDelete = baseMockArticleData("delete-no-token", "article");
-		mockDbData = [articleToDelete as Article];
+		mockDbData.length = 0; // Clear hoisted array
+		mockDbData.push(articleToDelete as Article); // Add to hoisted array
 
 		const { result } = renderHook(() => useArticleActions(refreshArticlesMock));
 

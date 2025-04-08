@@ -5,6 +5,7 @@ import { type ArticleView, useArticleView } from "@/hooks/useArticleView";
 // Removed PouchDB init hook import: import { useDatabaseInit } from "@/hooks/useDatabaseInit";
 import { filterArticles, sortArticles } from "@/lib/articleUtils"; // Import utils
 import {
+	type DexieArticle, // Import DexieArticle type
 	type DexieTag,
 	db,
 	initializeDexieDatabase,
@@ -20,8 +21,11 @@ import type {
 	ArticleSortField,
 	SortCriteria,
 } from "@/types/articles"; // Import new types
+import { useAuth } from "@clerk/clerk-react"; // Import useAuth
 import type React from "react";
 import {
+	type Dispatch, // Add Dispatch
+	type SetStateAction, // Add SetStateAction
 	createContext,
 	useCallback, // Import useCallback
 	useContext,
@@ -48,7 +52,7 @@ interface ArticleContextType {
 
 	// --- Filtering & Sorting ---
 	filters: ArticleFilters;
-	setFilters: React.Dispatch<React.SetStateAction<ArticleFilters>>; // Allow direct setting
+	setFilters: Dispatch<SetStateAction<ArticleFilters>>; // Allow direct setting
 	setSearchQuery: (query: string) => void;
 	// Add specific filter setters if needed (e.g., addSiteFilter, removeTagFilter)
 	setSelectedCategory: (category: ArticleCategory | null) => void; // New setter for category
@@ -86,6 +90,10 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	// 1. Initialize Database (Using Dexie)
 	const [isDbInitialized, setIsDbInitialized] = useState(false);
 	const [dbError, setDbError] = useState<Error | null>(null);
+	const [hasFetchedInitialData, setHasFetchedInitialData] = useState(false); // Track initial fetch
+
+	// Clerk Auth Hook
+	const { isLoaded, isSignedIn, getToken } = useAuth();
 
 	useEffect(() => {
 		let isMounted = true;
@@ -113,6 +121,82 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 			isMounted = false;
 		};
 	}, []); // Run once on mount
+
+	// 1.5. Fetch initial data from backend after auth and DB init
+	useEffect(() => {
+		let isMounted = true;
+		const fetchInitialData = async () => {
+			if (isLoaded && isSignedIn && isDbInitialized && !hasFetchedInitialData) {
+				console.log(
+					"ArticleContext: Auth ready & DB initialized. Fetching initial data...",
+				);
+				try {
+					const token = await getToken();
+					if (!token) {
+						throw new Error("Failed to retrieve authentication token.");
+					}
+
+					const workerUrl = import.meta.env.VITE_WORKER_URL;
+					if (!workerUrl) {
+						console.error(
+							"ArticleContext: VITE_WORKER_URL is not defined. Cannot fetch data.",
+						);
+						// Optionally set an error state here
+						return;
+					}
+
+					const response = await fetch(`${workerUrl}/items`, {
+						headers: {
+							Authorization: `Bearer ${token}`,
+						},
+					});
+
+					if (!response.ok) {
+						throw new Error(
+							`Failed to fetch initial data: ${response.status} ${response.statusText}`,
+						);
+					}
+
+					const fetchedItems: Article[] = await response.json(); // Assume backend returns Article[] compatible data
+
+					// Map fetched Article to DexieArticle, notably _id -> id
+					const dexieArticles: DexieArticle[] = fetchedItems.map((item) => ({
+						...item, // Spread existing properties
+						id: item._id, // Map _id to id
+						// Explicitly ensure all required DexieArticle fields are present.
+						// The Omit in DexieArticle definition handles _rev, _deleted, version.
+						// Assuming the rest of the fields in 'Article' match 'DexieArticle' requirements.
+					}));
+
+					// Use Dexie's bulkPut with the mapped data
+					await db.articles.bulkPut(dexieArticles);
+
+					console.log(
+						`ArticleContext: Successfully fetched and saved ${fetchedItems.length} items to Dexie.`,
+					);
+
+					if (isMounted) {
+						setHasFetchedInitialData(true); // Mark initial fetch as complete
+					}
+				} catch (error) {
+					console.error(
+						"ArticleContext: Error fetching initial data from backend:",
+						error,
+					);
+					// Optionally set an error state in the context
+					if (isMounted) {
+						// Maybe retry or notify user?
+					}
+				}
+			}
+		};
+
+		fetchInitialData();
+
+		return () => {
+			isMounted = false;
+		};
+	}, [isLoaded, isSignedIn, isDbInitialized, hasFetchedInitialData, getToken]); // Dependencies for the effect
 
 	// 2. Manage View State
 	const { currentView, setCurrentView } = useArticleView("all");

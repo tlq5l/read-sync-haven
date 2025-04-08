@@ -10,7 +10,6 @@ import {
 import { useArticles } from "@/context/ArticleContext";
 import type { ArticleSortField } from "@/types/articles";
 import { ArrowDownUp, WifiOff } from "lucide-react"; // Added WifiOff icon
-import { useTranslation } from "react-i18next"; // Added useTranslation
 import { Link, useLocation } from "react-router-dom";
 
 // Removed unused getSortLabel function
@@ -25,7 +24,6 @@ export default function TopBar() {
 		syncStatus, // Destructure syncStatus
 	} = useArticles();
 	const location = useLocation();
-	const { t } = useTranslation(); // Added translation hook
 	const isActive = (path: string) => location.pathname === path;
 
 	return (
@@ -40,21 +38,21 @@ export default function TopBar() {
 					className={`px-2 ${isActive("/inbox") ? "text-foreground" : "text-muted-foreground"}`}
 					asChild
 				>
-					<Link to="/inbox">{t("sidebar.inbox")}</Link>
+					<Link to="/inbox">Inbox</Link>
 				</Button>
 				<Button
 					variant="ghost"
 					className={`px-2 ${isActive("/later") ? "text-foreground" : "text-muted-foreground"}`}
 					asChild
 				>
-					<Link to="/later">{t("sidebar.later")}</Link>
+					<Link to="/later">Later</Link>
 				</Button>
 				<Button
 					variant="ghost"
 					className={`px-2 ${isActive("/archive") ? "text-foreground" : "text-muted-foreground"}`}
 					asChild
 				>
-					<Link to="/archive">{t("sidebar.archive")}</Link>
+					<Link to="/archive">Archive</Link>
 				</Button>
 			</div>
 
@@ -63,7 +61,7 @@ export default function TopBar() {
 				{syncStatus === "offline" && (
 					<div className="flex items-center text-xs px-2 py-1 rounded-md bg-destructive/10 text-destructive font-medium">
 						<WifiOff size={14} className="mr-1" />
-						{t("topBar.status.offline")}
+						Offline
 					</div>
 				)}
 			</div>
@@ -76,17 +74,13 @@ export default function TopBar() {
 				>
 					<SelectTrigger className="w-auto min-w-[140px] h-8 px-2 border-none shadow-none bg-transparent hover:bg-accent focus:ring-0">
 						<ArrowDownUp size={14} className="mr-1 opacity-50" />
-						<SelectValue placeholder={t("topBar.sort.placeholder")} />
+						<SelectValue placeholder="Sort by..." />
 					</SelectTrigger>
 					<SelectContent>
-						<SelectItem value="savedAt">
-							{t("topBar.sort.dateSaved")}
-						</SelectItem>
-						<SelectItem value="title">{t("topBar.sort.title")}</SelectItem>
-						<SelectItem value="siteName">{t("topBar.sort.source")}</SelectItem>
-						<SelectItem value="estimatedReadTime">
-							{t("topBar.sort.readTime")}
-						</SelectItem>
+						<SelectItem value="savedAt">Date Saved</SelectItem>
+						<SelectItem value="title">Title</SelectItem>
+						<SelectItem value="siteName">Source</SelectItem>
+						<SelectItem value="estimatedReadTime">Read Time</SelectItem>
 					</SelectContent>
 				</Select>
 				<Button
@@ -94,11 +88,11 @@ export default function TopBar() {
 					size="icon"
 					className="h-8 w-8"
 					onClick={toggleSortDirection}
-					aria-label={t(
+					aria-label={
 						sortCriteria.direction === "asc"
-							? "topBar.sort.ariaLabelAsc"
-							: "topBar.sort.ariaLabelDesc",
-					)}
+							? "Sort ascending"
+							: "Sort descending"
+					}
 				>
 					{sortCriteria.direction === "asc" ? "↑" : "↓"}
 				</Button>

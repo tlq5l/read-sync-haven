@@ -36,7 +36,6 @@ import {
 	Video,
 } from "lucide-react";
 import React, { useState } from "react"; // Keep useState for isLibraryOpen
-import { useTranslation } from "react-i18next";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
@@ -46,7 +45,6 @@ export default function Sidebar() {
 	const location = useLocation();
 	const navigate = useNavigate();
 	const { setCurrentView, setSelectedCategory, filters } = useArticles();
-	const { t } = useTranslation(); // Added translation hook
 	const currentCategory = filters.category; // Extract current category
 	// const { theme, setTheme } = useTheme(); // Removed as unused after theme toggle moved
 	const { synchronizeAnimations } = useAnimation();
@@ -125,7 +123,7 @@ export default function Sidebar() {
 						className="text-xl font-bold transition-opacity duration-200 text-gray-900 dark:text-white" // Corrected: Single className with merged styles
 						// style={styles.header} // Style prop correctly removed
 					>
-						{t("appTitle")}
+						Read Sync Haven
 					</h1>
 				)}
 				<div
@@ -178,9 +176,7 @@ export default function Sidebar() {
 						>
 							<Home size={20} />
 							{!collapsed && (
-								<span className="transition-opacity duration-200">
-									{t("sidebar.home")}
-								</span>
+								<span className="transition-opacity duration-200">Home</span>
 							)}
 						</Button>
 					</TransitionItem>
@@ -226,7 +222,7 @@ export default function Sidebar() {
 								<Library size={20} />{" "}
 								{!collapsed && (
 									<span className="transition-opacity duration-200 font-medium">
-										{t("sidebar.library")}
+										Library
 									</span>
 								)}
 							</Button>
@@ -314,7 +310,7 @@ export default function Sidebar() {
 								<Settings size={20} />
 								{!collapsed && (
 									<span className="transition-opacity duration-200">
-										{t("settings.title")}
+										Settings
 									</span>
 								)}
 							</Link>
@@ -342,7 +338,7 @@ export default function Sidebar() {
 									<LogIn size={20} />
 									{!collapsed && (
 										<span className="transition-opacity duration-200">
-											{t("sidebar.signIn")}
+											Sign In
 										</span>
 									)}
 								</Link>
@@ -363,7 +359,7 @@ export default function Sidebar() {
 							<Plus size={18} />
 							{!collapsed ? (
 								<span className="transition-opacity duration-200">
-									{t("sidebar.addContent")}
+									Add Content
 								</span>
 							) : null}
 						</Link>

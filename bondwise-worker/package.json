@@ -24,6 +24,7 @@
 		"@clerk/backend": "^1.25.8",
 		"@google/generative-ai": "^0.24.0",
 		"google-auth-library": "^9.15.1",
-		"itty-router": "^5.0.18"
+		"itty-router": "^5.0.18",
+		"svix": "^1.63.1"
 	}
 }

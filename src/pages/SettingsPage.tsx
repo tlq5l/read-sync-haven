@@ -4,13 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select"; // Added Select components
 import { Separator } from "@/components/ui/separator";
 // Resolved imports: Kept Switch and Tabs, removed ThemeToggle
 import { Switch } from "@/components/ui/switch";
@@ -20,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { useArticleActions } from "@/hooks/useArticleActions";
-import { supportedLngs } from "@/lib/i18n"; // Added supportedLngs import
 // Removed unused type imports:
 // import {
 // 	type Article,
@@ -39,14 +31,12 @@ import {
 	// User, // Removed unused User icon
 } from "lucide-react"; // Added ShieldCheck for Account
 import { useState } from "react"; // Remove useEffect import
-import { useTranslation } from "react-i18next"; // Added useTranslation
 import { Link } from "react-router-dom";
 
 export default function SettingsPage() {
 	const { toast } = useToast();
 	// Resolved hook usage: Kept theme, setTheme, t, i18n
 	const { theme, setTheme } = useTheme(); // Keep theme hooks
-	const { t, i18n } = useTranslation(); // Add i18n back
 	const [isExportingData, setIsExportingData] = useState(false);
 	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
 	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false); // Add state for metadata update button
@@ -195,7 +185,7 @@ export default function SettingsPage() {
 						<ArrowLeft className="h-5 w-5" />
 					</Link>
 				</Button>
-				<h1 className="text-2xl font-bold ml-2">{t("settings.title")}</h1>
+				<h1 className="text-2xl font-bold ml-2">Settings</h1>
 			</div>
 			<Tabs
 				defaultValue="account"
@@ -211,12 +201,12 @@ export default function SettingsPage() {
 						{" "}
 						{/* New Account Tab */}
 						<ShieldCheck className="h-4 w-4" />
-						<span>{t("settings.account.title")}</span>
+						<span>Account</span>
 					</TabsTrigger>
 					{/* Removed redundant Profile Tab Trigger */}
 					<TabsTrigger value="appearance" className="flex items-center gap-1">
 						<Palette className="h-4 w-4" />
-						<span>{t("settings.appearance.title")}</span>
+						<span>Appearance</span>
 					</TabsTrigger>
 					<TabsTrigger value="data" className="flex items-center gap-1">
 						<Database className="h-4 w-4" />
@@ -224,7 +214,7 @@ export default function SettingsPage() {
 					</TabsTrigger>
 					<TabsTrigger value="shortcuts" className="flex items-center gap-1">
 						<Keyboard className="h-4 w-4" />
-						<span>{t("settings.shortcuts.title")}</span>
+						<span>Shortcuts</span>
 					</TabsTrigger>
 				</TabsList>
 
@@ -259,23 +249,23 @@ export default function SettingsPage() {
 						<div className="pr-4">
 							<Card>
 								<CardHeader>
-									<CardTitle>{t("settings.appearance.title")}</CardTitle>
+									<CardTitle>Appearance</CardTitle>
 								</CardHeader>
 								<CardContent className="space-y-6">
 									{" "}
 									{/* Increased spacing */}
 									{/* Resolved Appearance Tab: Kept Switch and Language Select */}
 									<div className="space-y-3">
-										<Label>{t("settings.appearance.theme")}</Label>
+										<Label>Theme</Label>
 										<p className="text-sm text-muted-foreground">
-											{t("settings.appearance.themeDescription")}
+											Select the interface theme.
 										</p>
 										<div className="flex items-center space-x-2">
 											<Label
 												htmlFor="theme-switch"
 												className="text-sm font-normal"
 											>
-												{t("settings.appearance.light")}
+												Light
 											</Label>
 											<Switch
 												id="theme-switch"
@@ -288,33 +278,9 @@ export default function SettingsPage() {
 												htmlFor="theme-switch"
 												className="text-sm font-normal"
 											>
-												{t("settings.appearance.dark")}
+												Dark
 											</Label>
 										</div>
-									</div>
-									<Separator />
-									<div className="space-y-3">
-										<Label htmlFor="language-select">
-											{t("settings.appearance.language")}
-										</Label>
-										<p className="text-sm text-muted-foreground">
-											{t("settings.appearance.languageDescription")}
-										</p>
-										<Select
-											value={i18n.language.split("-")[0]}
-											onValueChange={(value) => i18n.changeLanguage(value)}
-										>
-											<SelectTrigger id="language-select" className="w-[180px]">
-												<SelectValue placeholder="Select language" />
-											</SelectTrigger>
-											<SelectContent>
-												{Object.entries(supportedLngs).map(([code, name]) => (
-													<SelectItem key={code} value={code}>
-														{name}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
 									</div>
 								</CardContent>
 							</Card>

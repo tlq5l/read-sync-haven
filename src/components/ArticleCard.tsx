@@ -20,7 +20,6 @@ import {
 	Trash2,
 } from "lucide-react";
 import React, { useState } from "react";
-import { useTranslation } from "react-i18next"; // Added useTranslation
 import { Link } from "react-router-dom";
 
 interface ArticleCardProps {
@@ -36,7 +35,6 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 	const { updateArticleStatus, optimisticRemoveArticle } = useArticles(); // Revert to optimisticRemoveArticle
 	const { toast } = useToast();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
-	const { t } = useTranslation(); // Added translation hook
 
 	// Use synchronized animation with staggered delay based on index
 	const cardAnimation = useSynchronizedAnimation({
@@ -129,7 +127,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 									className="text-xs text-muted-foreground"
 									data-testid="read-status"
 								>
-									{t("articleCard.read")}
+									Read
 								</span>
 								<div className="flex items-center gap-1">
 									{/* Move to Later Button */}
@@ -142,7 +140,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "later" });
 										}}
-										aria-label={t("articleCard.readLater")}
+										aria-label="Read Later"
 									>
 										<Clock size={16} />
 									</Button>
@@ -156,7 +154,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "archived" });
 										}}
-										aria-label={t("articleCard.archive")}
+										aria-label="Archive"
 									>
 										<Archive size={16} />
 									</Button>
@@ -170,7 +168,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "inbox" });
 										}}
-										aria-label={t("articleCard.moveToInbox")}
+										aria-label="Move to Inbox"
 									>
 										<Inbox size={16} />
 									</Button>
@@ -198,7 +196,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 												onClick={handleDelete}
 											>
 												<Trash2 className="mr-2 h-4 w-4" />
-												<span>{t("articleCard.delete")}</span>
+												<span>Delete</span>
 											</DropdownMenuItem>
 										</DropdownMenuContent>
 									</DropdownMenu>
@@ -210,7 +208,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 									className="text-xs font-medium text-bondwise-500"
 									data-testid="unread-status"
 								>
-									{t("articleCard.unread")}
+									Unread
 								</span>
 								<div className="flex items-center gap-1">
 									{/* Move to Later Button */}
@@ -223,7 +221,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "later" });
 										}}
-										aria-label={t("articleCard.readLater")}
+										aria-label="Read Later"
 									>
 										<Clock size={16} />
 									</Button>
@@ -237,7 +235,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "archived" });
 										}}
-										aria-label={t("articleCard.archive")}
+										aria-label="Archive"
 									>
 										<Archive size={16} />
 									</Button>
@@ -251,7 +249,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 											e.stopPropagation();
 											updateArticleStatus(article._id, { status: "inbox" });
 										}}
-										aria-label={t("articleCard.moveToInbox")}
+										aria-label="Move to Inbox"
 									>
 										<Inbox size={16} />
 									</Button>
@@ -279,7 +277,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 												onClick={handleDelete}
 											>
 												<Trash2 className="mr-2 h-4 w-4" />
-												<span>{t("articleCard.delete")}</span>
+												<span>Delete</span>
 											</DropdownMenuItem>
 										</DropdownMenuContent>
 									</DropdownMenu>
@@ -289,10 +287,10 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 						{/* Wrap title and excerpt and make this section grow */}
 						<div className="flex-grow mb-3">
 							<h3 className="text-lg font-medium line-clamp-2 mb-2">
-								{article.title || t("articleCard.untitled")}
+								{article.title || "Untitled"}
 							</h3>
 							<p className="text-sm text-muted-foreground line-clamp-2">
-								{article.excerpt || t("articleCard.noExcerpt")}
+								{article.excerpt || "No excerpt available"}
 							</p>
 						</div>
 						{/* Keep bottom metadata section */}
@@ -301,10 +299,10 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 							{/* Use mt-auto to push to bottom */}
 							<span>
 								{article.type === "pdf" && !article.siteName
-									? t("articleCard.pdfSource")
+									? "PDF Document"
 									: article.type === "epub" && !article.siteName
-										? t("articleCard.epubSource")
-										: article.siteName || t("articleCard.unknownSource")}
+										? "EPUB Document"
+										: article.siteName || "Unknown source"}
 							</span>
 							<div className="flex items-center gap-3">
 								<span>{article.estimatedReadTime || "?"} min read</span>

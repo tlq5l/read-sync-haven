@@ -20,6 +20,7 @@ export interface Env {
 	CLERK_SECRET_KEY: string;
 	CLERK_PUBLISHABLE_KEY: string;
 	GCF_AUTH_SECRET: string;
+	CLERK_WEBHOOK_SECRET: string; // Secret for verifying Clerk webhooks
 }
 
 /**

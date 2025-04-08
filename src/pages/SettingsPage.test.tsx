@@ -14,9 +14,7 @@ import { renderHook } from "@testing-library/react-hooks";
 
 import { ThemeProvider } from "@/context/ThemeContext"; // Import real ThemeProvider
 import SettingsPage from "@/pages/SettingsPage";
-// Kept necessary i18n imports from backup-staging-local
-import i18n from "i18next"; // Import i18n
-import { I18nextProvider, initReactI18next } from "react-i18next"; // Import provider and init
+// i18n imports removed
 // Removed comments and duplicate imports
 import { BrowserRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -93,25 +91,6 @@ vi.mock("@/components/ui/tabs", () => ({
 	),
 }));
 
-// Initialize i18next for testing
-i18n.use(initReactI18next).init({
-	lng: "en",
-	fallbackLng: "en",
-	// Minimal resources needed for SettingsPage
-	resources: {
-		en: {
-			translation: {
-				settings: {
-					title: "Settings",
-					// Add other keys used directly in SettingsPage if necessary
-				},
-			},
-		},
-	},
-	interpolation: {
-		escapeValue: false, // React already does escaping
-	},
-});
 
 // --- Test Suite ---
 
@@ -179,11 +158,9 @@ describe("SettingsPage", () => {
 		render(
 			<BrowserRouter>
 				<ThemeProvider>
-					<I18nextProvider i18n={i18n}>
 						{" "}
 						{/* Wrap with i18n Provider */}
 						<SettingsPage />
-					</I18nextProvider>
 				</ThemeProvider>
 			</BrowserRouter>,
 		);

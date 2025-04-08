@@ -11,9 +11,7 @@ import {
 import { renderHook } from "@testing-library/react-hooks";
 
 import type { Article } from "@/services/db";
-// Keep the i18n imports from backup-staging-local
-import i18n from "i18next"; // Import i18n
-import { I18nextProvider, initReactI18next } from "react-i18next"; // Import provider and init function
+// i18n imports removed
 // The @testing-library/react imports were already present above, so the ones from backup-staging-local are removed.
 import { BrowserRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -42,42 +40,15 @@ vi.mock("@/hooks/use-synchronized-animation", () => ({
 	}),
 }));
 
-// Initialize i18next for testing
-i18n.use(initReactI18next).init({
-	lng: "en",
-	fallbackLng: "en",
-	// Minimal resources needed for the card component
-	resources: {
-		en: {
-			translation: {
-				articleCard: {
-					read: "Read",
-					unread: "Unread",
-					untitled: "Untitled",
-					noExcerpt: "No excerpt available",
-					unknownSource: "Unknown source",
-					minRead: "{{count}} min read",
-					pdfSource: "PDF Document",
-					epubSource: "EPUB Book",
-				},
-			},
-		},
-	},
-	interpolation: {
-		escapeValue: false, // React already does escaping
-	},
-});
 
 describe("ArticleCard", () => {
 	// Helper function to render the component with an article and i18n provider
 	const renderCard = (article: Article) => {
 		render(
 			<BrowserRouter>
-				<I18nextProvider i18n={i18n}>
 					{" "}
 					{/* Wrap with provider */}
 					<ArticleCard article={article} />
-				</I18nextProvider>
 			</BrowserRouter>,
 		);
 	};
