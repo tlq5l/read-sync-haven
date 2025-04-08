@@ -23,12 +23,22 @@ const ThemeContext = createContext<ThemeProviderState>(initialState);
 export function ThemeProvider({
 	children,
 	defaultTheme = "system",
-	storageKey = "bondwise-ui-theme", // Key for theme
+	storageKey = "thinkara-ui-theme", // Key for theme - UPDATED
 	...props
 }: ThemeProviderProps) {
-	const [theme, setTheme] = useState<Theme>(
-		() => (localStorage.getItem(storageKey) as Theme) || defaultTheme,
-	);
+	const [theme, setTheme] = useState<Theme>(() => {
+		try {
+			const item = window.localStorage.getItem(storageKey);
+			// Ensure item is one of the valid Theme types
+			if (item === "light" || item === "dark" || item === "system") {
+				return item;
+			}
+		} catch (e) {
+			// Ignore localStorage errors
+			console.error("Error reading theme from localStorage", e);
+		}
+		return defaultTheme;
+	});
 
 	// Effect for Theme
 	useEffect(() => {

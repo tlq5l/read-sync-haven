@@ -46,7 +46,7 @@ export default {
 			if (path === "/" || path === "") {
 				return jsonResponse({
 					status: "ok",
-					message: "Bondwise Sync API is running",
+					message: "Thinkara Sync API is running",
 					version: "1.0.1", // Updated version for refactor
 					endpoints: ["/items", "/api/summarize", "/api/chat"],
 				});

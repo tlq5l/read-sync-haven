@@ -1,5 +1,5 @@
 {
-	"name": "bondwise-worker",
+	"name": "thinkara-worker",
 	"module": "index.ts",
 	"type": "module",
 	"private": true,

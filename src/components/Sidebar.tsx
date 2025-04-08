@@ -11,24 +11,17 @@ import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@clerk/clerk-react"; // Removed unused useUser and UserButton
 import {
-	// ChevronLeft, // Removed old icon
-	// ChevronRight, // Removed old icon
-	// Clock, // Removed unused icon
 	Home,
-	Library, // Added Library icon
+	Library, // Keep Library icon
 	LogIn,
-	LogOut, // Added LogOut icon
-	// MenuIcon, // Removed old icon
-	// Moon, // Removed as unused after theme toggle moved
-	// PanelLeftClose, // Removed old icon
-	// PanelLeftOpen, // Removed old icon
+	LogOut, // Keep LogOut icon
 	Plus,
 	Settings,
 	SidebarClose,
 	SidebarOpen,
-	// Sun,
 } from "lucide-react";
-// import React from "react"; // Removed unused React import
+// Removed LucideIcon type import
+// Removed useState import, removed unused React
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
@@ -36,7 +29,7 @@ export default function Sidebar() {
 	const { isSidebarCollapsed: collapsed, toggleSidebar } = useKeyboard(); // Use context state and toggle
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { setCurrentView, setSelectedCategory } = useArticles(); // Restore setSelectedCategory, removed unused filters
+	const { setCurrentView, setSelectedCategory } = useArticles(); // Removed unused filters
 	// const currentCategory = filters.category; // Removed unused variable declaration
 	// const { theme, setTheme } = useTheme(); // Removed as unused after theme toggle moved
 	const { synchronizeAnimations } = useAnimation();
@@ -53,9 +46,8 @@ export default function Sidebar() {
 
 	// useEffect(() => { ... }, [theme]); // Removed: Tailwind handles dark mode (Corrected)
 
+	// Updated isActive: removed category check as Library button now always clears filter
 	const isActive = (path: string) => location.pathname === path;
-	// const isViewActive = (view: "all" | "unread" | "favorites") =>
-	// 	currentView === view; // Removed unused function
 
 	// const toggleTheme = () => { // Removed as unused after theme toggle moved
 	// 	setTheme(theme === "dark" ? "light" : "dark");
@@ -76,6 +68,7 @@ export default function Sidebar() {
 	};
 
 	// const styles = { ... }; // Removed: Using Tailwind classes (Corrected)
+	// Removed categories array and categoryIcons map
 
 	return (
 		<div
@@ -97,7 +90,7 @@ export default function Sidebar() {
 						className="text-xl font-bold transition-opacity duration-200 text-gray-900 dark:text-white" // Corrected: Single className with merged styles
 						// style={styles.header} // Style prop correctly removed
 					>
-						Read Sync Haven
+						Thinkara
 					</h1>
 				)}
 				<div
@@ -156,20 +149,21 @@ export default function Sidebar() {
 					</TransitionItem>
 
 					<TransitionItem showFrom="left" className="w-full">
-						{/* Library Button */}
+						{/* Library Button with Dropdown */}
 						<Button
 							variant="ghost"
 							className={cn(
 								"w-full flex items-center gap-3 py-2 transition-all duration-200",
 								collapsed ? "justify-center" : "justify-start",
 								"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+								// Updated isActive check for simple Library button
 								isActive("/library") &&
 									"bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100",
 							)}
+							// Updated onClick to navigate and reset category filter
 							onClick={() => {
-								setSelectedCategory(null); // Reset category when navigating to base library
-								setCurrentView("all"); // Reset view when going to library (consistent with Home)
-								navigate("/library");
+								setSelectedCategory(null); // Reset filter
+								navigate("/library"); // Navigate
 							}}
 						>
 							<Library size={20} />
@@ -177,6 +171,8 @@ export default function Sidebar() {
 								<span className="transition-opacity duration-200">Library</span>
 							)}
 						</Button>
+
+						{/* Removed Collapsible Category List */}
 					</TransitionItem>
 
 					{/* Removed Unread and Favorites buttons - handled by TopBar */}

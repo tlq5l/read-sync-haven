@@ -99,19 +99,19 @@ vi.mock("lucide-react", async (importOriginal) => {
 	const mockedIcons: Record<string, React.FC<{ "data-testid"?: string }>> = {}; // Define type for mockedIcons
 
 	// Create simple mock components for icons used in Sidebar
+	// Icons used in Sidebar and its sub-components
 	const iconNames = [
 		"Home",
-		"Library", // Added Library icon mock
+		"Library",
 		"Settings",
-		"Sun",
-		"Moon",
+		"Sun", // Needed for ThemeProvider context? Keep for now.
+		"Moon", // Needed for ThemeProvider context? Keep for now.
 		"LogIn",
-		"LogOut", // Add LogOut icon mock
+		"LogOut",
 		"Plus",
-		"SidebarClose", // Add Sidebar icons used in toggle
+		"SidebarClose",
 		"SidebarOpen",
-		"MenuIcon", // Keep MenuIcon if used elsewhere, though maybe not in current Sidebar
-		// ChevronLeft seems removed from Sidebar component, can potentially be removed here too
+		// Removed unused Chevron and category icons
 	];
 
 	for (const name of iconNames) {
@@ -220,7 +220,9 @@ describe("Sidebar Component", () => {
 		expect(mockNavigate).toHaveBeenCalledWith("/");
 	});
 
-	it("renders the Library button with Library icon and navigates to '/library' on click", () => {
+	// ----- Library Dropdown Tests Removed -----
+
+	it("renders the Library button, navigates, and resets category on click", () => {
 		render(
 			<MockProviders>
 				<Sidebar />
@@ -232,11 +234,21 @@ describe("Sidebar Component", () => {
 		expect(
 			libraryButton.querySelector('[data-testid="icon-Library"]'),
 		).toBeInTheDocument();
+		// Check chevrons are NOT present
+		expect(
+			libraryButton.querySelector('[data-testid="icon-ChevronRight"]'),
+		).not.toBeInTheDocument();
+		expect(
+			libraryButton.querySelector('[data-testid="icon-ChevronDown"]'),
+		).not.toBeInTheDocument();
 
 		fireEvent.click(libraryButton);
-		expect(mockSetSelectedCategory).toHaveBeenCalledWith(null); // Check category reset
-		expect(mockSetCurrentView).toHaveBeenCalledWith("all"); // Check view reset
-		expect(mockNavigate).toHaveBeenCalledWith("/library"); // Check navigation
+		// Check category reset
+		expect(mockSetSelectedCategory).toHaveBeenCalledWith(null);
+		// Check navigation
+		expect(mockNavigate).toHaveBeenCalledWith("/library");
+		// Check setCurrentView is NOT called (only category buttons did this)
+		expect(mockSetCurrentView).not.toHaveBeenCalled();
 	});
 
 	it("renders the Settings link visibly", () => {

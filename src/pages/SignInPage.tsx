@@ -5,7 +5,7 @@ export default function SignInPage() {
 		<div className="flex items-center justify-center min-h-screen bg-background">
 			<div className="w-full max-w-md p-6">
 				<h1 className="text-2xl font-bold text-center mb-6">
-					Sign In to Read Sync Haven
+					Sign In to Thinkara
 				</h1>
 				<SignIn
 					routing="path"

@@ -5,7 +5,7 @@ export default function SignUpPage() {
 		<div className="flex items-center justify-center min-h-screen bg-background">
 			<div className="w-full max-w-md p-6">
 				<h1 className="text-2xl font-bold text-center mb-6">
-					Create Your Read Sync Haven Account
+					Create Your Thinkara Account
 				</h1>
 				<SignUp
 					routing="path"

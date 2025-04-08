@@ -9,6 +9,7 @@ import {
 	setupGlobalAnimationTimings,
 } from "@/lib/animation";
 import { ClerkProvider } from "@clerk/clerk-react";
+import { dark } from "@clerk/themes"; // Import Clerk dark theme
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { ArticleProvider } from "./context/ArticleContext"; // Import ArticleProvider
@@ -127,8 +128,11 @@ const App = () => (
 		publishableKey={PUBLISHABLE_KEY}
 		signInUrl="/sign-in"
 		signUpUrl="/sign-up"
+		appearance={{ baseTheme: dark }} // Set Clerk theme to dark
 	>
-		<ThemeProvider defaultTheme="system" storageKey="bondwise-ui-theme">
+		<ThemeProvider defaultTheme="dark" storageKey="bondwise-ui-theme">
+			{" "}
+			{/* Set default app theme to dark */}
 			<ThemeSupport />
 			<AnimationProvider>
 				<MotionPreferenceHandler>
