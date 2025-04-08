@@ -1,7 +1,7 @@
 // src/setupTests.ts
 import * as matchers from "@testing-library/jest-dom/matchers";
 import { expect, vi } from "vitest"; // Import vi
-
+import "fake-indexeddb/auto"; // Mock IndexedDB for tests
 // Polyfill EventTarget for JSDOM environment if it's missing
 if (typeof global.EventTarget === "undefined") {
 	// A simple polyfill or assign from a known source if available

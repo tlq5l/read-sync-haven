@@ -133,6 +133,9 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 		retryLoading: syncRetryLoading, // Rename to avoid conflict
 		syncStatus, // Destructure syncStatus from useArticleSync
 	} = useArticleSync(isDbInitialized); // Remove hidingArticleIds from call
+
+	// Log removed
+
 	// 4. Tags State
 	const [allTags, setAllTags] = useState<Tag[]>([]);
 

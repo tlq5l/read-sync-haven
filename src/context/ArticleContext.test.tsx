@@ -1,5 +1,7 @@
 import type { ArticleView } from "@/hooks/useArticleView";
-import type { Article, Tag } from "@/services/db";
+// Import db for seeding, adjust Tag import path if needed
+import { type DexieTag, db } from "@/services/db/dexie";
+import type { Article, Tag } from "@/services/db/types"; // Assuming types are here
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ArticleProvider, useArticles } from "./ArticleContext";
@@ -67,17 +69,25 @@ const { hoistedMockTags, mockGetAllTags } = vi.hoisted(() => {
 	};
 });
 
-// Hoisted Mocks for services used BY useArticleSync
-const {
-	mockGetAllArticles,
-	mockFetchCloudItems,
-	mockOperationsQueueDbAllDocs,
-	// Add other service mocks if needed by tests
-} = vi.hoisted(() => ({
-	mockGetAllArticles: vi.fn(),
-	mockFetchCloudItems: vi.fn(),
-	mockOperationsQueueDbAllDocs: vi.fn(),
-	// ...initialize other service mocks here
+// Hoisted Mocks for services used BY useArticleSync (REMOVED as useArticleSync will be mocked directly)
+// Hoisted mock for useArticleSync return values
+const { mockUseArticleSyncReturn, mockRefreshArticles, mockRetryLoading } =
+	vi.hoisted(() => ({
+		mockRefreshArticles: vi.fn().mockResolvedValue([]), // Default mock for refresh
+		mockRetryLoading: vi.fn(),
+		mockUseArticleSyncReturn: vi.fn().mockReturnValue({
+			articles: [],
+			isLoading: true,
+			isRefreshing: false,
+			error: null,
+			syncStatus: "idle",
+			refreshArticles: vi.fn().mockResolvedValue([]), // Default function mock
+			retryLoading: vi.fn(), // Default function mock
+		}),
+	}));
+
+vi.mock("@/hooks/useArticleSync", () => ({
+	useArticleSync: mockUseArticleSyncReturn,
 }));
 
 // --- Mocks for Other Hooks and DB Services ---
@@ -137,37 +147,7 @@ vi.mock("@/hooks/useArticleActions", () => ({
 	}),
 }));
 
-// Mock DB/Cloud services used by the REAL useArticleSync
-vi.mock("@/services/db", async (importOriginal) => {
-	const actual = await importOriginal<typeof import("@/services/db")>();
-	return {
-		...actual,
-		getAllTags: mockGetAllTags,
-		getAllArticles: mockGetAllArticles, // Use hoisted mock
-		articlesDb: {
-			// Mock PouchDB methods if needed directly
-			get: vi.fn(),
-			put: vi.fn(),
-			remove: vi.fn(),
-			bulkDocs: vi.fn().mockResolvedValue([]), // Default mock for bulkDocs
-			info: vi.fn().mockResolvedValue({ doc_count: 0 }),
-			createIndex: vi.fn().mockResolvedValue({ result: "created" }),
-		},
-		operationsQueueDb: {
-			// Mock queue methods
-			allDocs: mockOperationsQueueDbAllDocs, // Use hoisted mock
-			bulkDocs: vi.fn().mockResolvedValue([]),
-			// Add other queue methods if needed
-		},
-		// Keep other exports if necessary
-	};
-});
-vi.mock("@/services/cloudSync", () => ({
-	fetchCloudItems: mockFetchCloudItems, // Use hoisted mock
-	deleteItemFromCloud: vi.fn().mockResolvedValue("success"),
-	saveItemToCloud: vi.fn().mockResolvedValue("success"),
-}));
-
+// Mock DB/Cloud services (REMOVED as useArticleSync will be mocked directly)
 vi.mock("@/hooks/use-toast", () => ({
 	useToast: () => ({ toast: vi.fn() }),
 }));
@@ -184,6 +164,8 @@ const ArticleConsumer = () => {
 		optimisticRemoveArticle,
 		refreshArticles, // Also expose refresh for test trigger if needed
 	} = useArticles();
+
+	// Log removed
 	return (
 		<div>
 			<div data-testid="loading-state">{isLoading.toString()}</div>
@@ -210,97 +192,186 @@ const ArticleConsumer = () => {
 
 // --- Tests ---
 describe("ArticleContext", () => {
-	beforeEach(() => {
+	beforeEach(async () => {
+		// Make beforeEach async for db operations
 		vi.clearAllMocks();
-		// Reset mocks for services called by useArticleSync
-		mockGetAllArticles.mockReset().mockResolvedValue([]); // Default to empty cache
-		mockFetchCloudItems.mockReset().mockResolvedValue([]); // Default to empty cloud
-		mockOperationsQueueDbAllDocs.mockReset().mockResolvedValue({ rows: [] }); // Default to empty queue
-		mockOptimisticRemove.mockReset(); // Reset action mock
+
+		// Reset mocks
+		mockUseArticleSyncReturn.mockReturnValue({
+			articles: [],
+			isLoading: true,
+			isRefreshing: false,
+			error: null,
+			syncStatus: "idle",
+			refreshArticles: mockRefreshArticles.mockResolvedValue([]),
+			retryLoading: mockRetryLoading,
+		});
+		mockOptimisticRemove.mockReset();
+
+		// Seed Dexie with tags before each test
+		// NOTE: Assumes fake-indexeddb clears between tests or we clear manually
+		await db.tags.clear(); // Clear previous tags
+		// Explicitly construct plain objects matching DexieTag structure
+		const plainTags = hoistedMockTags.map((tag) => ({
+			id: tag._id, // Map _id to id
+			name: tag.name,
+			color: tag.color,
+			createdAt: tag.createdAt,
+			// userId: tag.userId // Explicitly include if defined and needed, otherwise omit
+		}));
+		await db.tags.bulkAdd(plainTags); // Use plain objects
+		// No need to mockGetAllTags anymore as context uses db.tags.toArray()
 	});
 
 	it("should provide initial loading state and then load articles", async () => {
-		mockGetAllArticles.mockResolvedValueOnce([mockArticle1, mockArticle2]);
-		await act(async () => {
-			render(
-				<ArticleProvider>
-					<ArticleConsumer />
-				</ArticleProvider>,
-			);
-		});
-		await waitFor(
-			() => {
-				expect(screen.getByTestId("loading-state")).toHaveTextContent("false");
-			},
-			{ timeout: 3000 },
+		// 1. Mock initial loading state (done by beforeEach)
+		const initialRender = render(
+			<ArticleProvider>
+				<ArticleConsumer />
+			</ArticleProvider>,
 		);
+		expect(screen.getByTestId("loading-state")).toHaveTextContent("true");
+		expect(screen.getByTestId("raw-count")).toHaveTextContent("0");
+
+		// 2. Mock the loaded state *after* initial render
+		mockUseArticleSyncReturn.mockReturnValue({
+			articles: [mockArticle1, mockArticle2], // Provide mock articles
+			isLoading: false, // Set loading to false
+			isRefreshing: false,
+			error: null,
+			syncStatus: "success",
+			refreshArticles: mockRefreshArticles.mockResolvedValue([
+				mockArticle1,
+				mockArticle2,
+			]),
+			retryLoading: mockRetryLoading,
+		});
+
+		// 3. Re-render or trigger update (React Testing Library handles this with state updates)
+		// We need to wait for the state update triggered by the mock change
+		await waitFor(() => {
+			expect(screen.getByTestId("loading-state")).toHaveTextContent("false");
+		});
+
+		// 4. Assert final state
 		expect(screen.getByTestId("raw-count")).toHaveTextContent("2");
 		expect(screen.getByTestId("processed-count")).toHaveTextContent("2");
 		expect(screen.getByText("Article A")).toBeInTheDocument();
 		expect(screen.getByText("Article B")).toBeInTheDocument();
 	});
-
 	it("should provide fetched tags", async () => {
-		await act(async () => {
-			render(
-				<ArticleProvider>
-					<ArticleConsumer />
-				</ArticleProvider>,
-			);
+		// Initial render (loading state from beforeEach)
+		render(
+			<ArticleProvider>
+				<ArticleConsumer />
+			</ArticleProvider>,
+		);
+		expect(screen.getByTestId("tag-count")).toHaveTextContent("0"); // Initially 0
+
+		// Set mock to non-loading state (tags are fetched independently by the context)
+		mockUseArticleSyncReturn.mockReturnValue({
+			articles: [], // Doesn't matter for this test
+			isLoading: false,
+			isRefreshing: false,
+			error: null,
+			syncStatus: "success",
+			refreshArticles: mockRefreshArticles.mockResolvedValue([]),
+			retryLoading: mockRetryLoading,
 		});
+
+		// Wait for the context to fetch tags and update state
 		await waitFor(
 			() => {
+				// Check loading state from the hook mock
 				expect(screen.getByTestId("loading-state")).toHaveTextContent("false");
+				// Check tag count (relies on mockGetAllTags set in beforeEach)
 				expect(screen.getByTestId("tag-count")).toHaveTextContent(
 					hoistedMockTags.length.toString(),
 				);
 			},
-			{ timeout: 3000 },
+			{ timeout: 3000 }, // Increased timeout slightly if tag fetching takes time
 		);
 	});
 
-	// Reverted this test structure to use render + button click
 	it("should reflect refreshing state during refresh", async () => {
-		// Initial load setup
-		mockGetAllArticles.mockResolvedValueOnce([mockArticle1]);
-		mockFetchCloudItems.mockResolvedValueOnce([]);
+		const initialArticles = [mockArticle1];
+		const finalArticles = [mockArticle1, mockArticle2];
 
-		await act(async () => {
-			render(
-				<ArticleProvider>
-					<ArticleConsumer />
-				</ArticleProvider>,
-			);
+		// Define state snapshots
+		const stateInitial = {
+			articles: initialArticles,
+			isLoading: false,
+			isRefreshing: false,
+			error: null,
+			syncStatus: "success",
+			refreshArticles: mockRefreshArticles,
+			retryLoading: mockRetryLoading,
+		};
+		const stateRefreshing = {
+			articles: initialArticles,
+			isLoading: false,
+			isRefreshing: true,
+			error: null,
+			syncStatus: "syncing",
+			refreshArticles: mockRefreshArticles,
+			retryLoading: mockRetryLoading,
+		};
+		const stateFinal = {
+			articles: finalArticles,
+			isLoading: false,
+			isRefreshing: false,
+			error: null,
+			syncStatus: "success",
+			refreshArticles: mockRefreshArticles,
+			retryLoading: mockRetryLoading,
+		};
+
+		// Variable to track current state for the mock to return
+		let currentSyncState = stateInitial;
+		// Use mockImplementation to dynamically return the current state
+		mockUseArticleSyncReturn.mockImplementation(() => currentSyncState);
+
+		// Mock refresh implementation ONLY updates the tracker variable
+		// Reset mock implementation before setting it for this test
+		mockRefreshArticles.mockReset();
+		mockRefreshArticles.mockImplementation(async () => {
+			// Wrap state updates in act, despite the warning, as it's best practice
+			await act(async () => {
+				currentSyncState = stateRefreshing;
+				await new Promise((res) => setTimeout(res, 0)); // Allow state to flush
+			});
+			// Simulate async work
+			await new Promise((res) => setTimeout(res, 50));
+			// Update tracker to final state, wrapped in act
+			await act(async () => {
+				currentSyncState = stateFinal;
+				await new Promise((res) => setTimeout(res, 0)); // Allow state to flush
+			});
+			return finalArticles; // Return value of the refresh fn
 		});
 
-		// Wait for initial load
-		await waitFor(() => {
-			expect(screen.getByTestId("loading-state")).toHaveTextContent("false");
-			expect(screen.getByTestId("processed-count")).toHaveTextContent("1");
-		});
+		// Initial Render
+		render(
+			<ArticleProvider>
+				<ArticleConsumer />
+			</ArticleProvider>,
+		);
+		await waitFor(() =>
+			expect(screen.getByTestId("processed-count")).toHaveTextContent("1"),
+		);
 		expect(screen.getByTestId("refreshing-state")).toHaveTextContent("false");
 
-		// Setup mocks for the *refresh* call
-		// Reconciliation fetch (includes deleted)
-		mockGetAllArticles.mockResolvedValueOnce([mockArticle1]);
-		// Cloud fetch (returns new article)
-		mockFetchCloudItems.mockResolvedValueOnce([mockArticle2]);
-		// Final UI fetch (non-deleted)
-		mockGetAllArticles.mockResolvedValueOnce([mockArticle1, mockArticle2]);
-
-		// Find and click the Refresh button inside the consumer
+		// Trigger Refresh by clicking button
 		const refreshButton = screen.getByRole("button", { name: /Refresh/i });
-		await act(async () => {
-			refreshButton.click();
-			// Wait for refreshing to start immediately after click
-			await waitFor(() => {
-				expect(screen.getByTestId("refreshing-state")).toHaveTextContent(
-					"true",
-				);
-			});
-		});
+		// No act needed here IF state updates are correctly wrapped in act within the mock implementation
+		refreshButton.click();
 
-		// Wait for refreshing to complete and state to update
+		// Assert refreshing state (waitFor detects change triggered by mock implementation)
+		await waitFor(() =>
+			expect(screen.getByTestId("refreshing-state")).toHaveTextContent("true"),
+		);
+
+		// Assert final state (waitFor detects change triggered by mock implementation)
 		await waitFor(
 			() => {
 				expect(screen.getByTestId("refreshing-state")).toHaveTextContent(
@@ -308,23 +379,32 @@ describe("ArticleContext", () => {
 				);
 				expect(screen.getByTestId("processed-count")).toHaveTextContent("2");
 			},
-			{ timeout: 5000 },
-		); // Longer timeout for refresh
+			{ timeout: 3000 },
+		); // Keep timeout just in case
 	});
 
 	it("should reflect error state from sync", async () => {
-		mockGetAllArticles.mockResolvedValueOnce([]);
-		const testError = new Error("Sync Failed");
-		mockFetchCloudItems.mockRejectedValueOnce(testError);
+		// 1. Mock initial loading state (done by beforeEach)
+		render(
+			<ArticleProvider>
+				<ArticleConsumer />
+			</ArticleProvider>,
+		);
+		expect(screen.getByTestId("loading-state")).toHaveTextContent("true");
 
-		await act(async () => {
-			render(
-				<ArticleProvider>
-					<ArticleConsumer />
-				</ArticleProvider>,
-			);
+		// 2. Mock the error state *after* initial render
+		const testError = new Error("Sync Failed");
+		mockUseArticleSyncReturn.mockReturnValue({
+			articles: [], // Empty articles on error
+			isLoading: false, // Loading finished
+			isRefreshing: false,
+			error: testError, // Provide the error object
+			syncStatus: "offline", // Or appropriate error status
+			refreshArticles: mockRefreshArticles,
+			retryLoading: mockRetryLoading,
 		});
 
+		// 3. Wait for the state update triggered by the mock change
 		await waitFor(
 			() => {
 				expect(screen.getByTestId("loading-state")).toHaveTextContent("false");
@@ -337,41 +417,55 @@ describe("ArticleContext", () => {
 	});
 
 	it("should optimistically hide removed articles from processedArticles", async () => {
-		mockGetAllArticles.mockResolvedValueOnce([
-			mockArticle1,
-			mockArticle2,
-			mockArticle3,
-		]);
-		mockFetchCloudItems.mockResolvedValueOnce([]); // No cloud changes
+		// 1. Initial Load State with 3 articles
+		const initialState = {
+			articles: [mockArticle1, mockArticle2, mockArticle3],
+			isLoading: false,
+			isRefreshing: false,
+			error: null,
+			syncStatus: "success",
+			refreshArticles: mockRefreshArticles,
+			retryLoading: mockRetryLoading,
+		};
+		mockUseArticleSyncReturn.mockReturnValue(initialState);
 
-		await act(async () => {
-			render(
-				<ArticleProvider>
-					<ArticleConsumer />
-				</ArticleProvider>,
-			);
-		});
+		render(
+			<ArticleProvider>
+				<ArticleConsumer />
+			</ArticleProvider>,
+		);
 
+		// Wait for initial load and assert state
 		await waitFor(() => {
 			expect(screen.getByTestId("loading-state")).toHaveTextContent("false");
 			expect(screen.getByTestId("processed-count")).toHaveTextContent("3");
 		});
+		expect(screen.getByTestId("raw-count")).toHaveTextContent("3");
 		expect(screen.getByText("Article A")).toBeInTheDocument();
 
+		// 2. Trigger Optimistic Removal
 		const removeButton = screen.getByRole("button", { name: /Remove A/i });
-		await act(async () => {
-			removeButton.click();
-		});
+		// Click the button directly, the state update is synchronous
+		removeButton.click();
 
+		// 3. Assert mock call immediately after act completes
 		expect(mockOptimisticRemove).toHaveBeenCalledWith("1");
 		expect(mockOptimisticRemove).toHaveBeenCalledTimes(1);
-		// With the real hook, the hiding is internal state, check the *result*
-		// The `processedArticles` count *should* decrease visually.
-		await waitFor(() => {
-			expect(screen.getByTestId("processed-count")).toHaveTextContent("2");
-		});
-		expect(screen.queryByText("Article A")).not.toBeInTheDocument();
+
+		// 4. Assert final state using waitFor to catch the result of the state update
+		// The state update from setHidingArticleIds should cause a re-render and update processedArticles
+		await waitFor(
+			() => {
+				expect(screen.getByTestId("processed-count")).toHaveTextContent("2");
+				expect(screen.queryByText("Article A")).not.toBeInTheDocument();
+			},
+			{ timeout: 2000 }, // Keep timeout just in case
+		);
+
+		// Check other elements are still there
 		expect(screen.getByText("Article B")).toBeInTheDocument();
-		expect(screen.getByTestId("raw-count")).toHaveTextContent("3"); // Raw count from hook state doesn't change yet
+		expect(screen.getByText("Article C")).toBeInTheDocument();
+		// Raw count remains the same as the underlying hook mock didn't change
+		expect(screen.getByTestId("raw-count")).toHaveTextContent("3");
 	});
 });

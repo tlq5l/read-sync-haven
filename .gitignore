@@ -41,3 +41,5 @@ bondwise-worker/.dev.vars
 
 # Wrangler build artifacts
 bondwise-worker/.wrangler/
+
+.vercel
