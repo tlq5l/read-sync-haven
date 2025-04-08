@@ -91,7 +91,6 @@ vi.mock("@/components/ui/tabs", () => ({
 	),
 }));
 
-
 // --- Test Suite ---
 
 describe("SettingsPage", () => {
@@ -158,9 +157,9 @@ describe("SettingsPage", () => {
 		render(
 			<BrowserRouter>
 				<ThemeProvider>
-						{" "}
-						{/* Wrap with i18n Provider */}
-						<SettingsPage />
+					{" "}
+					{/* Wrap with i18n Provider */}
+					<SettingsPage />
 				</ThemeProvider>
 			</BrowserRouter>,
 		);

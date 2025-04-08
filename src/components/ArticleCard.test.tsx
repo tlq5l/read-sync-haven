@@ -40,15 +40,14 @@ vi.mock("@/hooks/use-synchronized-animation", () => ({
 	}),
 }));
 
-
 describe("ArticleCard", () => {
 	// Helper function to render the component with an article and i18n provider
 	const renderCard = (article: Article) => {
 		render(
 			<BrowserRouter>
-					{" "}
-					{/* Wrap with provider */}
-					<ArticleCard article={article} />
+				{" "}
+				{/* Wrap with provider */}
+				<ArticleCard article={article} />
 			</BrowserRouter>,
 		);
 	};

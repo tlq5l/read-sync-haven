@@ -1,9 +1,10 @@
-import path from "node:path";
+/// <reference types="vitest" />
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import react from "@vitejs/plugin-react-swc";
 import { GoogleAuth } from "google-auth-library";
-import { type Plugin, defineConfig, loadEnv } from "vite";
+import { type Plugin, defineConfig, loadEnv } from "vite"; // Use vite's defineConfig
 import { nodePolyfills } from "vite-plugin-node-polyfills";
+import tsconfigPaths from "vite-tsconfig-paths";
 
 // // Custom plugin to provide GCF token during development
 // function gcfDevTokenProvider(): Plugin {
@@ -89,6 +90,7 @@ export default defineConfig(({ mode }) => ({
 	plugins: [
 		// Add the custom plugin for development only - Placed first
 		// mode === "development" ? gcfDevTokenProvider() : null, // Use mode variable
+		tsconfigPaths(), // Add the plugin
 		react({
 			jsxImportSource: "react",
 			// jsxRuntime: "classic", // Removed invalid option
@@ -112,13 +114,17 @@ export default defineConfig(({ mode }) => ({
 		}),
 	],
 	resolve: {
-		alias: {
-			"@": path.resolve(__dirname, "./src"),
-		},
+		// alias: { // Remove manual alias
+		// 	"@": path.resolve(__dirname, "./src"),
+		// },
 		dedupe: ["react", "react-dom"], // Ensure single instance
 	},
 	define: {
+		// Definitions from vitest.config.ts
 		global: "globalThis",
+		"import.meta.env.VITEST": "true",
+		"import.meta.env.DEV": "false",
+		// Original Vite defines (if any were here, they'd merge or override)
 	},
 	build: {
 		target: "es2020",
@@ -174,4 +180,20 @@ export default defineConfig(({ mode }) => ({
 			},
 		},
 	},
-})); // Close the function call
+	// Configuration for Vitest
+	test: {
+		globals: true,
+		environment: "jsdom",
+		setupFiles: "./src/setupTests.ts",
+		environmentOptions: {
+			jsdom: {
+				// Add any jsdom-specific options here
+			},
+		},
+		// Optional: Configure coverage
+		// coverage: {
+		//   provider: 'v8',
+		//   reporter: ['text', 'json', 'html'],
+		// },
+	},
+}));

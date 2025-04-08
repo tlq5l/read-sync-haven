@@ -1,7 +1,9 @@
+import { Buffer } from "node:buffer"; // Import Buffer for pdfParser
 import { useToast } from "@/hooks/use-toast";
 import { type DexieArticle, db } from "@/services/db/dexie"; // Import Dexie db instance
 import type { Article } from "@/services/db/types"; // Import original Article type
 import { parseArticle } from "@/services/parser";
+import { parsePdf } from "@/services/pdfParser"; // Import the correct PDF parser
 import { useAuth } from "@clerk/clerk-react"; // Keep for userId association
 import { useCallback } from "react";
 import { v4 as uuidv4 } from "uuid"; // Import uuid for generating IDs
@@ -104,47 +106,51 @@ async function processEpubFile(
 	};
 }
 
-// Helper function to process PDF files (Modified to return Dexie compatible structure)
+// Helper function to process PDF files using pdfParser service
 async function processPdfFile(
 	file: File,
 	userId: string,
 ): Promise<DexieArticle> {
 	// Return DexieArticle directly
-	const pdfModule = await import("@/services/pdf");
-	if (!pdfModule.isValidPdf(file)) {
-		throw new Error("Invalid PDF file.");
+	// Removed import of old pdf service
+
+	// Check file type explicitly (optional, but good practice)
+	if (
+		!file.name.toLowerCase().endsWith(".pdf") &&
+		file.type !== "application/pdf"
+	) {
+		throw new Error("Invalid file type. Expected PDF.");
 	}
-	const fileBuffer = await file.arrayBuffer();
-	const metadata = await pdfModule.extractPdfMetadata(file, fileBuffer);
-	const base64Content = pdfModule.arrayBufferToBase64(fileBuffer);
-	const estimatedReadingTime = await pdfModule.getEstimatedReadingTime(
-		fileBuffer.byteLength,
-		metadata.pageCount,
-	);
+
+	const arrayBuffer = await file.arrayBuffer();
+	const buffer = Buffer.from(arrayBuffer); // Convert ArrayBuffer to Buffer
+	const extractedText = await parsePdf(buffer); // Use the imported parsePdf
+
+	// Removed metadata extraction and base64 conversion
+	// Removed old estimation logic relying on pageCount
+
 	const id = uuidv4(); // Generate ID for Dexie
 
 	return {
 		id, // Use generated ID
 		userId,
-		title: metadata.title || file.name.replace(/\.pdf$/i, ""),
+		title: file.name.replace(/\.pdf$/i, ""), // Use filename as title
 		type: "pdf",
-		content: base64Content, // Store base64 content
+		content: extractedText, // Store extracted text
 		url: `local-pdf://${file.name}`,
 		savedAt: Date.now(),
 		status: "inbox",
 		isRead: false,
 		favorite: false,
 		tags: [],
-		author: metadata.author,
-		publishedDate: metadata.publishedDate,
-		excerpt: metadata.description || "PDF file",
-		pageCount: metadata.pageCount,
+		// Removed fields derived from old metadata: author, publishedDate, excerpt, pageCount
 		readingProgress: 0,
 		siteName: "PDF Document",
-		estimatedReadTime: estimatedReadingTime,
+		estimatedReadTime: undefined, // Remove estimation or set default, as pageCount is unavailable
 		fileName: file.name,
-		fileSize: fileBuffer.byteLength,
-		// Remove PouchDB specific fields like _rev, _deleted
+		fileSize: arrayBuffer.byteLength, // Use original ArrayBuffer for size
+		// Removed fileData (base64)
+		excerpt: "PDF file", // Add default excerpt as it's required
 	};
 }
 
