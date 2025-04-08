@@ -1,5 +1,5 @@
 {
-	"name": "bondwise-extension",
+	"name": "thinkara-extension",
 	"module": "index.ts",
 	"type": "module",
 	"private": true,

@@ -1,4 +1,4 @@
-# bondwise-extension
+# thinkara-extension
 
 To install dependencies:
 
