@@ -27,7 +27,7 @@ import { supportedLngs } from "@/lib/i18n"; // Added supportedLngs import
 // 	type Highlight,
 // 	type Tag,
 // } from "@/services/db/types";
-import { db } from "@/services/db/dexie"; // Import dexie instance
+import { db, removeDuplicateArticles } from "@/services/db/dexie"; // Import dexie instance and removeDuplicateArticles
 import { UserProfile } from "@clerk/clerk-react"; // Import Clerk's UserProfile
 import { dark } from "@clerk/themes"; // Import Clerk dark theme
 import {
@@ -126,15 +126,33 @@ export default function SettingsPage() {
 	const handleCleanDuplicates = async () => {
 		setIsCleaningDuplicates(true);
 		try {
-			// await removeDuplicateLocalArticles(); // Comment out call as function is disabled
-			toast({
-				title: "Cleanup Skipped",
-				description: "Duplicate removal is currently disabled.",
-			});
-			// Toast messages are handled within the hook
+			const removedCount = await removeDuplicateArticles();
+
+			if (removedCount > 0) {
+				toast({
+					title: "Cleanup Complete",
+					description: `Removed ${removedCount} duplicate articles.`,
+				});
+			} else if (removedCount === 0) {
+				toast({
+					title: "No Duplicates Found",
+					description: "No duplicate articles needed removal.",
+				});
+			} else {
+				// removedCount === -1 indicates an error occurred within the function
+				throw new Error(
+					"Duplicate removal function encountered an internal error.",
+				);
+			}
 		} catch (error) {
+			console.error("Error cleaning duplicates:", error);
+			toast({
+				title: "Cleanup Failed",
+				description: "An error occurred while removing duplicates.",
+				variant: "destructive",
+			});
 			// Error toast is also handled within the hook, but log here just in case
-			console.error("Error triggering duplicate cleanup from settings:", error);
+			// Error already logged above or within removeDuplicateArticles
 		} finally {
 			setIsCleaningDuplicates(false);
 		}

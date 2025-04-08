@@ -9,6 +9,7 @@ import type { Article, ArticleCategory, Highlight, Tag } from "./types"; // Impo
 export interface DexieArticle
 	extends Omit<Article, "_id" | "_rev" | "_deleted" | "version"> {
 	id: string; // Primary key for Dexie
+	url: string; // Explicitly add URL as it's used for duplicate check
 	// Add compound indexes or multi-entry indexes as needed
 	// Example: *tags for multi-entry index on the tags array
 	// Example: [userId+savedAt] for compound index
@@ -22,6 +23,7 @@ export interface DexieTag extends Omit<Tag, "_id" | "_rev"> {
 	id: string; // Primary key for Dexie
 }
 // Define DexieArticle class for mapping (optional but good practice)
+// Dexie pattern requires class implementing matching interface
 export class DexieArticle implements DexieArticle {
 	constructor(
 		public id: string,
@@ -100,6 +102,7 @@ export class ReadSyncDexie extends Dexie {
 		this.version(1).stores({
 			articles: `
         id,
+        url,
         userId,
         savedAt,
         isRead,
@@ -115,8 +118,9 @@ export class ReadSyncDexie extends Dexie {
         [userId+favorite],
         [userId+type],
         [userId+category],
-        [userId+siteName]
-      `, // 'id' is primary key, others are indexes. '*tags' for multi-entry array index. '[userId+savedAt]' etc. for compound indexes.
+        [userId+siteName],
+        [userId+url]
+      `, // 'id' is primary key, others are indexes. Added 'url' and compound index including it.
 			highlights: `
         id,
         articleId,
@@ -173,4 +177,84 @@ export async function initializeDexieDatabase(): Promise<void> {
 		});
 
 	return initializationPromise;
+}
+
+// --- Duplicate Removal ---
+
+/**
+ * Removes duplicate articles based on their 'url', keeping only the one saved earliest.
+ * @returns {Promise<number>} The number of duplicate articles removed.
+ */
+export async function removeDuplicateArticles(): Promise<number> {
+	console.log("Starting duplicate article removal process...");
+	try {
+		// Ensure DB is initialized before proceeding
+		await initializeDexieDatabase();
+
+		const allArticles = await db.articles.toArray();
+		console.log(`Found ${allArticles.length} total articles.`);
+
+		if (allArticles.length < 2) {
+			console.log("Not enough articles to have duplicates.");
+			return 0;
+		}
+
+		const articlesByUrl = new Map<string, DexieArticle[]>();
+
+		// Group articles by URL
+		for (const article of allArticles) {
+			// Ensure URL exists and is a non-empty string before grouping
+			if (
+				article.url &&
+				typeof article.url === "string" &&
+				article.url.trim() !== ""
+			) {
+				const group = articlesByUrl.get(article.url) || [];
+				group.push(article);
+				articlesByUrl.set(article.url, group);
+			} else {
+				// Log articles with invalid/missing URLs but don't stop the process
+				console.warn(
+					`Article with ID ${article.id} has missing or invalid URL, skipping.`,
+				);
+			}
+		}
+
+		const duplicateIds: ArticleId[] = [];
+
+		// Identify duplicates within each group
+		for (const [url, articles] of articlesByUrl.entries()) {
+			if (articles.length > 1) {
+				// Sort by savedAt (earliest first)
+				articles.sort((a, b) => a.savedAt - b.savedAt);
+
+				// The first article is the one to keep, the rest are duplicates
+				const idsToRemove = articles.slice(1).map((article) => article.id);
+				if (idsToRemove.length > 0) {
+					duplicateIds.push(...idsToRemove);
+					console.log(
+						`Identified ${idsToRemove.length} duplicates for URL: ${url}`,
+					);
+				}
+			}
+		}
+
+		if (duplicateIds.length > 0) {
+			console.log(
+				`Attempting to delete ${duplicateIds.length} duplicate articles...`,
+			);
+			await db.articles.bulkDelete(duplicateIds);
+			console.log(
+				`Successfully deleted ${duplicateIds.length} duplicate articles.`,
+			);
+			return duplicateIds.length;
+		}
+
+		console.log("No duplicate articles found to remove.");
+		return 0;
+	} catch (error) {
+		console.error("Error removing duplicate articles:", error);
+		// Don't re-throw here, let the UI handle the error reporting if needed
+		return -1; // Indicate an error occurred
+	}
 }
