@@ -9,33 +9,66 @@ import { useKeyboard } from "@/context/KeyboardContext"; // Import useKeyboard
 // import { useTheme } from "@/context/ThemeContext"; // Removed as unused after theme toggle moved
 import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
 import { cn } from "@/lib/utils";
+import type { ArticleCategory } from "@/services/db/types"; // Import ArticleCategory - Updated path
 import { useAuth } from "@clerk/clerk-react"; // Removed unused useUser and UserButton
 import {
+	BookOpen, // Icon for Books
+	ChevronDown, // Icon for Library open
+	ChevronRight, // Icon for Library closed
+	// ChevronLeft, // Removed old icon
+	// ChevronRight, // Removed old icon
+	// Clock, // Removed unused icon
+	FileText, // Icon for PDFs
 	Home,
-	Library, // Keep Library icon
+	Library,
 	LogIn,
-	LogOut, // Keep LogOut icon
+	// MenuIcon, // Removed old icon
+	// Moon, // Removed as unused after theme toggle moved
+	Newspaper, // Icon for Articles
+	// PanelLeftClose, // Removed old icon
+	// PanelLeftOpen, // Removed old icon
 	Plus,
 	Settings,
+	Shapes, // Icon for Other
 	SidebarClose,
 	SidebarOpen,
+	// Sun,
+	Video,
 } from "lucide-react";
-// Removed LucideIcon type import
-// Removed useState import, removed unused React
+import React, { useState } from "react"; // Keep useState for isLibraryOpen
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export default function Sidebar() {
 	// const [collapsed, setCollapsed] = useState(false); // Replaced with context state
 	const { isSidebarCollapsed: collapsed, toggleSidebar } = useKeyboard(); // Use context state and toggle
+	const [isLibraryOpen, setIsLibraryOpen] = useState(true);
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { setCurrentView, setSelectedCategory } = useArticles(); // Removed unused filters
-	// const currentCategory = filters.category; // Removed unused variable declaration
+	const { setCurrentView, setSelectedCategory, filters } = useArticles();
+	const currentCategory = filters.category; // Extract current category
 	// const { theme, setTheme } = useTheme(); // Removed as unused after theme toggle moved
 	const { synchronizeAnimations } = useAnimation();
-	const { isSignedIn, signOut } = useAuth();
+	const { isSignedIn } = useAuth();
 	// const { user } = useUser(); // Removed as unused
 	// const [isDarkMode, setIsDarkMode] = useState(false); // Removed: Using Tailwind dark mode variants (Corrected)
+
+	// Define categories for the dropdown (excluding "All")
+	const categories: ArticleCategory[] = [
+		"article",
+		"book",
+		"pdf",
+		"video",
+		"other",
+	];
+
+	// Map categories to icons
+	const categoryIcons: Record<ArticleCategory, React.ElementType> = {
+		article: Newspaper,
+		book: BookOpen,
+		pdf: FileText,
+		video: Video,
+		other: Shapes,
+	};
 
 	// Create synchronized animations for the sidebar
 	const sidebarAnimation = useSynchronizedAnimation({
@@ -46,8 +79,9 @@ export default function Sidebar() {
 
 	// useEffect(() => { ... }, [theme]); // Removed: Tailwind handles dark mode (Corrected)
 
-	// Updated isActive: removed category check as Library button now always clears filter
 	const isActive = (path: string) => location.pathname === path;
+	// const isViewActive = (view: "all" | "unread" | "favorites") =>
+	// 	currentView === view; // Removed unused function
 
 	// const toggleTheme = () => { // Removed as unused after theme toggle moved
 	// 	setTheme(theme === "dark" ? "light" : "dark");
@@ -68,7 +102,6 @@ export default function Sidebar() {
 	};
 
 	// const styles = { ... }; // Removed: Using Tailwind classes (Corrected)
-	// Removed categories array and categoryIcons map
 
 	return (
 		<div
@@ -90,7 +123,7 @@ export default function Sidebar() {
 						className="text-xl font-bold transition-opacity duration-200 text-gray-900 dark:text-white" // Corrected: Single className with merged styles
 						// style={styles.header} // Style prop correctly removed
 					>
-						Thinkara
+						Read Sync Haven
 					</h1>
 				)}
 				<div
@@ -149,30 +182,92 @@ export default function Sidebar() {
 					</TransitionItem>
 
 					<TransitionItem showFrom="left" className="w-full">
-						{/* Library Button with Dropdown */}
-						<Button
-							variant="ghost"
-							className={cn(
-								"w-full flex items-center gap-3 py-2 transition-all duration-200",
-								collapsed ? "justify-center" : "justify-start",
-								"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
-								// Updated isActive check for simple Library button
-								isActive("/library") &&
-									"bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100",
-							)}
-							// Updated onClick to navigate and reset category filter
-							onClick={() => {
-								setSelectedCategory(null); // Reset filter
-								navigate("/library"); // Navigate
-							}}
-						>
-							<Library size={20} />
+						{/* Library Button */}
+						{/* Collapsible Library Trigger - Restructured to separate chevron and main button */}
+						<div className="flex items-center w-full">
+							{/* Chevron Button - Only for toggling dropdown */}
 							{!collapsed && (
-								<span className="transition-opacity duration-200">Library</span>
+								<Button
+									variant="ghost"
+									size="sm"
+									data-testid="library-expander-button" // Add test ID
+									className="p-0 h-8 w-8 mr-1"
+									onClick={(e) => {
+										e.stopPropagation(); // Prevent event bubbling
+										setIsLibraryOpen(!isLibraryOpen);
+									}}
+								>
+									{isLibraryOpen ? (
+										<ChevronDown size={16} />
+									) : (
+										<ChevronRight size={16} />
+									)}
+								</Button>
 							)}
-						</Button>
-
-						{/* Removed Collapsible Category List */}
+							{/* Main Library Button - Only for navigation */}
+							<Button
+								variant="ghost"
+								className={cn(
+									"flex items-center gap-3 py-2 transition-all duration-200", // Original cn()
+									collapsed
+										? "justify-center w-full"
+										: "justify-start flex-grow", // Adjusted width
+									"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100", // Merged base styles
+								)}
+								onClick={() => {
+									setSelectedCategory(null); // Clear category filter
+									navigate("/inbox"); // Navigate to the main library view
+								}}
+								// style={styles.link} // Style prop correctly removed
+							>
+								<Library size={20} />{" "}
+								{!collapsed && (
+									<span className="transition-opacity duration-200 font-medium">
+										Library
+									</span>
+								)}
+							</Button>
+						</div>
+						{/* Collapsible Category List - Render directly below trigger if open */}
+						{isLibraryOpen && !collapsed && (
+							<div className="w-full pl-6 mt-1 space-y-1">
+								{categories.map((cat) => {
+									// Handle PDF capitalization specifically
+									const label =
+										cat === "pdf"
+											? "PDFs"
+											: `${cat.charAt(0).toUpperCase() + cat.slice(1)}s`;
+									const isActiveCategory = currentCategory === cat;
+									return (
+										<Button
+											key={cat ?? "all"}
+											variant="ghost"
+											size="sm"
+											className={cn(
+												// Corrected: Single className with merged styles
+												"w-full flex items-center justify-start gap-2 py-1 h-8 text-sm", // Original classes
+												"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100", // Merged base styles
+												isActiveCategory &&
+													"bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100", // Merged active styles
+											)}
+											onClick={() => {
+												setSelectedCategory(cat);
+												// Optional: navigate to a base view if needed
+												// navigate("/inbox");
+											}}
+											// style={isActiveCategory ? styles.activeLink : styles.link} // Style prop correctly removed
+										>
+											{/* Render the icon */}
+											{React.createElement(categoryIcons[cat], {
+												size: 16,
+												className: "mr-2",
+											})}
+											<span>{label}</span>
+										</Button>
+									);
+								})}
+							</div>
+						)}
 					</TransitionItem>
 
 					{/* Removed Unread and Favorites buttons - handled by TopBar */}
@@ -221,28 +316,6 @@ export default function Sidebar() {
 								)}
 							</Link>
 						</Button>
-						{/* Sign Out Button (Conditional) */}
-						{isSignedIn && (
-							<Button
-								variant="ghost"
-								className={cn(
-									"w-full flex items-center gap-3 py-2 transition-all duration-200",
-									collapsed ? "justify-center" : "justify-start",
-									"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
-								)}
-								onClick={async () => {
-									// Use Clerk's recommended pattern: pass redirect callback to signOut
-									await signOut(() => navigate("/sign-in"));
-								}}
-							>
-								<LogOut size={20} />
-								{!collapsed && (
-									<span className="transition-opacity duration-200">
-										Sign Out
-									</span>
-								)}
-							</Button>
-						)}
 						{/* Theme Toggle Button - Removed, moved to Settings/Appearance */}
 						{/* Sign In Link (Conditional) */}
 						{!isSignedIn && (
