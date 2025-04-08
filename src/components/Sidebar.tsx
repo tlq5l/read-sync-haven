@@ -15,7 +15,9 @@ import {
 	// ChevronRight, // Removed old icon
 	// Clock, // Removed unused icon
 	Home,
+	Library, // Added Library icon
 	LogIn,
+	LogOut, // Added LogOut icon
 	// MenuIcon, // Removed old icon
 	// Moon, // Removed as unused after theme toggle moved
 	// PanelLeftClose, // Removed old icon
@@ -34,11 +36,11 @@ export default function Sidebar() {
 	const { isSidebarCollapsed: collapsed, toggleSidebar } = useKeyboard(); // Use context state and toggle
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { setCurrentView } = useArticles(); // Removed unused setSelectedCategory and filters
-	// const currentCategory = filters.category; // Removed unused currentCategory
+	const { setCurrentView, setSelectedCategory } = useArticles(); // Restore setSelectedCategory, removed unused filters
+	// const currentCategory = filters.category; // Removed unused variable declaration
 	// const { theme, setTheme } = useTheme(); // Removed as unused after theme toggle moved
 	const { synchronizeAnimations } = useAnimation();
-	const { isSignedIn } = useAuth();
+	const { isSignedIn, signOut } = useAuth();
 	// const { user } = useUser(); // Removed as unused
 	// const [isDarkMode, setIsDarkMode] = useState(false); // Removed: Using Tailwind dark mode variants (Corrected)
 
@@ -153,6 +155,30 @@ export default function Sidebar() {
 						</Button>
 					</TransitionItem>
 
+					<TransitionItem showFrom="left" className="w-full">
+						{/* Library Button */}
+						<Button
+							variant="ghost"
+							className={cn(
+								"w-full flex items-center gap-3 py-2 transition-all duration-200",
+								collapsed ? "justify-center" : "justify-start",
+								"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+								isActive("/library") &&
+									"bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100",
+							)}
+							onClick={() => {
+								setSelectedCategory(null); // Reset category when navigating to base library
+								setCurrentView("all"); // Reset view when going to library (consistent with Home)
+								navigate("/library");
+							}}
+						>
+							<Library size={20} />
+							{!collapsed && (
+								<span className="transition-opacity duration-200">Library</span>
+							)}
+						</Button>
+					</TransitionItem>
+
 					{/* Removed Unread and Favorites buttons - handled by TopBar */}
 				</TransitionGroup>
 
@@ -199,6 +225,28 @@ export default function Sidebar() {
 								)}
 							</Link>
 						</Button>
+						{/* Sign Out Button (Conditional) */}
+						{isSignedIn && (
+							<Button
+								variant="ghost"
+								className={cn(
+									"w-full flex items-center gap-3 py-2 transition-all duration-200",
+									collapsed ? "justify-center" : "justify-start",
+									"text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+								)}
+								onClick={async () => {
+									// Use Clerk's recommended pattern: pass redirect callback to signOut
+									await signOut(() => navigate("/sign-in"));
+								}}
+							>
+								<LogOut size={20} />
+								{!collapsed && (
+									<span className="transition-opacity duration-200">
+										Sign Out
+									</span>
+								)}
+							</Button>
+						)}
 						{/* Theme Toggle Button - Removed, moved to Settings/Appearance */}
 						{/* Sign In Link (Conditional) */}
 						{!isSignedIn && (
