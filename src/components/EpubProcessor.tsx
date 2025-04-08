@@ -115,7 +115,8 @@ export default function EpubProcessor({
 				const opfPath = epubBook.packaging?.opfPath; // Keep for logging context
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				let basePath = (epubBook as any).path?.directory ?? ""; // Cast to any to access potential runtime property 'path'
-				if (!basePath && opfPath && typeof opfPath === "string") { // Fallback if path.directory is missing
+				if (!basePath && opfPath && typeof opfPath === "string") {
+					// Fallback if path.directory is missing
 					basePath = dirname(opfPath);
 				}
 				console.log(
@@ -145,13 +146,25 @@ export default function EpubProcessor({
 							return "";
 						}
 
-						// Construct the full path within the zip archive using the basePath
-						fullSectionPath =
-							basePath && basePath !== "."
-								? join(basePath, relativeSectionPath)
-								: relativeSectionPath;
-						fullSectionPath = normalize(fullSectionPath); // Normalize after potential join
+						// Trim leading/trailing slashes for consistent joining
+						const cleanBasePath = basePath.replace(/^\/+|\/+$/g, "");
+						const cleanRelativeSectionPath = relativeSectionPath.replace(
+							/^\/+|\/+$/g,
+							"",
+						);
 
+						// Construct the full path within the zip archive using the cleaned base path
+						// Ensure components are joined correctly, especially if basePath is empty
+						fullSectionPath = cleanBasePath
+							? join(cleanBasePath, cleanRelativeSectionPath)
+							: cleanRelativeSectionPath; // If no base path, use relative path directly
+
+						fullSectionPath = normalize(fullSectionPath); // Normalize the joined path
+
+						// Ensure no leading slash remains after normalization for zip lookup
+						if (fullSectionPath.startsWith("/")) {
+							fullSectionPath = fullSectionPath.substring(1);
+						}
 						// console.log( // Removed DEBUG log
 						// 	`\t[DEBUG] Section ${item.href}: Relative path = "${relativeSectionPath}", Base path = "${basePath}", Calculated Full path = "${fullSectionPath}"`
 						// );
@@ -192,7 +205,6 @@ export default function EpubProcessor({
 						// console.log(`\t[DEBUG] Section ${item.href}: HTML parsing completed.`); // Removed DEBUG log
 						// console.log(`\t[DEBUG] Section ${item.href}: Querying for image elements.`); // Removed DEBUG log
 						const imageElements = root.querySelectorAll("img");
-						// console.log(`\t[DEBUG] Section ${item.href}: Found ${imageElements.length} image elements. Starting image loop.`); // Removed DEBUG log
 
 						for (const img of imageElements) {
 							const originalSrc = img.getAttribute("src");
@@ -200,27 +212,19 @@ export default function EpubProcessor({
 							if (originalSrc && !originalSrc.startsWith("data:")) {
 								let imagePath: string | undefined; // Full path in zip
 								try {
-									// Determine if image src is absolute (from zip root) or relative (to OPF base path)
-									const isAbsolute = originalSrc.startsWith("/"); // Check if path starts from root
-									let relativeImagePath = originalSrc;
-									if (isAbsolute) {
-										relativeImagePath = relativeImagePath.substring(1); // Remove leading '/'
-										// If absolute path, treat it as relative to the zip root, potentially adjusted by basePath
-										imagePath =
-											basePath && basePath !== "."
-												? join(basePath, relativeImagePath)
-												: relativeImagePath;
-									} else {
-										// If relative path, join with the OPF base path
-										imagePath =
-											basePath && basePath !== "."
-												? join(basePath, relativeImagePath)
-												: relativeImagePath;
-									}
+									const relativeImagePath = originalSrc; // Changed let to const based on lint rule
+									// Resolve the image path relative to the *section's path*
+									const sectionDirectory = dirname(fullSectionPath);
+									imagePath = join(sectionDirectory, relativeImagePath);
+
 									imagePath = normalize(imagePath); // Normalize the final path
 
-									// console.log( // Removed DEBUG log
-									// 	`\t[Epub Img DEBUG] Orig src: "${originalSrc}", IsAbsolute: ${isAbsolute}, Base path: "${basePath}", Resolved zip path: "${imagePath}"`
+									// Ensure no leading slash remains after normalization for zip lookup
+									if (imagePath.startsWith("/")) {
+										imagePath = imagePath.substring(1);
+									}
+									// console.log( // DIAGNOSTIC LOG removed
+									// 	`\t[Epub Img DEBUG] Section: "${fullSectionPath}", SectionDir: "${sectionDirectory}", Orig src: "${originalSrc}", Resolved Img Path: "${imagePath}"`
 									// );
 
 									// Look up in zip using case-insensitive map
@@ -271,8 +275,7 @@ export default function EpubProcessor({
 								}
 							}
 						} // End image loop
-						// console.log(`\t[DEBUG] Section ${item.href}: Finished image loop.`); // Removed DEBUG log
-						console.log(`\t[DEBUG] Section ${item.href}: Finished image loop.`); // Log after image loop
+						// console.log(`\t[DEBUG] Section ${item.href}: Finished image loop.`); // Ensure commented out
 
 						// Return the modified HTML (prefer body content)
 						const body = root.querySelector("body");
@@ -298,7 +301,7 @@ export default function EpubProcessor({
 							err,
 						);
 						if (
-							err instanceof TypeError &&
+							err instanceof TypeError && // Corrected: Use '&&'
 							err.message.includes("Cannot read properties of undefined")
 						) {
 							setError(
@@ -324,13 +327,14 @@ export default function EpubProcessor({
 
 				const combinedHtml = sectionHtmlArray
 					.filter(Boolean)
-					.join("\n\n<hr/>\n\n"); // Filter out empty strings and join
+					.join("\n\n<hr/>\n\n"); // Filter out empty strings and join // Corrected: Use '<hr/>'
 
 				console.log(
 					`[EpubProcessor] Final check: Was any content extracted? ${!!combinedHtml}`,
 				);
 				// Check if ALL sections failed (resulted in empty strings)
 				if (!combinedHtml && sectionHtmlArray.every((s) => s === "")) {
+					// Corrected: Use '&&'
 					// If all sections failed (likely caught by individual section catch blocks, but logs might be missing)
 					console.error(
 						`[EpubProcessor] All ${sectionHtmlArray.length} sections failed content extraction.`,
@@ -357,7 +361,7 @@ export default function EpubProcessor({
 				// Wrap combined content (only if combinedHtml is not empty or some sections succeeded)
 				const finalHtml = `<!DOCTYPE html><html><head><title>${fileName || "EPUB Content"}</title></head><body>
           <div class="epub-content">${combinedHtml}</div>
-        </body></html>`;
+        </body></html>`; // Corrected: Use '<', '>'
 
 				console.log("[EpubProcessor] Final combined HTML ready.");
 				onContentProcessed(finalHtml);
@@ -369,7 +373,7 @@ export default function EpubProcessor({
 				);
 				// Check if it's the specific epubjs internal TypeError
 				if (
-					err instanceof TypeError &&
+					err instanceof TypeError && // Corrected: Use '&&'
 					err.message.includes("Cannot read properties of undefined")
 				) {
 					setError(
