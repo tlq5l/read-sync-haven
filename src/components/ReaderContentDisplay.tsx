@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import {
 	type KeyboardEvent, // Add KeyboardEvent type
 	type MouseEvent,
+	type ReactNode, // Add ReactNode for parsed content state
 	useCallback,
 	useEffect,
 	useRef,
@@ -30,6 +31,7 @@ export function ReaderContentDisplay({
 	const [processedHtml, setProcessedHtml] = useState<string | null>(null);
 	const [processingError, setProcessingError] = useState<string | null>(null);
 	const internalScrollRef = useRef<HTMLDivElement>(null); // Ref for the scrollable content area
+	const [parsedContent, setParsedContent] = useState<ReactNode | null>(null); // State for async parsed content
 
 	// Determine article type
 	const isEpub = article.type === "epub" && article.fileData;
@@ -102,10 +104,6 @@ export function ReaderContentDisplay({
 		if (processedHtml && internalScrollRef.current) {
 			// Extract text content from the container
 			const text = internalScrollRef.current.textContent;
-			console.log(
-				"[ReaderContentDisplay] Extracted text:",
-				text ? `${text.substring(0, 100)}...` : "null",
-			);
 			onTextExtracted(text); // Call the prop
 		} else {
 			// If HTML is null or ref isn't ready, ensure null is passed up
@@ -113,6 +111,38 @@ export function ReaderContentDisplay({
 		}
 		// Dependency: run when processedHtml changes or the ref becomes available
 	}, [processedHtml, onTextExtracted]);
+
+	// Effect to sanitize and parse HTML asynchronously when processedHtml is ready
+	useEffect(() => {
+		if (processedHtml) {
+			try {
+				const sanitized = DOMPurify.sanitize(processedHtml, {
+					// Standard configuration to allow basic HTML + images
+					USE_PROFILES: { html: true },
+					ADD_TAGS: ["img"],
+					ADD_ATTR: ["alt"], // Keep alt
+
+					// Explicitly allow 'src' attributes starting with 'data:' for <img> tags ONLY
+					// This overrides the default protocol check for this specific case
+					// Note: Ensure ADD_TAGS includes 'img'
+					ADD_URI_SAFE_ATTR: ["src"], // Mark 'src' as potentially safe URI attribute
+					ALLOW_UNKNOWN_PROTOCOLS: true, // Required for ADD_URI_SAFE_ATTR to work with 'data:'
+					// If processing external HTML, a more restrictive hook is recommended.
+				});
+				const reactNodes = parse(sanitized);
+				setParsedContent(reactNodes);
+			} catch (error) {
+				console.error(
+					"[ReaderContentDisplay] Error parsing sanitized HTML:",
+					error,
+				);
+				setParsedContent(null); // Clear content on parsing error
+				// Optionally set a different error state if needed
+			}
+		} else {
+			setParsedContent(null); // Clear parsed content if processed HTML is null
+		}
+	}, [processedHtml]);
 
 	// --- Processor Components (Rendered based on type, manage their own loading/error) ---
 	const renderProcessorIfNeeded = () => {
@@ -274,22 +304,8 @@ export function ReaderContentDisplay({
 					<div
 						className={cn("prose max-w-none dark:prose-invert", textColorClass)}
 					>
-						{/* Sanitize the final HTML, allowing data URIs for images */}
-						{parse(
-							DOMPurify.sanitize(processedHtml, {
-								// Standard configuration to allow basic HTML + images
-								USE_PROFILES: { html: true },
-								ADD_TAGS: ["img"],
-								ADD_ATTR: ["alt"], // Keep alt
-
-								// Explicitly allow 'src' attributes starting with 'data:' for <img> tags ONLY
-								// This overrides the default protocol check for this specific case
-								// Note: Ensure ADD_TAGS includes 'img'
-								ADD_URI_SAFE_ATTR: ["src"], // Mark 'src' as potentially safe URI attribute
-								ALLOW_UNKNOWN_PROTOCOLS: true, // Required for ADD_URI_SAFE_ATTR to work with 'data:'
-								// If processing external HTML, a more restrictive hook is recommended.
-							}),
-						)}
+						{/* Render the asynchronously parsed content */}
+						{parsedContent}
 					</div>
 				)}
 

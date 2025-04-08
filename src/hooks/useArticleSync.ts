@@ -2,7 +2,7 @@ import { useToast } from "@/hooks/use-toast";
 import { type DexieArticle, db } from "@/services/db/dexie"; // Import Dexie db instance
 import type { Article } from "@/services/db/types"; // Import original Article type
 import { useLiveQuery } from "dexie-react-hooks"; // Use Dexie's React hook for live updates
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // Removed unused imports: useEffect, useRef, uuidv4
 
 // --- Helper Functions (Can be simplified or removed if not needed) ---
@@ -30,7 +30,13 @@ export function useArticleSync(
 	isDbInitialized: boolean, // Keep dependency on DB initialization
 	// Remove hidingArticleIds - optimistic updates handled differently or in ArticleContext
 ) {
-	const { toast } = useToast(); // Keep toast for error reporting
+	const { toast: toastFn } = useToast(); // Keep toast for error reporting
+
+	// Ref to store the latest toast function to avoid dependency issues
+	const toastRef = useRef(toastFn);
+	useEffect(() => {
+		toastRef.current = toastFn;
+	}, [toastFn]);
 
 	// State for loading and error, simplified as sync is removed
 	const [isLoading, setIsLoading] = useState<boolean>(true); // Still useful for initial load
@@ -73,7 +79,8 @@ export function useArticleSync(
 				);
 				setIsLoading(false); // Set loading false even on error
 				// Consider toasting here or letting the context handle it
-				toast({
+				toastRef.current({
+					// Use the ref to call the latest toast function
 					title: "Error Loading Local Data",
 					description:
 						error?.message || "Could not load articles from the database.",
@@ -127,14 +134,15 @@ export function useArticleSync(
 				err instanceof Error ? err : new Error("Failed to refresh articles."),
 			);
 			setIsLoading(false);
-			toast({
+			toastRef.current({
+				// Use the ref to call the latest toast function
 				title: "Error Refreshing Data",
 				description: err?.message || "Could not refresh articles.",
 				variant: "destructive",
 			});
-			return articles; // Return the last known good (mapped) state on error
+			return []; // Return empty array on error
 		}
-	}, [isDbInitialized, articles, toast]); // Dependency on articles to return last known state on error
+	}, [isDbInitialized]); // toast dependency removed, using ref instead
 
 	// --- Retry Function ---
 	// Similar to refresh, mainly clears error and potentially re-triggers fetch
@@ -152,6 +160,7 @@ export function useArticleSync(
 
 	// Memoize the returned object
 	// Note: Removed isRefreshing, syncStatus as they relate to cloud sync
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Intentionally omitting isLoading and error to stabilize the returned object reference and prevent infinite loops in consumers depending on the object reference itself. Consumers needing loading/error state should select those properties specifically.
 	const returnedValue = useMemo(
 		() => ({
 			articles, // Now returns mapped and sorted Article[]
@@ -167,7 +176,7 @@ export function useArticleSync(
 					? ("offline" as const)
 					: ("success" as const),
 		}),
-		[articles, isLoading, error, refreshArticles, retryLoading],
+		[articles, refreshArticles, retryLoading],
 	);
 
 	return returnedValue;

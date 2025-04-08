@@ -66,7 +66,6 @@ export async function extractEpubMetadata(
 
 		// Extract metadata
 		const metadata = book.package.metadata;
-
 		// Extract cover if available
 		let coverUrl: string | undefined;
 		try {

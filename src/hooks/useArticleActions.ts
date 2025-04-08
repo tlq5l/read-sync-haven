@@ -190,8 +190,8 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				const savedArticle = mapDexieToArticle(dexieArticle); // Map back for return
 
 				toast({
-					title: "Article saved",
-					description: `"${savedArticle.title}" has been saved locally.`, // Updated message
+					title: "Success",
+					description: `Parsing successful. Article "${savedArticle.title}" added to library.`,
 				});
 
 				// Trigger UI refresh
@@ -229,15 +229,12 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 
 			try {
 				let dexieArticle: DexieArticle;
-				let fileType: "epub" | "pdf";
 
 				// Process file using updated helpers returning DexieArticle
 				if (file.name.toLowerCase().endsWith(".epub")) {
 					dexieArticle = await processEpubFile(file, userId);
-					fileType = "epub";
 				} else if (file.name.toLowerCase().endsWith(".pdf")) {
 					dexieArticle = await processPdfFile(file, userId);
-					fileType = "pdf";
 				} else {
 					throw new Error(
 						"Invalid file type. Only EPUB and PDF formats are supported.",
@@ -252,8 +249,8 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 
 				// Show success toast
 				toast({
-					title: `${fileType.toUpperCase()} saved`,
-					description: `"${savedArticle.title}" has been saved locally.`, // Updated message
+					title: "Success",
+					description: `File processed successfully. "${savedArticle.title}" added to library.`,
 				});
 
 				// Trigger UI refresh

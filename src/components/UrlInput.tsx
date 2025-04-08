@@ -44,8 +44,8 @@ export default function UrlInput({ onSuccess }: UrlInputProps) {
 				if (onSuccess) {
 					onSuccess();
 				} else {
-					// Navigate to the article reader page
-					navigate(`/read/${article._id}`);
+					// Navigate to the library page
+					navigate("/inbox");
 				}
 			}
 		} catch (err) {

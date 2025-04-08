@@ -25,8 +25,8 @@ export default function AddPage() {
 					title: "Success",
 					description: `${file.name} added to your library`,
 				});
-				// Navigate to the article
-				navigate(`/read/${article._id}`);
+				// Navigate to the library page
+				navigate("/inbox");
 			}
 		} catch (error) {
 			console.error(`Error uploading ${uploadType.toUpperCase()}:`, error);
