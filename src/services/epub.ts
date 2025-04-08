@@ -95,9 +95,15 @@ export async function extractEpubMetadata(
 
 		return result;
 	} catch (error) {
-		console.error("Error extracting EPUB metadata:", error);
+		// Add more detailed logging to capture the specific epubjs error
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		console.error(
+			`Error extracting EPUB metadata (epubjs): ${errorMessage}`,
+			error,
+		);
 		// Propagate the error to the caller
-		throw error; // Re-throw the error
+		// Remove the 'cause' property as it's causing a TS error in this environment
+		throw new Error(`EPUB Parsing Failed: ${errorMessage}`); // Re-throw with more context
 	}
 }
 
