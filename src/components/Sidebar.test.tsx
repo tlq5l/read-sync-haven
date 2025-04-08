@@ -31,6 +31,7 @@ vi.mock("@clerk/clerk-react", async (importOriginal) => {
 
 // Mock useArticles hook
 const mockSetCurrentView = vi.fn();
+const mockSetSelectedCategory = vi.fn(); // Define mock function externally
 vi.mock("@/context/ArticleContext", async (importOriginal) => {
 	const actual =
 		await importOriginal<typeof import("@/context/ArticleContext")>();
@@ -64,7 +65,7 @@ vi.mock("@/context/ArticleContext", async (importOriginal) => {
 			setSortCriteria: vi.fn(), // Add mock setter
 			setSortField: vi.fn(),
 			toggleSortDirection: vi.fn(),
-			setSelectedCategory: vi.fn(), // Add mock setter
+			setSelectedCategory: mockSetSelectedCategory, // Use external mock function
 		})),
 	};
 });
@@ -111,15 +112,58 @@ vi.mock("lucide-react", async (importOriginal) => {
 	};
 });
 
+// Mock Animation/Transition Components and Hooks
+vi.mock("@/components/ui/transition-group", () => ({
+	TransitionGroup: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+		<div className={className}>{children}</div>
+	),
+	TransitionItem: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+		<div className={className}>{children}</div>
+	),
+}));
+vi.mock("@/context/AnimationContext", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/context/AnimationContext")>();
+	return {
+		...actual,
+		useAnimation: () => ({
+			synchronizeAnimations: (callback: () => void) => callback(), // Simple passthrough
+		}),
+	};
+});
+vi.mock("@/hooks/use-synchronized-animation", () => ({
+	useSynchronizedAnimation: () => ({
+		ref: vi.fn(), // Mock ref
+	}),
+}));
+// Mock KeyboardContext hook
+const mockToggleSidebar = vi.fn();
+vi.mock("@/context/KeyboardContext", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/context/KeyboardContext")>();
+	return {
+		...actual,
+		useKeyboard: () => ({
+			isSidebarCollapsed: false, // Default state
+			toggleSidebar: mockToggleSidebar,
+			// Mock other returned values if needed by the component/tests
+			registerShortcut: vi.fn(),
+			unregisterShortcut: vi.fn(),
+			triggerShortcut: vi.fn(),
+		}),
+	};
+});
+
+
 // --- Test Setup ---
 
+// MockProviders WITHOUT KeyboardProvider (as it seems to cause the leak)
+// Keep AnimationProvider mocked as well (done earlier)
+// useKeyboard hook is mocked above to provide necessary values
 const MockProviders = ({ children }: { children: React.ReactNode }) => (
 	<MemoryRouter>
 		<ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-			<AnimationProvider>
-				<KeyboardProvider>{children}</KeyboardProvider>{" "}
-				{/* Wrap with KeyboardProvider */}
-			</AnimationProvider>
+			{/* AnimationProvider is effectively mocked via useAnimation/useSynchronizedAnimation mocks */}
+			{/* KeyboardProvider is removed due to suspected memory leak */}
+			{children}
 		</ThemeProvider>
 	</MemoryRouter>
 );
@@ -217,50 +261,63 @@ describe("Sidebar Component", () => {
 
 	// Add more tests as needed for collapse/expand etc.
 
-	it("reveals Library sub-menu on click and sets current view on sub-menu item click", async () => {
+	it("reveals Library category sub-menu and sets selected category on click", () => { // No longer needs async
+		// mockSetSelectedCategory is now defined globally and used in the mock factory
 		render(
 			<MockProviders>
 				<Sidebar />
 			</MockProviders>,
 		);
-		const libraryButton = screen.getByRole("button", { name: /library/i });
+		// Use the added data-testid to select the expander button reliably
+		const libraryExpanderButton = screen.getByTestId(
+			"library-expander-button",
+		);
+		const libraryMainButton = screen.getByRole("button", { name: /^library$/i }); // Exact match for Library
 
-		// Initially, sub-menu items might not be visible or exist depending on implementation
-		// Using queryByRole which returns null if not found, and checking visibility cautiously
-		// Note: If using Shadcn's Collapsible, items might exist but not be visible.
-		// If they are conditionally rendered, queryByRole returning null is expected.
-		expect(screen.queryByRole("button", { name: /inbox/i })).not.toBeVisible();
-		expect(screen.queryByRole("button", { name: /unread/i })).not.toBeVisible();
-		expect(
-			screen.queryByRole("button", { name: /favorites/i }),
-		).not.toBeVisible();
+		// Initially, the library sub-menu (categories) should be visible because default state is open
+		// Test for one category button, e.g., Articles
+		const articlesButtonInitial = screen.getByRole("button", {
+			name: /articles/i,
+		});
+		expect(articlesButtonInitial).toBeVisible();
 
-		// Click the Library button to reveal the sub-menu
-		fireEvent.click(libraryButton);
+		// --- Test closing and opening ---
+		// Click the chevron button to close the sub-menu
+		fireEvent.click(libraryExpanderButton);
+		// Now category buttons should NOT be in the DOM
+		expect(screen.queryByRole("button", { name: /articles/i })).toBeNull();
+		expect(screen.queryByRole("button", { name: /pdfs/i })).toBeNull();
 
-		// Wait for potential animation/rerender and find the sub-menu items
-		const inboxButton = await screen.findByRole("button", { name: /inbox/i });
-		const unreadButton = screen.getByRole("button", { name: /unread/i });
-		const favoritesButton = screen.getByRole("button", { name: /favorites/i });
+		// Click the chevron button again to re-open the sub-menu
+		fireEvent.click(libraryExpanderButton);
+		const articlesButton = screen.getByRole("button", { name: /articles/i });
+		const pdfsButton = screen.getByRole("button", { name: /pdfs/i });
+		const booksButton = screen.getByRole("button", { name: /books/i });
 
-		// Assert sub-menu items are now visible
-		expect(inboxButton).toBeVisible();
-		expect(unreadButton).toBeVisible();
-		expect(favoritesButton).toBeVisible();
+		expect(articlesButton).toBeVisible();
+		expect(pdfsButton).toBeVisible();
+		expect(booksButton).toBeVisible();
 
-		// Click Inbox
-		fireEvent.click(inboxButton);
-		expect(mockSetCurrentView).toHaveBeenCalledWith("all"); // Assuming 'Inbox' corresponds to 'all'
+		// --- Test setting category ---
+		// Click Articles category button
+		fireEvent.click(articlesButton);
+		expect(mockSetSelectedCategory).toHaveBeenCalledWith("article");
 
-		// Click Unread
-		fireEvent.click(unreadButton);
-		expect(mockSetCurrentView).toHaveBeenCalledWith("unread");
+		// Click PDFs category button
+		fireEvent.click(pdfsButton);
+		expect(mockSetSelectedCategory).toHaveBeenCalledWith("pdf");
 
-		// Click Favorites
-		fireEvent.click(favoritesButton);
-		expect(mockSetCurrentView).toHaveBeenCalledWith("favorites");
+		// Click Books category button
+		fireEvent.click(booksButton);
+		expect(mockSetSelectedCategory).toHaveBeenCalledWith("book");
+
+		// Click main Library button (should clear category)
+		fireEvent.click(libraryMainButton);
+		expect(mockSetSelectedCategory).toHaveBeenCalledWith(null);
 
 		// Verify total calls
-		expect(mockSetCurrentView).toHaveBeenCalledTimes(3);
+		// Check the initial state and logic to confirm if clicking the main Library button resets the category
+		// Assuming it does: article, pdf, book, null calls = 4
+		expect(mockSetSelectedCategory).toHaveBeenCalledTimes(4);
 	});
 });

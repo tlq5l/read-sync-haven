@@ -85,7 +85,7 @@ describe("useReadingProgress", () => {
 			await result.current.updateReadingProgress("article-progress-1", 95);
 		});
 
-		expect(mockGetArticle).toHaveBeenCalledWith("article-progress-1");
+		expect(mockGetArticle).toHaveBeenCalledWith("article-progress-1"); // Reinstated: Hook needs to fetch the article first
 		expect(mockUpdateArticle).toHaveBeenCalledWith(
 			expect.objectContaining({
 				_id: "article-progress-1",
@@ -117,7 +117,7 @@ describe("useReadingProgress", () => {
 			await result.current.updateReadingProgress("article-progress-1", 10.5);
 		});
 
-		expect(mockGetArticle).toHaveBeenCalledWith("article-progress-1");
+		expect(mockGetArticle).toHaveBeenCalledWith("article-progress-1"); // Reinstated: Hook needs to fetch the article first
 		expect(mockUpdateArticle).not.toHaveBeenCalled();
 		// expect(mockGetTokenFn).not.toHaveBeenCalled(); // Removed check
 		// expect(mockSaveItemToCloud).not.toHaveBeenCalled(); // Removed check as cloud sync is removed

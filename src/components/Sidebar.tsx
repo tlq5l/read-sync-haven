@@ -190,6 +190,7 @@ export default function Sidebar() {
 								<Button
 									variant="ghost"
 									size="sm"
+									data-testid="library-expander-button" // Add test ID
 									className="p-0 h-8 w-8 mr-1"
 									onClick={(e) => {
 										e.stopPropagation(); // Prevent event bubbling

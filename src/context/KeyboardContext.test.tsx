@@ -36,16 +36,16 @@ vi.mock("@/hooks/use-toast", () => ({
 }));
 
 // Mock useArticles to provide necessary functions like refreshArticles if tested
+const mockArticleContextValue = {
+	refreshArticles: mockRefreshArticles,
+	// Add other properties if KeyboardContext depends on them
+};
 vi.mock("@/context/ArticleContext", async (importOriginal) => {
 	const actual =
 		await importOriginal<typeof import("@/context/ArticleContext")>();
 	return {
 		...actual,
-		useArticles: () => ({
-			// Provide necessary mocked values/functions
-			refreshArticles: mockRefreshArticles,
-			// Add other properties if KeyboardContext depends on them
-		}),
+		useArticles: () => mockArticleContextValue, // Return stable mock object
 	};
 });
 // --- End Mocks ---

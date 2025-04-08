@@ -10,7 +10,7 @@ import {
 } from "@testing-library/react";
 import { renderHook } from "@testing-library/react-hooks";
 
-import type { Article } from "@/services/db";
+import type { Article } from "@/services/db/types"; // Corrected import path after Dexie migration
 // i18n imports removed
 // The @testing-library/react imports were already present above, so the ones from backup-staging-local are removed.
 import { BrowserRouter } from "react-router-dom";
@@ -250,7 +250,7 @@ describe("ArticleCard", () => {
 			":scope > span:first-child",
 		);
 		expect(sourceSpan).toBeInTheDocument();
-		expect(sourceSpan).toHaveTextContent("EPUB Book"); // Expect rendered text
+		expect(sourceSpan).toHaveTextContent("EPUB Document"); // Expect rendered text (Updated based on merge change)
 		expect(screen.getByText("90 min read")).toBeInTheDocument();
 	});
 

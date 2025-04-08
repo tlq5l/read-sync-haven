@@ -1,10 +1,10 @@
 import type { ArticleView } from "@/hooks/useArticleView";
+import { server } from "@/mocks/server"; // Import the MSW server instance
 // Import db for seeding, adjust Tag import path if needed
 import { type DexieTag, db } from "@/services/db/dexie";
 import type { Article, Tag } from "@/services/db/types"; // Assuming types are here
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw"; // Import MSW functions
-import { server } from "@/mocks/server"; // Import the MSW server instance
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"; // Added afterEach
 import { ArticleProvider, useArticles } from "./ArticleContext";
 
