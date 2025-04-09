@@ -381,61 +381,61 @@ export default function ArticleReader() {
 								</Button>
 							</form>
 						</TabsContent>
-					</Tabs>
-
-					{/* History Tab */}
-					<TabsContent
-						value="history"
-						className="mt-4 flex flex-col h-[calc(100vh-200px)]" // Adjust height as needed
-					>
-						<ScrollArea className="flex-1 mb-4 pr-4">
-							{isLoadingHistory && (
-								<p className="text-sm text-muted-foreground">
-									Loading history...
-								</p>
-							)}
-							{historyError && (
-								<p className="text-sm text-destructive">
-									History Error: {historyError}
-								</p>
-							)}
-							{!isLoadingHistory &&
-								!historyError &&
-								historyMessages.length === 0 && (
-									<p className="text-sm text-muted-foreground text-center py-4">
-										No chat history found for this article.
+						{/* History Tab (Moved inside Tabs) */}
+						<TabsContent
+							value="history"
+							className="mt-4 flex flex-col h-[calc(100vh-200px)]" // Adjust height as needed
+						>
+							<ScrollArea className="flex-1 mb-4 pr-4">
+								{isLoadingHistory && (
+									<p className="text-sm text-muted-foreground">
+										Loading history...
 									</p>
 								)}
-							{!isLoadingHistory &&
-								!historyError &&
-								historyMessages.length > 0 && (
-									<div className="space-y-4">
-										{historyMessages.map((msg) => (
-											<div
-												key={msg.messageId} // Use the unique ID from the history hook
-												className={cn(
-													"p-3 rounded-lg max-w-[80%] break-words", // Added break-words
-													msg.sender === "user"
-														? "bg-primary text-primary-foreground self-end ml-auto"
-														: "bg-muted text-muted-foreground self-start mr-auto",
-												)}
-											>
-												<p className="text-sm whitespace-pre-wrap">
-													{msg.content}
-												</p>
-												{/* Optional: Display timestamp */}
-												<p className="text-xs text-muted-foreground/60 mt-1 text-right">
-													{new Date(msg.timestamp).toLocaleTimeString([], {
-														hour: "2-digit",
-														minute: "2-digit",
-													})}
-												</p>
-											</div>
-										))}
-									</div>
+								{historyError && (
+									<p className="text-sm text-destructive">
+										History Error: {historyError}
+									</p>
 								)}
-						</ScrollArea>
-					</TabsContent>
+								{!isLoadingHistory &&
+									!historyError &&
+									historyMessages.length === 0 && (
+										<p className="text-sm text-muted-foreground text-center py-4">
+											No chat history found for this article.
+										</p>
+									)}
+								{!isLoadingHistory &&
+									!historyError &&
+									historyMessages.length > 0 && (
+										<div className="space-y-4">
+											{historyMessages.map((msg) => (
+												<div
+													key={msg.messageId} // Use the unique ID from the history hook
+													className={cn(
+														"p-3 rounded-lg max-w-[80%] break-words", // Added break-words
+														msg.sender === "user"
+															? "bg-primary text-primary-foreground self-end ml-auto"
+															: "bg-muted text-muted-foreground self-start mr-auto",
+													)}
+												>
+													<p className="text-sm whitespace-pre-wrap">
+														{msg.content}
+													</p>
+													{/* Optional: Display timestamp */}
+													<p className="text-xs text-muted-foreground/60 mt-1 text-right">
+														{new Date(msg.timestamp).toLocaleTimeString([], {
+															hour: "2-digit",
+															minute: "2-digit",
+														})}
+													</p>
+												</div>
+											))}
+										</div>
+									)}
+							</ScrollArea>
+						</TabsContent>
+					</Tabs>{" "}
+					{/* Moved Tabs closing tag here */}
 				</SheetContent>
 			</Sheet>
 		</div>
