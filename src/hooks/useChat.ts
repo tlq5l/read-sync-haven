@@ -1,443 +1,453 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ChatMessage as HistoryChatMessage } from "./useChatHistory"; // Use type import
 
-export type ChatMessage = {
+// Type for messages managed *within* this hook (active chat display)
+export type ActiveChatMessage = {
 	sender: "user" | "ai";
 	text: string;
+	timestamp?: number; // Optional timestamp for consistency
 };
+
+// Type definition for the props we expect from useChatHistory via ArticleReader
+interface ChatHistoryProps {
+	articleId: string | null;
+	selectedSessionId: string | null;
+	setSelectedSessionId: (sessionId: string | null) => void; // Function to update the selected session in the parent
+	selectedSessionMessages: HistoryChatMessage[]; // Messages loaded from history
+	createNewSession: (
+		initialMessage: Omit<HistoryChatMessage, "timestamp">,
+	) => Promise<string>; // Returns new session ID
+	addMessageToSession: (
+		sessionId: string,
+		newMessage: Omit<HistoryChatMessage, "timestamp">,
+	) => Promise<void>;
+}
 
 /**
  * Custom hook to manage chat interactions related to article content.
- * Handles API calls, chat history, input state, and loading/error states.
+ * Integrates with useChatHistory for persistence.
  */
 export function useChat(
 	fullTextContent: string | null,
-	onChatSettled?: () => void, // Optional callback
+	historyProps: ChatHistoryProps, // Pass history functions and state
+	onChatSettled?: () => void,
 ) {
 	const { getToken } = useAuth();
-	const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+	// This state now represents the messages displayed in the *active* chat UI
+	const [chatHistory, setChatHistory] = useState<ActiveChatMessage[]>([]);
 	const [chatInput, setChatInput] = useState("");
 	const [isChatting, setIsChatting] = useState(false);
-	const [chatError, setChatError] = useState<Error | null>(null); // Use Error type
-	const chatScrollAreaRef = useRef<HTMLDivElement>(null); // Ref for scrolling
+	const [chatError, setChatError] = useState<Error | null>(null);
+	const chatScrollAreaRef = useRef<HTMLDivElement>(null);
+
+	const {
+		articleId,
+		selectedSessionId,
+		setSelectedSessionId,
+		selectedSessionMessages,
+		createNewSession,
+		addMessageToSession,
+	} = historyProps;
+
+	// Effect to load historical messages into the active chat view when a session is selected
+	useEffect(() => {
+		if (selectedSessionId && selectedSessionMessages.length > 0) {
+			// Map HistoryChatMessage to ActiveChatMessage if structures differ significantly
+			// Assuming they are compatible enough for now (sender, content/text, timestamp)
+			const activeMessages = selectedSessionMessages.map((msg) => ({
+				sender: msg.sender,
+				text: msg.content, // Map content to text
+				timestamp: msg.timestamp,
+			}));
+			setChatHistory(activeMessages);
+			console.log(
+				`[useChat] Loaded ${activeMessages.length} messages from session ${selectedSessionId}`,
+			);
+			scrollToBottom();
+		} else if (!selectedSessionId) {
+			// Clear active chat if no session is selected (or user starts a new one implicitly)
+			setChatHistory([]);
+			console.log(
+				"[useChat] Cleared active chat history (no session selected).",
+			);
+		}
+		// Dependency: selectedSessionMessages signals that new messages are loaded for the selected ID
+	}, [selectedSessionMessages, selectedSessionId]); // Add selectedSessionId dependency
 
 	const chatMutation = useMutation({
-		mutationFn: async (userMessage: string) => {
-			if (!fullTextContent) {
-				throw new Error("Article content not available for chat.");
-			}
-			if (!userMessage.trim()) {
-				throw new Error("Cannot send an empty message.");
+		mutationFn: async ({
+			userMessage,
+			currentSessionId,
+		}: { userMessage: string; currentSessionId: string | null }) => {
+			if (!fullTextContent) throw new Error("Article content not available.");
+			if (!userMessage.trim()) throw new Error("Empty message.");
+			if (!articleId) throw new Error("Article ID missing."); // Needed for history
+
+			let sessionIdForThisInteraction = currentSessionId;
+			let isNewSession = false;
+
+			// --- Save User Message to Persistent History ---
+			try {
+				const userHistoryMessage: Omit<HistoryChatMessage, "timestamp"> = {
+					sender: "user",
+					content: userMessage,
+					// articleId is part of the session, not the message itself in new structure
+				};
+				if (sessionIdForThisInteraction) {
+					await addMessageToSession(
+						sessionIdForThisInteraction,
+						userHistoryMessage,
+					);
+					console.log(
+						`[useChat] User message added to existing session: ${sessionIdForThisInteraction}`,
+					);
+				} else {
+					// Create a new session if none is selected
+					const newSessionId = await createNewSession(userHistoryMessage);
+					sessionIdForThisInteraction = newSessionId; // Use the new ID for the AI response
+					setSelectedSessionId(newSessionId); // Update parent state to select the new session
+					isNewSession = true;
+					console.log(
+						`[useChat] User message created new session: ${newSessionId}`,
+					);
+				}
+			} catch (historyError) {
+				console.error(
+					"[useChat] Failed to save user message to history:",
+					historyError,
+				);
+				throw new Error(
+					`Failed to save message history: ${historyError instanceof Error ? historyError.message : String(historyError)}`,
+				); // Propagate error
 			}
 
-			// Retrieve custom API settings from localStorage
+			// --- Update Local UI Optimistically (User Message) ---
+			// If it's a new session, the useEffect watching selectedSessionMessages might reload,
+			// but an immediate update feels better. If not a new session, just append.
+			if (!isNewSession) {
+				setChatHistory((prev) => [
+					...prev,
+					{ sender: "user", text: userMessage, timestamp: Date.now() },
+				]);
+			}
+			// Note: If it *is* a new session, the state update happens via useEffect watching selectedSessionMessages
+			// triggered by setSelectedSessionId above. Add user message manually might cause duplication.
+			// Let's refine this: setChatHistory directly after createNewSession succeeds.
+			if (isNewSession) {
+				setChatHistory([
+					{ sender: "user", text: userMessage, timestamp: Date.now() },
+				]);
+			}
+
+			// --- Call Backend API ---
 			const customApiKey = localStorage.getItem("customApiKey");
 			const customApiEndpoint = localStorage.getItem("customApiEndpoint");
-			// const customApiModel = localStorage.getItem("customApiModel"); // Removed unused variable
 			let response: Response;
 			let requestBody: string;
 			let apiUrl: string;
 			let headers: HeadersInit;
-			// Determine if streaming should be requested based on custom API usage
 			const streamRequested = customApiKey && customApiEndpoint;
+
 			if (customApiKey && customApiEndpoint) {
-				// Use custom OpenAI-compatible endpoint
-				console.log("Using custom API endpoint for chat...");
-				// Construct the final URL robustly, handling potential trailing slashes and existing paths
+				// Use custom OpenAI-compatible endpoint (Streaming ON)
+				console.log("[useChat] Using custom API endpoint (streaming)...");
 				const baseUrl = new URL(customApiEndpoint);
-				// Use a relative path to ensure correct joining with the base pathname
 				apiUrl = new URL("./v1/chat/completions", baseUrl).toString();
 				headers = {
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${customApiKey}`,
 				};
-				// Construct OpenAI-compatible request body for chat
 				const customApiPayload = {
 					model:
-						localStorage.getItem("customApiModel") || "openai/gpt-3.5-turbo", // Use configured model or default
+						localStorage.getItem("customApiModel") || "openai/gpt-3.5-turbo",
 					messages: [
 						{
 							role: "system",
-							content: `You are a helpful assistant discussing the following document content (truncated):\n\n${fullTextContent.slice(0, 12000)} [...truncated content]`, // Truncate content
+							content: `You are a helpful assistant discussing:\n\n${fullTextContent.slice(0, 12000)}...`,
 						},
+						// Use messages from the *currently displayed* chat history for context
 						...chatHistory.slice(-6).map((msg) => ({
-							// Ensure history format matches API
 							role: msg.sender === "user" ? "user" : "assistant",
 							content: msg.text,
 						})),
 						{ role: "user", content: userMessage },
 					],
-					stream: true, // ENABLED for custom API path
-					// Add other parameters like temperature if needed
+					stream: true,
 				};
 				requestBody = JSON.stringify(customApiPayload);
-
-				try {
-					// --- BEGIN DEBUG LOGGING ---
-					const logHeaders = { ...headers };
-					if (logHeaders.Authorization) {
-						logHeaders.Authorization = "Bearer <key_present>"; // Mask API key
-					}
-					console.log("[useChat DEBUG] Sending Request (Custom API):", {
-						url: apiUrl,
-						method: "POST",
-						headers: logHeaders,
-						body: requestBody, // Log the actual stringified body
-					});
-					// --- END DEBUG LOGGING ---
-					response = await fetch(apiUrl, {
-						method: "POST",
-						headers: headers,
-						body: requestBody,
-					});
-				} catch (error) {
-					console.error("Custom API Error:", error); // Existing specific logging
-					// Keep original error message for context
-					console.error("Original error calling custom API endpoint:", error);
-					throw new Error(
-						`Failed to connect to custom endpoint: ${apiUrl}. Please check the URL and network connection.`,
-					);
-				}
+				response = await fetch(apiUrl, {
+					method: "POST",
+					headers,
+					body: requestBody,
+				});
 			} else {
-				// Fallback to Cloudflare Worker proxy
-				console.log("Using Cloudflare Worker proxy for chat...");
+				// Fallback to Cloudflare Worker proxy (Non-streaming)
+				console.log("[useChat] Using Cloudflare Worker proxy...");
 				const clerkToken = await getToken();
-				if (!clerkToken) {
-					throw new Error("User not authenticated (Clerk token missing).");
-				}
+				if (!clerkToken) throw new Error("Authentication token missing.");
 				apiUrl = "https://thinkara-sync-api.vikione.workers.dev/api/chat";
 				headers = {
 					"Content-Type": "application/json",
 					Authorization: `Bearer ${clerkToken}`,
 				};
-				// Original body for worker (only needs current message and content)
 				requestBody = JSON.stringify({
 					content: fullTextContent,
 					message: userMessage,
 				});
-
-				try {
-					// --- BEGIN DEBUG LOGGING ---
-					const logHeaders = { ...headers };
-					if (logHeaders.Authorization) {
-						// Assuming Clerk token isn't super sensitive like API key, but can mask if needed
-						logHeaders.Authorization = "Bearer <token_present>";
-					}
-					console.log("[useChat DEBUG] Sending Request (Worker Proxy):", {
-						url: apiUrl,
-						method: "POST",
-						headers: logHeaders,
-						body: requestBody, // Log the actual stringified body
-					});
-					// --- END DEBUG LOGGING ---
-					response = await fetch(apiUrl, {
-						method: "POST",
-						headers: headers,
-						body: requestBody,
-					});
-				} catch (error) {
-					console.error("Error calling Cloudflare Worker proxy:", error);
-					throw new Error(
-						"Failed to connect to the chat service. Please check your network connection.",
-					);
-				}
+				response = await fetch(apiUrl, {
+					method: "POST",
+					headers,
+					body: requestBody,
+				});
 			}
 
-			// --- Handle Response (Streaming or Non-Streaming based on path) ---
-			const isCustomApiPath = customApiKey && customApiEndpoint;
-
+			// --- Handle Response (Common Logic for OK/Error) ---
 			if (!response.ok) {
-				// Handle error response (common logic)
-				const errorSource = isCustomApiPath
+				// ... existing error handling ...
+				const errorSource = streamRequested
 					? "custom API endpoint"
 					: "chat service";
 				let errorDetails = `Request failed with status ${response.status}`;
 				try {
-					const errorData = await response.json(); // Try JSON first
+					const errorData = await response.json();
 					errorDetails =
 						errorData?.error?.message ||
 						errorData?.message ||
-						errorData?.error ||
 						JSON.stringify(errorData);
 				} catch (e) {
 					try {
-						const textError = await response.text(); // Fallback to text
+						const textError = await response.text();
 						errorDetails += `\nResponse Body: ${textError.substring(0, 200)}`;
 					} catch (textE) {
-						/* ignore secondary error */
+						/*ignore*/
 					}
 				}
 				throw new Error(`Error from ${errorSource}: ${errorDetails}`);
 			}
 
-			// --- Handle SUCCESSFUL response ---
+			// --- Handle SUCCESSFUL Response (Streaming or Non-Streaming) ---
+			let finalAiContent = "";
+			let currentAiResponseText = ""; // For incremental UI updates
 
-			// Use the variable defined earlier
-			if (isCustomApiPath && streamRequested) {
-				// Streaming logic uses while loop below
-				console.log(
-					"[useChat] Handling STREAMING response from Custom API (while loop)...",
-				);
-				if (!response.body) {
-					// Add null check for response.body
-					throw new Error("Response body is null, cannot read stream.");
-				}
+			// Add placeholder for AI response in UI immediately
+			setChatHistory((prev) => [...prev, { sender: "ai", text: "" }]);
+			scrollToBottom();
+
+			if (streamRequested && response.body) {
+				console.log("[useChat] Handling STREAMING response...");
 				const reader = response.body.getReader();
 				const decoder = new TextDecoder();
-
-				// Define buffer and fullResponseContent once before the loop
 				let buffer = "";
-				let fullResponseContent = "";
 
 				// eslint-disable-next-line no-constant-condition
 				while (true) {
 					try {
 						const { done, value } = await reader.read();
-						if (done) {
-							console.log("[useChat] Stream finished (while loop).");
-							break; // Exit the loop when stream is done
-						}
+						if (done) break;
 						buffer += decoder.decode(value, { stream: true });
-
-						// Process buffer line by line for SSE format
 						const lines = buffer.split("\n");
-						buffer = lines.pop() || ""; // Keep potential partial line
+						buffer = lines.pop() || "";
 
 						for (const line of lines) {
 							if (line.startsWith("data: ")) {
 								const dataContent = line.substring(6).trim();
-								if (dataContent === "[DONE]") {
-									console.log("[useChat] Received [DONE] marker.");
-									continue; // Go to next line
-								}
+								if (dataContent === "[DONE]") continue;
 								if (dataContent) {
 									try {
 										const chunk = JSON.parse(dataContent);
 										const deltaContent = chunk.choices?.[0]?.delta?.content;
 										if (typeof deltaContent === "string") {
-											fullResponseContent += deltaContent;
-											// Update chat history incrementally
+											currentAiResponseText += deltaContent;
+											// Update UI incrementally
 											setChatHistory((prev) => {
-												const lastMessageIndex = prev.length - 1;
+												const lastMsgIndex = prev.length - 1;
 												if (
-													lastMessageIndex >= 0 &&
-													prev[lastMessageIndex].sender === "ai"
+													lastMsgIndex >= 0 &&
+													prev[lastMsgIndex].sender === "ai"
 												) {
-													const updatedHistory = [...prev];
-													updatedHistory[lastMessageIndex] = {
-														...updatedHistory[lastMessageIndex],
-														text: fullResponseContent,
+													const updated = [...prev];
+													updated[lastMsgIndex] = {
+														...updated[lastMsgIndex],
+														text: currentAiResponseText,
 													};
-													return updatedHistory;
+													return updated;
 												}
-												console.warn(
-													"[useChat] Stream update fallback triggered (while loop).",
-												);
-												return [
-													...prev,
-													{ sender: "ai", text: fullResponseContent },
-												];
+												return prev; // Should not happen if placeholder was added
 											});
 											scrollToBottom();
 										}
 									} catch (parseError) {
-										console.warn(
-											"[useChat] Failed to parse stream JSON chunk (while loop):",
-											dataContent,
-											parseError,
-										);
+										console.warn("[useChat] Stream parse error:", parseError);
 									}
 								}
-							} // end if line startsWith
-						} // end for line of lines
+							}
+						}
 					} catch (readError) {
-						console.error(
-							"[useChat] Error reading stream chunk (while loop):",
-							readError,
-						);
+						console.error("[useChat] Stream read error:", readError);
+						// Save whatever was received so far?
+						finalAiContent = currentAiResponseText; // Capture partial content before throwing
 						throw new Error(
 							`Stream read failed: ${readError instanceof Error ? readError.message : String(readError)}`,
-						); // Re-throw to be caught by mutation's onError
-						// break; // Loop should exit via throw
+						);
 					}
-				} // end while loop
+				}
+				finalAiContent = currentAiResponseText; // Full content after stream ends
+				console.log("[useChat] Stream finished.");
+			} else {
+				// Non-streaming path
+				console.log("[useChat] Handling NON-STREAMING response...");
+				const responseData = await response.json();
+				if (streamRequested) {
+					// Custom API (non-streaming mode - shouldn't happen with current logic)
+					finalAiContent = responseData?.choices?.[0]?.message?.content;
+				} else {
+					// GCF Worker
+					// Assuming GCF returns { choices: [{ message: { content: "..." } }] } based on previous debugging
+					finalAiContent = responseData?.choices?.[0]?.message?.content;
+				}
 
-				// Final state update after stream finishes successfully
-				setChatHistory((prev) => {
-					const lastMessageIndex = prev.length - 1;
-					if (
-						lastMessageIndex >= 0 &&
-						prev[lastMessageIndex].sender === "ai" &&
-						prev[lastMessageIndex].text !== fullResponseContent
-					) {
-						const updatedHistory = [...prev];
-						updatedHistory[lastMessageIndex] = {
-							...updatedHistory[lastMessageIndex],
-							text: fullResponseContent,
-						};
-						console.log("[useChat] Finalizing stream state (while loop).");
-						return updatedHistory;
-					}
-					return prev;
-				});
-				scrollToBottom();
-				return fullResponseContent; // Return accumulated content
-			}
-			// Removed redundant else block
-			// Handle NON-STREAMING response (GCF path or non-streaming Custom API)
-			console.log("[useChat] Handling NON-STREAMING response...");
-			let responseData: any; // Define responseData outside the try block
-			try {
-				responseData = await response.json();
-				console.log("[useChat] Parsed JSON Response:", responseData);
-			} catch (error) {
-				console.error("[useChat] Failed to parse non-streaming JSON:", error);
-				let rawText = "<failed to read>";
-				try {
-					// Attempt to read response body as text for better error context
-					// Clone response first as body can only be read once
-					const clonedResponse = response.clone();
-					rawText = await clonedResponse.text();
-				} catch (e) {
-					console.warn(
-						"[useChat] Failed to read raw text from error response:",
-						e,
+				if (!finalAiContent || typeof finalAiContent !== "string") {
+					throw new Error(
+						`Invalid response from ${streamRequested ? "custom API" : "chat service"} (missing content).`,
 					);
 				}
-				throw new Error(
-					`Failed to parse response: ${error instanceof Error ? error.message : String(error)}. Received: ${rawText.substring(0, 200)}`,
-				);
+				// Update UI with final content
+				setChatHistory((prev) => {
+					const lastMsgIndex = prev.length - 1;
+					if (lastMsgIndex >= 0 && prev[lastMsgIndex].sender === "ai") {
+						const updated = [...prev];
+						updated[lastMsgIndex] = {
+							...updated[lastMsgIndex],
+							text: finalAiContent,
+						};
+						return updated;
+					}
+					return [...prev, { sender: "ai", text: finalAiContent }]; // Fallback
+				});
+				scrollToBottom();
 			}
 
-			// --- Check for content AFTER successful parsing ---
-			let aiMessageContent: string | undefined;
-			if (isCustomApiPath) {
-				// Non-streaming custom API format (OpenAI compatible)
-				aiMessageContent = responseData?.choices?.[0]?.message?.content;
-			} else {
-				// GCF Format - Ensure this matches the expected structure
-				// If GCF returns { response: "..." }, it should be:
-				// aiMessageContent = responseData?.response;
-				// **ADJUSTING TO MATCH MOCK:** The mock returns choices[0].message.content
-				aiMessageContent = responseData?.choices?.[0]?.message?.content;
-			}
-
-			if (!aiMessageContent || typeof aiMessageContent !== "string") {
-				console.error("[useChat] Invalid/missing AI content:", responseData);
-				// Use the specific error message the test expects
-				const errorSource = isCustomApiPath ? "custom API" : "chat service";
-				// **ADJUSTING ERROR MESSAGE TO MATCH TEST EXPECTATION:**
-				// Note: The test actually expects "Invalid response from chat service (missing response)."
-				// Let's adjust the thrown error to match precisely.
-				throw new Error(
-					`Invalid response from ${errorSource} (missing response).`, // MATCHING TEST EXPECTATION
-				);
-			}
-
-			// --- Update state with valid content ---
-			setChatHistory((prev) => {
-				const lastMessageIndex = prev.length - 1;
-				if (lastMessageIndex >= 0 && prev[lastMessageIndex].sender === "ai") {
-					const updatedHistory = [...prev];
-					updatedHistory[lastMessageIndex] = {
-						...updatedHistory[lastMessageIndex],
-						text: aiMessageContent, // Use validated content
+			// --- Save AI Message to Persistent History ---
+			if (finalAiContent && sessionIdForThisInteraction) {
+				try {
+					const aiHistoryMessage: Omit<HistoryChatMessage, "timestamp"> = {
+						sender: "ai",
+						content: finalAiContent,
 					};
-					return updatedHistory;
+					await addMessageToSession(
+						sessionIdForThisInteraction,
+						aiHistoryMessage,
+					);
+					console.log(
+						`[useChat] AI response saved to session: ${sessionIdForThisInteraction}`,
+					);
+				} catch (historyError) {
+					console.error(
+						"[useChat] Failed to save AI message to history:",
+						historyError,
+					);
+					// Don't throw here, the chat succeeded, just log the history save failure
+					setChatError(
+						new Error(
+							`Chat successful, but failed to save AI response to history: ${historyError instanceof Error ? historyError.message : String(historyError)}`,
+						),
+					);
 				}
-				// If no placeholder exists (shouldn't happen with current onMutate), add new message
-				return [...prev, { sender: "ai", text: aiMessageContent }];
-			});
-			scrollToBottom();
-			return aiMessageContent; // Return the valid content
-			// Removed the original catch block as parsing errors are handled above
-			// and the specific content validation error is now thrown separately.
-			// Removed closing brace for the redundant else block
+			} else if (!sessionIdForThisInteraction) {
+				console.error(
+					"[useChat] Cannot save AI response, session ID is missing!",
+				);
+				setChatError(
+					new Error(
+						"Chat successful, but could not save AI response (session ID missing).",
+					),
+				);
+			}
+
+			return finalAiContent; // Return final AI response
 		},
-		onMutate: (userMessage: string) => {
+		onMutate: () => {
+			// userMessage is accessed within mutationFn, not needed directly here
 			setIsChatting(true);
 			setChatError(null);
-			// Add user message and an initial empty AI message placeholder
-			setChatHistory((prev) => [
-				...prev,
-				{ sender: "user", text: userMessage },
-				{ sender: "ai", text: "" }, // Placeholder for streaming AI response
-			]);
-			setChatInput(""); // Clear input field
-			scrollToBottom(); // Scroll down to show user message and placeholder
-		},
-		onSuccess: (finalAiResponse: string | undefined) => {
-			// State is updated incrementally during streaming.
-			// This callback can be used for final actions if needed,
-			// like perhaps ensuring the last update is finalized if there were edge cases.
-			// Or logging the final complete response.
-			console.log(
-				"[useChat] onSuccess triggered. Final AI response (length):",
-				typeof finalAiResponse === "string" ? finalAiResponse.length : "N/A",
-			);
-			// We might verify the last message is indeed the complete one,
-			// though the streaming logic aims to handle this.
+			// Optimistic UI update for user message happens inside mutationFn *after* history save attempt
+			// Clear input field
+			setChatInput("");
+			// Placeholder for AI message is added *after* backend call starts in mutationFn
+			// scrollToBottom(); // Scroll handled after user message added in mutationFn
 		},
 		onError: (error: Error) => {
-			const errorMessage =
-				error.message || "An unknown error occurred during chat.";
-			setChatError(error instanceof Error ? error : new Error(errorMessage)); // Ensure it's an Error object
-			// Add error message to chat history for user visibility
-			setChatHistory((prev) => [
-				...prev,
-				{ sender: "ai", text: `Error: ${errorMessage}` },
-			]);
+			setChatError(error);
+			// Add error message to *active* chat UI
+			// Check if the last message is already the error placeholder from mutationFn
+			setChatHistory((prev) => {
+				const lastMsg = prev[prev.length - 1];
+				if (lastMsg?.sender === "ai" && lastMsg.text.startsWith("Error:")) {
+					// If error happened during API call *after* placeholder was added, update it
+					return prev.map((msg, index) =>
+						index === prev.length - 1
+							? { ...msg, text: `Error: ${error.message}` }
+							: msg,
+					);
+				}
+				// If error happened before placeholder (e.g., saving user msg), add new error msg
+				return [...prev, { sender: "ai", text: `Error: ${error.message}` }];
+			});
 		},
 		onSettled: () => {
 			setIsChatting(false);
-			// Scroll to bottom after message exchange
 			scrollToBottom();
-			// Call the callback if provided
 			onChatSettled?.();
 		},
 	});
 
 	const scrollToBottom = useCallback(() => {
 		setTimeout(() => {
-			if (chatScrollAreaRef.current) {
-				chatScrollAreaRef.current.scrollTo({
-					top: chatScrollAreaRef.current.scrollHeight,
-					behavior: "smooth",
-				});
-			}
-		}, 100); // Small delay to allow DOM update
+			chatScrollAreaRef.current?.scrollTo({
+				top: chatScrollAreaRef.current.scrollHeight,
+				behavior: "smooth",
+			});
+		}, 100);
 	}, []);
 
-	// Scroll chat to bottom when the scroll function reference changes (effectively on mount)
 	useEffect(() => {
 		scrollToBottom();
-	}, [scrollToBottom]); // Remove chatHistory dependency, scrolling is handled in onSettled and on mount
+	}, [scrollToBottom]);
 
+	// Modified handleChatSubmit to pass necessary context
 	const handleChatSubmit = useCallback(
 		(e?: React.FormEvent<HTMLFormElement>) => {
 			e?.preventDefault();
-			if (chatInput.trim() && !isChatting && fullTextContent) {
-				chatMutation.mutate(chatInput.trim());
+			if (chatInput.trim() && !isChatting && fullTextContent && articleId) {
+				chatMutation.mutate({
+					userMessage: chatInput.trim(),
+					currentSessionId: selectedSessionId,
+				});
 			} else if (!fullTextContent) {
-				// Keep setting string here for consistency, or create new Error()
-				setChatError(
-					new Error("Article content not yet extracted or available."),
-				);
+				setChatError(new Error("Article content not available."));
+			} else if (!articleId) {
+				setChatError(new Error("Article context is missing."));
 			}
 		},
-		[chatInput, isChatting, fullTextContent, chatMutation],
+		[
+			chatInput,
+			isChatting,
+			fullTextContent,
+			articleId,
+			selectedSessionId,
+			chatMutation,
+		], // Added dependencies
 	);
 
 	return {
-		chatHistory,
+		chatHistory, // Active chat messages for UI display
 		chatInput,
 		setChatInput,
 		isChatting,
 		chatError,
 		handleChatSubmit,
-		chatScrollAreaRef, // Expose ref for the component to use
-		// Expose mutation object for more control in tests if needed
-		chatMutation,
+		chatScrollAreaRef,
 	};
 }
