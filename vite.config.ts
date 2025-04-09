@@ -1,4 +1,3 @@
-import { createRequire } from "node:module"; // Added for require.resolve, use node: protocol
 /// <reference types="vitest" />
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import react from "@vitejs/plugin-react-swc";
@@ -10,79 +9,78 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 // // Custom plugin to provide GCF token during development
 // function gcfDevTokenProvider(): Plugin {
-// 	return {
-// 		name: "vite-plugin-gcf-dev-token",
-// 		configureServer(server) {
-// 			// Load .env variables for server-side use
-// 			const env = loadEnv("development", process.cwd(), "");
-// 			const gcfUrl = env.VITE_GCF_SUMMARIZE_URL;
+//      return {
+//              name: "vite-plugin-gcf-dev-token",
+//              configureServer(server) {
+//                      // Load .env variables for server-side use
+//                      const env = loadEnv("development", process.cwd(), "");
+//                      const gcfUrl = env.VITE_GCF_SUMMARIZE_URL;
 
-// 			if (!gcfUrl) {
-// 				console.warn(
-// 					"VITE_GCF_SUMMARIZE_URL not found in .env file. GCF token endpoint will not work.",
-// 				);
-// 				return;
-// 			}
+//                      if (!gcfUrl) {
+//                              console.warn(
+//                                      "VITE_GCF_SUMMARIZE_URL not found in .env file. GCF token endpoint will not work.",
+//                              );
+//                              return;
+//                      }
 
-// 			server.middlewares.use(async (req, res, next) => {
-// 				if (req.url === "/api/get-gcf-token") {
-// 					console.log("Received request for GCF token...");
-// 					try {
-// 						const auth = new GoogleAuth();
-// 						// Get the client using ADC
-// 						const client = await auth.getClient();
-// 						// Check if the client supports fetchIdToken (it should for ADC)
-// 						if (
-// 							client &&
-// 							"fetchIdToken" in client &&
-// 							typeof client.fetchIdToken === "function"
-// 						) {
-// 							const idToken = await client.fetchIdToken(gcfUrl); // Fetch token with audience
-// 							console.log("Successfully fetched GCF token.");
-// 							res.setHeader("Content-Type", "application/json");
-// 							res.end(JSON.stringify({ token: idToken }));
-// 						} else {
-// 							throw new Error(
-// 								"Authenticated client does not support fetchIdToken.",
-// 							);
-// 						}
-// 					} catch (error: any) {
-// 						console.error("Error fetching GCF token:", error);
-// 						// Check if the error is due to ADC not being configured
-// 						if (
-// 							error.message?.includes(
-// 								"Could not load the default credentials",
-// 							) ||
-// 							error.message?.includes("Unable to detect a Project Id")
-// 						) {
-// 							res.statusCode = 500;
-// 							res.setHeader("Content-Type", "application/json");
-// 							res.end(
-// 								JSON.stringify({
-// 									error:
-// 										"Failed to get GCF token. Application Default Credentials (ADC) might not be configured. Run 'gcloud auth application-default login' in your terminal.",
-// 								}),
-// 							);
-// 						} else {
-// 							res.statusCode = 500;
-// 							res.setHeader("Content-Type", "application/json");
-// 							res.end(
-// 								JSON.stringify({
-// 									error: "Internal server error fetching GCF token.",
-// 									details: error.message,
-// 								}),
-// 							);
-// 						}
-// 					}
-// 				} else {
-// 					next(); // Pass request to next middleware if URL doesn't match
-// 				}
-// 			});
-// 		},
-// 	};
+//                      server.middlewares.use(async (req, res, next) => {
+//                              if (req.url === "/api/get-gcf-token") {
+//                                      console.log("Received request for GCF token...");
+//                                      try {
+//                                              const auth = new GoogleAuth();
+//                                              // Get the client using ADC
+//                                              const client = await auth.getClient();
+//                                              // Check if the client supports fetchIdToken (it should for ADC)
+//                                              if (
+//                                                      client &&
+//                                                      "fetchIdToken" in client &&
+//                                                      typeof client.fetchIdToken === "function"
+//                                              ) {
+//                                                      const idToken = await client.fetchIdToken(gcfUrl); // Fetch token with audience
+//                                                      console.log("Successfully fetched GCF token.");
+//                                                      res.setHeader("Content-Type", "application/json");
+//                                                      res.end(JSON.stringify({ token: idToken }));
+//                                              } else {
+//                                                      throw new Error(
+//                                                              "Authenticated client does not support fetchIdToken.",
+//                                                      );
+//                                              }
+//                                      } catch (error: any) {
+//                                              console.error("Error fetching GCF token:", error);
+//                                              // Check if the error is due to ADC not being configured
+//                                              if (
+//                                                      error.message?.includes(
+//                                                              "Could not load the default credentials",
+//                                                      ) ||
+//                                                      error.message?.includes("Unable to detect a Project Id")
+//                                              ) {
+//                                                      res.statusCode = 500;
+//                                                      res.setHeader("Content-Type", "application/json");
+//                                                      res.end(
+//                                                              JSON.stringify({
+//                                                                      error:
+//                                                                              "Failed to get GCF token. Application Default Credentials (ADC) might not be c
+// configured. Run 'gcloud auth application-default login' in your terminal.",
+//                                                              }),
+//                                                      );
+//                                              } else {
+//                                                      res.statusCode = 500;
+//                                                      res.setHeader("Content-Type", "application/json");
+//                                                      res.end(
+//                                                              JSON.stringify({
+//                                                                      error: "Internal server error fetching GCF token.",
+//                                                                      details: error.message,
+//                                                              }),
+//                                                      );
+//                                              }
+//                                      }
+//                              } else {
+//                                      next(); // Pass request to next middleware if URL doesn't match
+//                              }
+//                      });
+//              },
+//      };
 // }
-
-const require = createRequire(import.meta.url); // Added for require.resolve
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -111,17 +109,14 @@ export default defineConfig(({ mode }) => ({
 			protocolImports: true,
 		}),
 		// Copy the pdf.js worker to the output directory
-		mode !== "test"
-			? viteStaticCopy({
-					// Conditionally include only when not in test mode
-					targets: [
-						{
-							src: require.resolve("pdfjs-dist/build/pdf.worker.min.js"), // Use require.resolve
-							dest: ".", // Copy to the root of the dist folder
-						},
-					],
-				})
-			: null,
+		viteStaticCopy({
+			targets: [
+				{
+					src: "node_modules/pdfjs-dist/build/pdf.worker.min.mjs", // Corrected path with .mjs
+					dest: ".", // Copy to the root of the dist folder
+				},
+			],
+		}),
 		// Put the Sentry vite plugin after all other plugins
 		sentryVitePlugin({
 			authToken: process.env.SENTRY_AUTH_TOKEN,
@@ -131,7 +126,7 @@ export default defineConfig(({ mode }) => ({
 	],
 	resolve: {
 		// alias: { // Remove manual alias
-		// 	"@": path.resolve(__dirname, "./src"),
+		//      "@": path.resolve(__dirname, "./src"),
 		// },
 		dedupe: ["react", "react-dom"], // Ensure single instance
 	},
