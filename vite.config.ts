@@ -1,3 +1,4 @@
+import { createRequire } from "node:module"; // Added for require.resolve, use node: protocol
 /// <reference types="vitest" />
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 import react from "@vitejs/plugin-react-swc";
@@ -81,6 +82,8 @@ import tsconfigPaths from "vite-tsconfig-paths";
 // 	};
 // }
 
+const require = createRequire(import.meta.url); // Added for require.resolve
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
 	// Accept mode here
@@ -108,14 +111,17 @@ export default defineConfig(({ mode }) => ({
 			protocolImports: true,
 		}),
 		// Copy the pdf.js worker to the output directory
-		viteStaticCopy({
-			targets: [
-				{
-					src: "node_modules/pdfjs-dist/build/pdf.worker.min.js",
-					dest: ".", // Copy to the root of the dist folder
-				},
-			],
-		}),
+		mode !== "test"
+			? viteStaticCopy({
+					// Conditionally include only when not in test mode
+					targets: [
+						{
+							src: require.resolve("pdfjs-dist/build/pdf.worker.min.js"), // Use require.resolve
+							dest: ".", // Copy to the root of the dist folder
+						},
+					],
+				})
+			: null,
 		// Put the Sentry vite plugin after all other plugins
 		sentryVitePlugin({
 			authToken: process.env.SENTRY_AUTH_TOKEN,
