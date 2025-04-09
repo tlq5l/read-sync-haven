@@ -124,7 +124,10 @@ async function processPdfFile(
 
 	const arrayBuffer = await file.arrayBuffer();
 	// Removed Buffer conversion - parsePdf now accepts ArrayBuffer directly
-	const extractedText = await parsePdf(arrayBuffer); // Pass ArrayBuffer directly
+	const parseResult = await parsePdf(arrayBuffer); // Returns { text: string, forms: FormField[], tables: Table[] }
+	const extractedText = parseResult.text; // Extract text for content
+	// TODO: Decide how/where to store extracted form fields (parseResult.forms) and tables (parseResult.tables)
+	// They could be added as new properties to DexieArticle or stored separately.
 
 	// Removed metadata extraction and base64 conversion
 	// Removed old estimation logic relying on pageCount
