@@ -7,7 +7,7 @@
 	"scripts": {
 		"build": "tsc",
 		"start": "functions-framework --target=chatWithContent",
-		"deploy": "gcloud functions deploy chatWithContent --gen2 --runtime=nodejs20 --region=YOUR_REGION --source=. --entry-point=chatWithContent --trigger-http --allow-unauthenticated --set-secrets=gcf-gemini-api-key=gcf-gemini-api-key:latest,gcf-worker-auth-secret=gcf-worker-auth-secret:latest"
+		"deploy": "gcloud functions deploy chatWithContent --gen2 --runtime=nodejs20 --region=asia-southeast1 --source=. --entry-point=chatWithContent --trigger-http --allow-unauthenticated --set-secrets=gcf-gemini-api-key=gcf-gemini-api-key:latest,gcf-worker-auth-secret=gcf-worker-auth-secret:latest"
 	},
 	"dependencies": {
 		"@google-cloud/functions-framework": "^3.3.0",
