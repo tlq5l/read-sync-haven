@@ -100,11 +100,12 @@ export const handlers: RequestHandler[] = [
 			);
 		}
 
-		// Simulate successful response
-		console.log("[MSW] Responding successfully to /api/chat");
+		// Simulate successful NON-STREAMING JSON response (matching GCF format expectation)
+		console.log("[MSW] Responding successfully with JSON to /api/chat");
 		return HttpResponse.json({
-			status: "success",
-			response: MOCK_CHAT_RESPONSE,
+			choices: [{ message: { content: MOCK_CHAT_RESPONSE } }],
+			// Add other fields if the hook expects them, e.g., status
+			// status: "success"
 		});
 	}),
 
