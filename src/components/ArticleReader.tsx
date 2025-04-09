@@ -224,7 +224,7 @@ export default function ArticleReader() {
 								</p>
 							)}
 							{summary && (
-								<div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto max-h-[600px]">
+								<div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto max-h-[800px]">
 									<p>{summary}</p>
 								</div>
 							)}
