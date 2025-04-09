@@ -172,18 +172,18 @@ vi.mock("@/services/epub", () => ({
 	arrayBufferToBase64: vi.fn().mockReturnValue("mock-base64-epub"),
 	getEstimatedReadingTime: vi.fn().mockReturnValue(60),
 }));
-vi.mock("@/services/pdf", () => ({
-	extractPdfMetadata: vi.fn().mockResolvedValue({
-		title: "Test PDF",
-		author: "Test Author",
-		pageCount: 20,
-	}),
-	isValidPdf: vi.fn(),
-	arrayBufferToBase64: vi.fn().mockReturnValue("mock-base64-pdf"),
-	getEstimatedReadingTime: vi.fn().mockReturnValue(40),
-}));
+// Old pdf service mock removed
 vi.mock("@/services/parser", () => ({
 	parseArticle: vi.fn(),
+}));
+// Add mock for the actual pdfParser service
+vi.mock("@/services/pdfParser", () => ({
+	parsePdf: vi.fn().mockResolvedValue({
+		text: "Mock PDF text content",
+		forms: [],
+		tables: [],
+		status: "success",
+	}),
 }));
 
 // Mock toast hook - Keep
@@ -206,8 +206,8 @@ vi.mock("@clerk/clerk-react", () => ({
 // Note: We no longer import from '@/services/db' or '@/services/cloudSync'
 import * as epubService from "@/services/epub";
 import { parseArticle } from "@/services/parser";
-import * as pdfService from "@/services/pdf";
-
+// Removed old pdfService import
+import { parsePdf } from "@/services/pdfParser"; // Import the actual parser to mock it
 // --- Test Setup ---
 const refreshArticlesMock = vi.fn().mockResolvedValue(undefined); // Keep mock refresh function
 
@@ -281,19 +281,16 @@ describe("useArticleActions (Dexie)", () => {
 		vi.mocked(epubService.getEstimatedReadingTime)
 			.mockClear()
 			.mockReturnValue(60);
-		vi.mocked(pdfService.extractPdfMetadata).mockClear().mockResolvedValue({
-			title: "Test PDF",
-			author: "Test Author",
-			pageCount: 20,
+		// Removed mocks for old pdfService
+		// Clear the mock for the actual pdfParser
+		vi.mocked(parsePdf).mockClear();
+		// Re-apply default mock implementation for parsePdf in case it was modified in a test
+		vi.mocked(parsePdf).mockResolvedValue({
+			text: "Mock PDF text content",
+			forms: [],
+			tables: [],
+			status: "success",
 		});
-		vi.mocked(pdfService.isValidPdf).mockClear();
-		vi.mocked(pdfService.arrayBufferToBase64)
-			.mockClear()
-			.mockReturnValue("mock-base64-pdf");
-		vi.mocked(pdfService.getEstimatedReadingTime)
-			.mockClear()
-			.mockReturnValue(40);
-
 		// Reset refresh mock
 		refreshArticlesMock.mockClear();
 	});
@@ -303,7 +300,7 @@ describe("useArticleActions (Dexie)", () => {
 	});
 
 	it("should add PDF file via addArticleByFile", async () => {
-		vi.mocked(pdfService.isValidPdf).mockReturnValue(true);
+		// Remove mock for old pdfService.isValidPdf
 		vi.mocked(epubService.isValidEpub).mockReturnValue(false);
 		const mockFile = new File(["mock content"], "test.pdf", {
 			type: "application/pdf",
@@ -351,7 +348,7 @@ describe("useArticleActions (Dexie)", () => {
 
 	it("should add EPUB file via addArticleByFile", async () => {
 		vi.mocked(epubService.isValidEpub).mockReturnValue(true);
-		vi.mocked(pdfService.isValidPdf).mockReturnValue(false);
+		// Removed mock for old pdfService.isValidPdf
 		const mockFile = new File(["mock content"], "test.epub", {
 			type: "application/epub+zip",
 		});

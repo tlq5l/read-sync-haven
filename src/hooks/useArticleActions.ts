@@ -226,11 +226,18 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				return savedArticle;
 			} catch (err) {
 				console.error("Failed to add article by URL:", err);
+				let description = `Could not save the article from the provided URL. Error: ${err instanceof Error ? err.message : String(err)}`;
+				// Check for specific Readability/Fetch errors to provide better user feedback
+				if (err instanceof Error) {
+					if (err.message.includes("Readability")) {
+						description = `Could not extract article content from this page. The page structure might be incompatible (e.g., search results, login walls). Error: ${err.message}`;
+					} else if (err.message.includes("Failed to fetch HTML")) {
+						description = `Could not fetch the content from the URL. The website might be down or blocking access. Error: ${err.message}`;
+					}
+				}
 				toast({
-					title: "Parsing Failed",
-					description: `Could not parse the article from the provided URL. The article was not saved. Error: ${
-						err instanceof Error ? err.message : String(err)
-					}`,
+					title: "Save Failed", // More general title
+					description, // Use the potentially updated description
 					variant: "destructive",
 				});
 				return null;

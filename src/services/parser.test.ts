@@ -192,8 +192,9 @@ describe("parseArticle", () => {
 		mockParse.mockReturnValue(null); // Simulate Readability returning null
 
 		// Act & Assert
+		// Update expected error to match the more specific error thrown when Readability finds no content
 		await expect(parseArticle(testUrl)).rejects.toThrow(
-			/Could not parse article content/,
+			"Readability could not find article content on this page.",
 		);
 		expect(mockFetch).toHaveBeenCalledWith(`${testUrl}/`, expect.any(Object)); // Check normalized URL
 		expect(mockParse).toHaveBeenCalled(); // Parse was called but returned null

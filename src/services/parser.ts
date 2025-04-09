@@ -185,7 +185,20 @@ export async function parseArticle(
 	}
 
 	const normalizedUrl = normalizeUrl(url);
-	const html = await fetchHtml(normalizedUrl);
+	let html: string;
+	try {
+		html = await fetchHtml(normalizedUrl);
+	} catch (fetchError) {
+		console.error(
+			`[parser.ts] Failed to fetch HTML for ${normalizedUrl}:`,
+			fetchError,
+		);
+		// Re-throw fetch error to be caught by useArticleActions
+		throw new Error(
+			`Failed to fetch HTML: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`,
+		);
+	}
+
 	let article: ParsedReadabilityArticle | null;
 
 	// Create a proper DOM document that's compatible with Readability
@@ -208,7 +221,7 @@ export async function parseArticle(
 				article = reader.parse();
 			} catch (e) {
 				console.error("Failed to load or use JSDOM in SSR:", e);
-				throw new Error("Failed to parse article in SSR environment.");
+				throw new Error("Parser setup failed in SSR environment."); // More specific SSR error
 			}
 		} else {
 			// Should not happen in a pure client-side build if window was undefined
@@ -217,13 +230,31 @@ export async function parseArticle(
 			);
 		}
 
+		// Check if Readability succeeded but returned null or no content
 		if (!article) {
-			throw new Error("Could not parse article content");
+			console.warn(
+				`[parser.ts] Readability returned null for URL: ${normalizedUrl}. Page structure might be incompatible.`,
+			);
+			throw new Error(
+				"Readability could not find article content on this page.",
+			);
+		}
+		if (!article.content) {
+			// Readability succeeded but found no content - treat as incompatibility
+			console.warn(
+				`[parser.ts] Readability found no content for URL: ${normalizedUrl}.`,
+			);
+			throw new Error("Readability found no article content on this page.");
 		}
 	} catch (error) {
-		console.error("Error parsing article with Readability:", error);
+		// Catch errors from Readability execution itself OR the specific errors thrown above
+		console.error(
+			`[parser.ts] Error during Readability parsing for ${normalizedUrl}:`,
+			error,
+		);
+		// Throw a specific error for UI handling
 		throw new Error(
-			`Failed to parse article: ${error instanceof Error ? error.message : String(error)}`,
+			`Readability parsing failed: ${error instanceof Error ? error.message : String(error)}`,
 		);
 	}
 
