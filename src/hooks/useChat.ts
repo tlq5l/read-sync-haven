@@ -54,15 +54,14 @@ export function useChat(fullTextContent: string | null) {
 					messages: [
 						{
 							role: "system",
-							content: `You are a helpful assistant discussing the following document content:\n\n${fullTextContent}`,
-						}, // Provide context
-						...chatHistory, // Include previous messages for context
+							content: `You are a helpful assistant discussing the following document content (truncated):\n\n${fullTextContent.slice(0, 12000)} [...truncated content]`, // Truncate content
+						},
+						...chatHistory.slice(-6), // Limit history to last 6 messages
 						{ role: "user", content: userMessage },
 					],
 					// Add other parameters like temperature if needed
 				});
 
-				console.log('Custom API Request Payload:', JSON.parse(requestBody)); // Added logging
 				try {
 					response = await fetch(apiUrl, {
 						method: "POST",
@@ -125,7 +124,6 @@ export function useChat(fullTextContent: string | null) {
 			// --- Extract AI Response (Adapts based on source) ---
 			let aiResponseText: string | null = null;
 			if (customApiKey && customApiEndpoint) {
-				console.log('Custom API Raw Response Data:', data); // Added logging
 				// Extract from OpenAI-compatible response structure
 				aiResponseText = data?.choices?.[0]?.message?.content ?? null;
 				if (!aiResponseText) {
