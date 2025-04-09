@@ -51,6 +51,19 @@ function getMimeType(filename: string): string | null {
 			return null;
 	}
 }
+
+// Helper function to safely decode URI components
+function decodeURIComponentSafely(uriComponent: string): string {
+	try {
+		return decodeURIComponent(uriComponent);
+	} catch (e) {
+		console.warn(
+			`[EpubProcessor] Failed to decode URI component: "${uriComponent}". Using original string. Error:`,
+			e,
+		);
+		return uriComponent; // Return original string if decoding fails
+	}
+}
 // --- End Helper Functions ---
 
 // --- Main Component ---
@@ -137,11 +150,17 @@ export default function EpubProcessor({
 						`[EpubProcessor] Attempting to process section: ${item.href}`,
 					);
 					let fullSectionPath = ""; // Define for error logging scope
+					let relativeSectionPath = ""; // Declare here for catch block access
 					try {
-						const relativeSectionPath = item.href ? normalize(item.href) : "";
+						// Decode the href first
+						const decodedHref = item.href
+							? decodeURIComponentSafely(item.href)
+							: "";
+						relativeSectionPath = decodedHref ? normalize(decodedHref) : ""; // Assign value here
+						relativeSectionPath = decodedHref ? normalize(decodedHref) : ""; // Assign to existing variable
 						if (!relativeSectionPath) {
 							console.warn(
-								`[EpubProcessor] Missing section href for item ${item.idref}. Skipping.`,
+								`[EpubProcessor] Missing or empty section href for item ${item.idref} (Original: ${item.href || "N/A"}). Skipping.`,
 							);
 							return "";
 						}
@@ -181,7 +200,7 @@ export default function EpubProcessor({
 
 						if (!sectionFile) {
 							console.warn(
-								`[EpubProcessor] FAIL: Section file not found in zip for href "${item.href}" (searched full path: ${fullSectionPath}). Skipping.`,
+								`[EpubProcessor] FAIL (Section Load): File not found in zip for href "${item.href}" (decoded: "${relativeSectionPath}", searched full path: "${fullSectionPath}", case-insensitive search path: "${fullSectionPath.toLowerCase()}"). Skipping section.`,
 							);
 							return ""; // Skip section if file not found
 						}
@@ -190,7 +209,7 @@ export default function EpubProcessor({
 
 						if (typeof sectionHtml !== "string" || sectionHtml.length === 0) {
 							console.warn(
-								`[EpubProcessor] FAIL: Section content is not a string or empty for href "${item.href}" (path: ${actualSectionPath}). Skipping.`,
+								`[EpubProcessor] FAIL (Section Load): Section content is not a string or empty for href "${item.href}" (actual path: ${actualSectionPath}). Skipping section.`,
 							);
 							return "";
 						}
@@ -208,68 +227,102 @@ export default function EpubProcessor({
 
 						for (const img of imageElements) {
 							const originalSrc = img.getAttribute("src");
-							// Use JSZip for images, resolving paths relative to the OPF base path
-							if (originalSrc && !originalSrc.startsWith("data:")) {
-								let imagePath: string | undefined; // Full path in zip
+							// Decode original src and check if it's not a data URI
+							const decodedOriginalSrc = originalSrc
+								? decodeURIComponentSafely(originalSrc)
+								: null;
+							if (
+								decodedOriginalSrc &&
+								!decodedOriginalSrc.startsWith("data:")
+							) {
+								// let imagePath: string | undefined; // Removed unused variable
+								let triedPaths: string[] = []; // Declare here for catch block access
 								try {
-									const relativeImagePath = originalSrc; // Changed let to const based on lint rule
-									// Resolve the image path relative to the *section's path*
-									const sectionDirectory = dirname(fullSectionPath);
-									imagePath = join(sectionDirectory, relativeImagePath);
+									let actualImagePath: string | undefined;
+									let imageFile: JSZip.JSZipObject | null = null;
+									triedPaths = []; // Reset for each image attempt
+									triedPaths = []; // Assign to existing variable (reset)
 
-									imagePath = normalize(imagePath); // Normalize the final path
-
-									// Ensure no leading slash remains after normalization for zip lookup
-									if (imagePath.startsWith("/")) {
-										imagePath = imagePath.substring(1);
-									}
-									// console.log( // DIAGNOSTIC LOG removed
-									// 	`\t[Epub Img DEBUG] Section: "${fullSectionPath}", SectionDir: "${sectionDirectory}", Orig src: "${originalSrc}", Resolved Img Path: "${imagePath}"`
-									// );
-
-									// Look up in zip using case-insensitive map
-									const actualImagePath = imagePath
-										? pathMap[imagePath.toLowerCase()]
-										: undefined;
-									const imageFile = actualImagePath
+									// Strategy 1: Resolve relative to the section's directory
+									const pathRelativeToSectionDir = normalize(
+										join(dirname(fullSectionPath), decodedOriginalSrc),
+									);
+									triedPaths.push(pathRelativeToSectionDir);
+									actualImagePath =
+										pathMap[pathRelativeToSectionDir.toLowerCase()];
+									imageFile = actualImagePath
 										? zip.file(actualImagePath)
 										: null;
 
-									if (imageFile) {
+									// Strategy 2: Resolve relative to the OPF base path
+									if (!imageFile && basePath) {
+										const pathRelativeToOpfDir = normalize(
+											join(basePath, decodedOriginalSrc),
+										);
+										triedPaths.push(pathRelativeToOpfDir);
+										actualImagePath =
+											pathMap[pathRelativeToOpfDir.toLowerCase()];
+										imageFile = actualImagePath
+											? zip.file(actualImagePath)
+											: null;
+									}
+
+									// Strategy 3: Resolve relative to the root (treat as absolute within zip)
+									if (!imageFile) {
+										const pathRelativeToRoot = normalize(
+											decodedOriginalSrc.startsWith("/")
+												? decodedOriginalSrc.substring(1)
+												: decodedOriginalSrc,
+										);
+										triedPaths.push(pathRelativeToRoot);
+										actualImagePath = pathMap[pathRelativeToRoot.toLowerCase()];
+										imageFile = actualImagePath
+											? zip.file(actualImagePath)
+											: null;
+									}
+
+									// --- Proceed if image file was found by any strategy ---
+									if (imageFile && actualImagePath) {
+										// Check actualImagePath as well
+										console.log(
+											`\t[Epub Img] INFO: Found image "${decodedOriginalSrc}" at actual path "${actualImagePath}" (tried: ${triedPaths.join(", ")})`,
+										);
+
 										const base64Data = await imageFile.async("base64");
-										if (base64Data && actualImagePath) {
-											const mimeType = getMimeType(actualImagePath);
-											if (mimeType) {
-												img.setAttribute(
-													"src",
-													`data:${mimeType};base64,${base64Data}`,
-												);
-												console.log(
-													`\t[Epub Img] SUCCESS: Embedded image "${actualImagePath}" using JSZip`,
-												);
-											} else {
-												console.warn(
-													`\t[Epub Img] FAIL: Could not get MIME type for "${actualImagePath}"`,
-												);
-												img.removeAttribute("src");
-											}
+										const mimeType = getMimeType(actualImagePath); // actualImagePath is guaranteed here
+
+										if (base64Data && mimeType) {
+											img.setAttribute(
+												"src",
+												`data:${mimeType};base64,${base64Data}`,
+											);
+											console.log(
+												`\t[Epub Img] SUCCESS: Embedded image "${decodedOriginalSrc}" (found at: "${actualImagePath}")`,
+											);
+										} else if (!mimeType) {
+											console.warn(
+												`\t[Epub Img] FAIL (Embed): Could not determine MIME type for image "${decodedOriginalSrc}" (path: "${actualImagePath}")`,
+											);
+											img.removeAttribute("src");
 										} else {
 											console.warn(
-												`\t[Epub Img] FAIL: JSZip returned no base64 data for "${actualImagePath}"`,
+												`\t[Epub Img] FAIL (Embed): JSZip returned no base64 data for image "${decodedOriginalSrc}" (path: "${actualImagePath}")`,
 											);
 											img.removeAttribute("src");
 										}
 									} else {
+										// Image not found by any strategy
 										console.warn(
-											`\t[Epub Img] FAIL: Image file not found in zip at resolved path "${imagePath}" (looked for actual path "${actualImagePath || "NOT FOUND"}")`,
+											`\t[Epub Img] FAIL (Find): Image file not found for src "${decodedOriginalSrc}". Tried paths: ${triedPaths.join(", ")}`,
 										);
 										img.removeAttribute("src");
 									}
 								} catch (imgErr: any) {
+									// Generic error during image processing
 									console.error(
-										`\t[Epub Img] FAIL: Error processing image src "${originalSrc}" (resolved path: "${imagePath ?? "unknown"}"):`,
+										`\t[Epub Img] FAIL (Error): Error processing image src "${decodedOriginalSrc}" (Tried paths: ${triedPaths.join(", ")}): %o`, // Use %o for object logging
 										imgErr?.message || imgErr,
-										imgErr,
+										imgErr, // Log the full error object
 									);
 									img.removeAttribute("src");
 								}
@@ -285,9 +338,9 @@ export default function EpubProcessor({
 					} catch (sectionErr: any) {
 						// Restore simpler error logging
 						console.error(
-							`[EpubProcessor] FAIL: Error processing section href: ${item.href} (searched full path: ${fullSectionPath}):`,
+							`[EpubProcessor] FAIL (Section Process): Error processing section href: "${item.href}" (decoded: "${relativeSectionPath}", searched full path: "${fullSectionPath}"): %o`, // Use %o
 							sectionErr?.message || sectionErr,
-							sectionErr,
+							sectionErr, // Log the full error object
 						);
 						return ""; // Return empty string on error
 					}

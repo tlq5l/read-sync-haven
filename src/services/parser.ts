@@ -2,29 +2,36 @@ import { Readability } from "@mozilla/readability";
 import DOMPurify from "dompurify";
 // JSDOM is imported dynamically below for Node.js environments only
 // import { JSDOM } from "jsdom";
-import TurndownService from "turndown";
 
 // No need for Node.js polyfills as we're using browser-native DOMParser
 
 // Import types
 import type { Article } from "./db/types"; // Changed path
 
-// Create turndown service for HTML to Markdown conversion
-const turndownService = new TurndownService({
-	headingStyle: "atx",
-	hr: "---",
-	bulletListMarker: "-",
-	codeBlockStyle: "fenced",
-});
+// Define Custom Error Types
+export class FetchError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "FetchError";
+	}
+}
 
-// Add additional Turndown rules
-turndownService.addRule("removeExtraLineBreaks", {
-	filter: ["p", "h1", "h2", "h3", "h4", "h5", "h6"],
-	replacement: (content) => {
-		return `\n\n${content}\n\n`;
-	},
-});
+export class ParseError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "ParseError";
+	}
+}
 
+export class ReadabilityError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "ReadabilityError";
+	}
+}
+
+// Fetch timeout configuration (e.g., 30 seconds)
+const FETCH_TIMEOUT_MS = 30000;
 // URL validation
 export function isValidUrl(urlString: string): boolean {
 	try {
@@ -46,6 +53,9 @@ export function normalizeUrl(url: string): string {
 
 // Fetch HTML content from URL
 export async function fetchHtml(url: string): Promise<string> {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
 	try {
 		// Try direct fetch first with correct CORS mode
 		try {
@@ -56,16 +66,27 @@ export async function fetchHtml(url: string): Promise<string> {
 					Accept:
 						"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 				},
-				mode: "cors", // Explicitly set CORS mode
-				credentials: "omit", // No credentials needed for article fetch
+				mode: "cors",
+				credentials: "omit",
 				cache: "no-cache",
+				signal: controller.signal, // Add abort signal
 			});
 
 			if (directResponse.ok) {
+				clearTimeout(timeoutId); // Clear timeout on successful fetch
 				return await directResponse.text();
 			}
+			// Throw specific error for non-ok direct response
+			throw new FetchError(
+				`Direct fetch failed with status ${directResponse.status}`,
+			);
 		} catch (directError) {
-			console.log("Direct fetch failed, trying CORS proxies", directError);
+			// Handle timeout specifically
+			if (directError instanceof Error && directError.name === "AbortError") {
+				console.log("Direct fetch timed out, trying CORS proxies");
+			} else {
+				console.log("Direct fetch failed, trying CORS proxies:", directError);
+			}
 		}
 
 		// Updated CORS proxies for 2025 based on current research
@@ -90,6 +111,9 @@ export async function fetchHtml(url: string): Promise<string> {
 		for (const proxyUrl of corsProxies) {
 			try {
 				console.log(`Trying proxy: ${proxyUrl.split("?")[0]}`);
+				// Use a new controller for each proxy attempt? Or reuse outer one? Reusing seems simpler.
+				// If reusing outer, we need to clear/reset the timer properly.
+				// Let's stick to one outer timeout for the whole operation. If proxies are slow, the whole thing fails.
 				const response = await fetch(proxyUrl, {
 					headers: {
 						"User-Agent":
@@ -98,6 +122,7 @@ export async function fetchHtml(url: string): Promise<string> {
 							"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 					},
 					cache: "no-cache",
+					signal: controller.signal, // Use the same signal
 				});
 
 				if (response.ok) {
@@ -106,6 +131,7 @@ export async function fetchHtml(url: string): Promise<string> {
 						console.log(
 							`Successfully fetched content using ${proxyUrl.split("?")[0]}`,
 						);
+						clearTimeout(timeoutId); // Clear timeout on successful fetch
 						return text;
 					}
 					console.warn(
@@ -119,48 +145,35 @@ export async function fetchHtml(url: string): Promise<string> {
 					);
 				}
 			} catch (error) {
+				// Handle timeout specifically for proxies
+				if (error instanceof Error && error.name === "AbortError") {
+					console.warn(`Timeout using proxy ${proxyUrl.split("?")[0]}`);
+					// If the main timeout is triggered, abort all subsequent attempts
+					throw new FetchError("Fetching article timed out via proxy.");
+				}
+				// Removed redundant else block after throw
 				console.warn(`Error using proxy ${proxyUrl.split("?")[0]}:`, error);
-				// Continue to the next proxy
+				// Continue to the next proxy if it wasn't a timeout
 			}
 		}
 
 		// If we get here, all individual proxies failed
-		// Try with Promise.any as a last resort, which will use the first successful proxy
-		try {
-			console.log("Trying all proxies concurrently with Promise.any");
-			const proxyRequests = corsProxies.map(async (proxyUrl) => {
-				const response = await fetch(proxyUrl, {
-					headers: {
-						"User-Agent":
-							"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.160 Safari/537.36",
-						Accept:
-							"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-					},
-					cache: "no-cache",
-				});
-
-				if (!response.ok) {
-					throw new Error(`HTTP error! Status: ${response.status}`);
-				}
-
-				const text = await response.text();
-				if (!text || text.length === 0) {
-					throw new Error("Empty response");
-				}
-
-				return text;
-			});
-
-			return await Promise.race(proxyRequests);
-		} catch (aggregateError) {
-			// All proxies failed in Promise.any
-			throw new Error(
-				"All CORS proxies failed. Unable to fetch article content.",
-			);
-		}
+		// If we get here, all individual proxy attempts failed (or timed out)
+		throw new FetchError(
+			"All direct and proxy fetch attempts failed or timed out.",
+		);
 	} catch (error) {
-		console.error("Error fetching HTML:", error);
-		throw error instanceof Error ? error : new Error(String(error));
+		console.error("Unhandled error during fetchHtml:", error);
+		// Ensure specific FetchError is thrown
+		if (error instanceof FetchError) {
+			throw error;
+		}
+		// Wrap other unexpected errors
+		throw new FetchError(
+			`An unexpected error occurred during fetching: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	} finally {
+		clearTimeout(timeoutId); // Always clear the timeout
 	}
 }
 
@@ -181,7 +194,7 @@ export async function parseArticle(
 	url: string,
 ): Promise<Omit<Article, "_id" | "savedAt" | "isRead" | "favorite" | "tags">> {
 	if (!isValidUrl(url)) {
-		throw new Error("Invalid URL");
+		throw new ParseError("Invalid URL provided.");
 	}
 
 	const normalizedUrl = normalizeUrl(url);
@@ -193,8 +206,11 @@ export async function parseArticle(
 			`[parser.ts] Failed to fetch HTML for ${normalizedUrl}:`,
 			fetchError,
 		);
-		// Re-throw fetch error to be caught by useArticleActions
-		throw new Error(
+		// Re-throw specific FetchError or wrap others
+		if (fetchError instanceof FetchError) {
+			throw fetchError; // Propagate the specific error
+		}
+		throw new FetchError(
 			`Failed to fetch HTML: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`,
 		);
 	}
@@ -221,11 +237,11 @@ export async function parseArticle(
 				article = reader.parse();
 			} catch (e) {
 				console.error("Failed to load or use JSDOM in SSR:", e);
-				throw new Error("Parser setup failed in SSR environment."); // More specific SSR error
+				throw new ParseError("Parser setup failed in SSR environment (JSDOM).");
 			}
 		} else {
 			// Should not happen in a pure client-side build if window was undefined
-			throw new Error(
+			throw new ParseError(
 				"Parsing environment unclear: window is undefined but not in SSR build.",
 			);
 		}
@@ -235,8 +251,8 @@ export async function parseArticle(
 			console.warn(
 				`[parser.ts] Readability returned null for URL: ${normalizedUrl}. Page structure might be incompatible.`,
 			);
-			throw new Error(
-				"Readability could not find article content on this page.",
+			throw new ReadabilityError(
+				"Readability could not parse the article content (returned null). The page structure might be incompatible.",
 			);
 		}
 		if (!article.content) {
@@ -244,7 +260,9 @@ export async function parseArticle(
 			console.warn(
 				`[parser.ts] Readability found no content for URL: ${normalizedUrl}.`,
 			);
-			throw new Error("Readability found no article content on this page.");
+			throw new ReadabilityError(
+				"Readability parsed the page but found no main content.",
+			);
 		}
 	} catch (error) {
 		// Catch errors from Readability execution itself OR the specific errors thrown above
@@ -253,8 +271,12 @@ export async function parseArticle(
 			error,
 		);
 		// Throw a specific error for UI handling
-		throw new Error(
-			`Readability parsing failed: ${error instanceof Error ? error.message : String(error)}`,
+		// Throw specific ReadabilityError or wrap others
+		if (error instanceof ReadabilityError || error instanceof ParseError) {
+			throw error; // Propagate specific errors
+		}
+		throw new ReadabilityError(
+			`Readability processing failed: ${error instanceof Error ? error.message : String(error)}`,
 		);
 	}
 
@@ -332,10 +354,4 @@ export function extractTextFromHtml(html: string): string {
 	const parser = new DOMParser();
 	const doc = parser.parseFromString(html, "text/html");
 	return doc.body.textContent || "";
-}
-
-// Helper function to convert HTML to Markdown
-export function htmlToMarkdown(html: string): string {
-	const sanitizedHtml = DOMPurify.sanitize(html);
-	return turndownService.turndown(sanitizedHtml);
 }

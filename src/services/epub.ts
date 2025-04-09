@@ -3,7 +3,8 @@
  * Provides functions to extract metadata from EPUB files
  */
 import ePub from "epubjs";
-
+import { XMLParser } from "fast-xml-parser";
+import JSZip from "jszip";
 // Helper function to convert ArrayBuffer to Base64
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
 	let binary = "";
@@ -67,11 +68,101 @@ export async function extractEpubMetadata(
 		// Extract metadata
 		const metadata = book.package.metadata;
 		// Extract cover if available
-		let coverUrl: string | undefined;
+		// let coverUrl: string | undefined; // Removed unused variable
+		let coverBase64: string | undefined;
 		try {
-			coverUrl = await book.coverUrl();
-		} catch (e) {
-			console.warn("Could not extract cover from EPUB:", e);
+			// Try getting cover using epubjs first
+			const coverBlobUrl = await book.coverUrl();
+			if (coverBlobUrl) {
+				// Convert blob URL to base64
+				const response = await fetch(coverBlobUrl);
+				const blob = await response.blob();
+				coverBase64 = await new Promise((resolve, reject) => {
+					const reader = new FileReader();
+					reader.onloadend = () => resolve(reader.result as string);
+					reader.onerror = reject;
+					reader.readAsDataURL(blob);
+				});
+				URL.revokeObjectURL(coverBlobUrl); // Clean up blob URL
+			}
+		} catch (epubjsCoverError) {
+			console.warn(
+				"epubjs failed to get coverUrl, attempting fallback via JSZip:",
+				epubjsCoverError,
+			);
+			// Fallback using JSZip and OPF parsing
+			try {
+				const zip = await JSZip.loadAsync(fileBuffer);
+				const containerFile = zip.file("META-INF/container.xml");
+				if (!containerFile) {
+					throw new Error("META-INF/container.xml not found in EPUB.");
+				}
+				const containerXml = await containerFile.async("string");
+				const parser = new XMLParser({ ignoreAttributes: false });
+				const containerData = parser.parse(containerXml);
+
+				const rootfilePath =
+					containerData?.container?.rootfiles?.rootfile?.["@_full-path"];
+				if (!rootfilePath) {
+					throw new Error("Could not find rootfile path in container.xml.");
+				}
+
+				const opfFile = zip.file(rootfilePath);
+				if (!opfFile) {
+					throw new Error(`OPF file not found at path: ${rootfilePath}`);
+				}
+				const opfXml = await opfFile.async("string");
+				const opfData = parser.parse(opfXml);
+
+				const metadata = opfData?.package?.metadata;
+				const manifest = opfData?.package?.manifest?.item;
+
+				let coverItemId: string | undefined;
+				if (metadata?.meta && Array.isArray(metadata.meta)) {
+					coverItemId = metadata.meta.find(
+						(meta: any) => meta["@_name"] === "cover",
+					)?.["@_content"];
+				} else if (metadata?.meta?.["@_name"] === "cover") {
+					coverItemId = metadata.meta["@_content"];
+				}
+
+				if (coverItemId && manifest) {
+					const coverManifestItem = (
+						Array.isArray(manifest) ? manifest : [manifest]
+					).find((item: any) => item["@_id"] === coverItemId);
+
+					if (coverManifestItem?.["@_href"]) {
+						const coverPath = coverManifestItem["@_href"];
+						// Resolve cover path relative to OPF file
+						const opfDir = rootfilePath.substring(
+							0,
+							rootfilePath.lastIndexOf("/"),
+						);
+						const absoluteCoverPath = opfDir
+							? `${opfDir}/${coverPath}`
+							: coverPath;
+
+						const coverFile = zip.file(absoluteCoverPath);
+						if (coverFile) {
+							const coverBuffer = await coverFile.async("arraybuffer");
+							const mimeType =
+								coverManifestItem["@_media-type"] || "image/jpeg"; // Default fallback
+							coverBase64 = `data:${mimeType};base64,${arrayBufferToBase64(coverBuffer)}`;
+							console.log("Successfully extracted cover using JSZip fallback.");
+						} else {
+							console.warn(
+								`Cover image file not found at resolved path: ${absoluteCoverPath}`,
+							);
+						}
+					} else {
+						console.warn("Cover item found in manifest, but href is missing.");
+					}
+				} else {
+					console.warn("Could not find cover meta tag or manifest in OPF.");
+				}
+			} catch (fallbackError) {
+				console.error("Error during JSZip cover fallback:", fallbackError);
+			}
 		}
 
 		// Return the metadata
@@ -84,9 +175,9 @@ export async function extractEpubMetadata(
 			publishedDate: metadata.published_date || metadata.modified_date,
 		};
 
-		// Add cover if available
-		if (coverUrl) {
-			result.cover = coverUrl;
+		// Add cover if extracted (either via epubjs or fallback)
+		if (coverBase64) {
+			result.cover = coverBase64;
 		}
 
 		// Properly destroy the book instance to free up resources
@@ -106,22 +197,40 @@ export async function extractEpubMetadata(
 	}
 }
 
-// Function to validate if a file is a valid EPUB
-export function isValidEpub(file: File): boolean {
-	// Check file extension
-	const extension = file.name.split(".").pop()?.toLowerCase();
-	if (extension !== "epub") {
-		return false;
-	}
+// Function to validate if a buffer contains a valid EPUB structure
+export async function isValidEpub(fileBuffer: ArrayBuffer): Promise<boolean> {
+	try {
+		const zip = await JSZip.loadAsync(fileBuffer);
 
-	// Check MIME type if available
-	if (file.type && !file.type.includes("application/epub+zip")) {
-		// Some browsers may not report the correct MIME type for EPUB files
-		// So we'll be lenient here and rely more on the extension
-		console.warn("File has .epub extension but mime type is:", file.type);
-	}
+		// 1. Check for mimetype file existence and content
+		const mimetypeFile = zip.file("mimetype");
+		if (!mimetypeFile) {
+			console.error("EPUB Validation Error: 'mimetype' file not found.");
+			return false;
+		}
+		const mimetypeContent = await mimetypeFile.async("string");
+		if (mimetypeContent.trim() !== "application/epub+zip") {
+			console.error(
+				`EPUB Validation Error: Invalid content in 'mimetype' file: "${mimetypeContent.trim()}"`,
+			);
+			return false;
+		}
 
-	return true;
+		// 2. Check for META-INF/container.xml existence
+		const containerFile = zip.file("META-INF/container.xml");
+		if (!containerFile) {
+			console.error(
+				"EPUB Validation Error: 'META-INF/container.xml' file not found.",
+			);
+			return false;
+		}
+
+		// Basic structure checks passed
+		return true;
+	} catch (error) {
+		console.error("EPUB Validation Error: Could not load zip file.", error);
+		return false; // Failed to load as zip, likely not a valid EPUB
+	}
 }
 
 // Get estimated reading time for an EPUB book

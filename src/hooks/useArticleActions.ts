@@ -2,7 +2,12 @@
 import { useToast } from "@/hooks/use-toast";
 import { type DexieArticle, db } from "@/services/db/dexie"; // Import Dexie db instance
 import type { Article } from "@/services/db/types"; // Import original Article type
-import { parseArticle } from "@/services/parser";
+import {
+	FetchError,
+	ParseError,
+	ReadabilityError,
+	parseArticle,
+} from "@/services/parser";
 import { parsePdf } from "@/services/pdfParser"; // Import the correct PDF parser
 import { useAuth } from "@clerk/clerk-react"; // Keep for userId association
 import { useCallback } from "react";
@@ -70,10 +75,11 @@ async function processEpubFile(
 ): Promise<DexieArticle> {
 	// Return DexieArticle directly
 	const epubModule = await import("@/services/epub");
-	if (!epubModule.isValidEpub(file)) {
-		throw new Error("Invalid EPUB file.");
+	const fileBuffer = await file.arrayBuffer(); // Read buffer first
+	if (!(await epubModule.isValidEpub(fileBuffer))) {
+		// Await async validation and pass buffer
+		throw new Error("Invalid EPUB file structure or required files missing."); // More specific error
 	}
-	const fileBuffer = await file.arrayBuffer();
 	const metadata = await epubModule.extractEpubMetadata(fileBuffer);
 	const base64Content = epubModule.arrayBufferToBase64(fileBuffer);
 	const estimatedReadingTime = await epubModule.getEstimatedReadingTime(
@@ -226,18 +232,26 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				return savedArticle;
 			} catch (err) {
 				console.error("Failed to add article by URL:", err);
-				let description = `Could not save the article from the provided URL. Error: ${err instanceof Error ? err.message : String(err)}`;
-				// Check for specific Readability/Fetch errors to provide better user feedback
-				if (err instanceof Error) {
-					if (err.message.includes("Readability")) {
-						description = `Could not extract article content from this page. The page structure might be incompatible (e.g., search results, login walls). Error: ${err.message}`;
-					} else if (err.message.includes("Failed to fetch HTML")) {
-						description = `Could not fetch the content from the URL. The website might be down or blocking access. Error: ${err.message}`;
-					}
+				let title = "Save Failed";
+				let description = "";
+
+				// Check for specific custom error types
+				if (err instanceof FetchError) {
+					title = "Fetch Failed";
+					description = `Could not fetch content from the URL. The website might be down, blocking access, or the request timed out. Error: ${err.message}`;
+				} else if (err instanceof ReadabilityError) {
+					title = "Parsing Failed";
+					description = `Could not extract the main article content from this page. The page structure might be incompatible (e.g., login walls, complex layouts). Error: ${err.message}`;
+				} else if (err instanceof ParseError) {
+					title = "Invalid Input"; // e.g., Invalid URL
+					description = `Could not process the request. Error: ${err.message}`;
+				} else {
+					// Generic fallback
+					description = `An unexpected error occurred while saving the article. Error: ${err instanceof Error ? err.message : String(err)}`;
 				}
 				toast({
-					title: "Save Failed", // More general title
-					description, // Use the potentially updated description
+					title, // Use the dynamically set title
+					description, // Use the specific error description
 					variant: "destructive",
 				});
 				return null;
