@@ -11,7 +11,10 @@ export type ChatMessage = {
  * Custom hook to manage chat interactions related to article content.
  * Handles API calls, chat history, input state, and loading/error states.
  */
-export function useChat(fullTextContent: string | null) {
+export function useChat(
+	fullTextContent: string | null,
+	onChatSettled?: () => void, // Optional callback
+) {
 	const { getToken } = useAuth();
 	const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 	const [chatInput, setChatInput] = useState("");
@@ -390,6 +393,8 @@ export function useChat(fullTextContent: string | null) {
 			setIsChatting(false);
 			// Scroll to bottom after message exchange
 			scrollToBottom();
+			// Call the callback if provided
+			onChatSettled?.();
 		},
 	});
 
