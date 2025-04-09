@@ -327,7 +327,7 @@ export default function ArticleReader() {
 							className="mt-4 flex flex-col flex-1 overflow-hidden" // Added overflow-hidden
 						>
 							<ScrollArea
-								className="flex-1 min-h-0 mb-4 pr-4"
+								className="flex-1 min-h-0 pr-4"
 								ref={chatScrollAreaRef}
 							>
 								{" "}
