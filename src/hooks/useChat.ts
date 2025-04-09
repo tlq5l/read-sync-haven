@@ -62,6 +62,7 @@ export function useChat(fullTextContent: string | null) {
 					// Add other parameters like temperature if needed
 				});
 
+				console.log('Custom API Request Payload:', JSON.parse(requestBody)); // Added logging
 				try {
 					response = await fetch(apiUrl, {
 						method: "POST",
@@ -69,7 +70,9 @@ export function useChat(fullTextContent: string | null) {
 						body: requestBody,
 					});
 				} catch (error) {
-					console.error("Error calling custom API endpoint:", error);
+					console.error('Custom API Error:', error); // Added specific logging
+					// Keep original error message for context
+					console.error("Original error calling custom API endpoint:", error);
 					throw new Error(
 						`Failed to connect to custom endpoint: ${apiUrl}. Please check the URL and network connection.`,
 					);
@@ -122,9 +125,14 @@ export function useChat(fullTextContent: string | null) {
 			// --- Extract AI Response (Adapts based on source) ---
 			let aiResponseText: string | null = null;
 			if (customApiKey && customApiEndpoint) {
+				console.log('Custom API Raw Response Data:', data); // Added logging
 				// Extract from OpenAI-compatible response structure
 				aiResponseText = data?.choices?.[0]?.message?.content ?? null;
 				if (!aiResponseText) {
+					console.error( // Log the problematic data structure too
+						"Missing AI content. Custom API Raw Response Data:",
+						data,
+					);
 					throw new Error(
 						"Invalid response from custom API endpoint (missing AI response content).",
 					);
