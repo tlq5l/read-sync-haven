@@ -70,119 +70,82 @@ export async function parsePdf(
 		let allForms: FormField[] = [];
 		let allTables: Table[] = [];
 
-		for (let i = 1; i <= pdfDoc.numPages; i++) {
-			const page = await pdfDoc.getPage(i);
-			let pageText = "";
-			let pageForms: FormField[] = [];
-			let pageTables: Table[] = [];
-			let pageStatus: "success" | "error" = "success";
-			try {
-				const textContent = await page.getTextContent();
-				const sortedItems = textContent.items
-					.filter((item): item is TextItem => "str" in item) // Filter for actual TextItems
-					.sort((a, b) => {
-						const yDiff = a.transform[5] - b.transform[5];
-						const tolerance = 1;
-						if (Math.abs(yDiff) > tolerance) {
-							return yDiff;
-						}
-						return a.transform[4] - b.transform[4];
-					});
-				// --- Basic Table Detection ---
-				// Apply the heuristic table detection function to the sorted items
-				// Note: This happens *before* deciding whether to use OCR text for the page's full text,
-				// as table structure relies on coordinate data from pdfjs-dist.
-				pageTables = detectTablesFromTextItems(sortedItems); // Assign to pageTables
-				if (pageTables.length > 0) {
-					// Accumulate for final result
-					allTables = allTables.concat(pageTables);
-					// console.log(`Page ${i}: Found ${pageTables.length} potential table(s).`);
-				}
-				// --- End Basic Table Detection ---
+		// Create an array of promises for processing each page
+		const pagePromises = Array.from({ length: pdfDoc.numPages }, (_, i) => {
+			const pageNum = i + 1;
+			return pdfDoc
+				.getPage(pageNum)
+				.then((page) => processSinglePage(page, pageNum));
+			// Note: Could add a .catch here to handle getPage errors,
+			// but processSinglePage already has internal error handling.
+		});
 
-				const extractedText = sortedItems.map((item) => item.str).join(" ");
-				const hasSufficientText =
-					extractedText.replace(/\s+/g, "").length >= MIN_TEXT_THRESHOLD;
+		// Execute all page processing promises concurrently
+		const pageResultsSettled = await Promise.allSettled(pagePromises);
 
-				if (hasSufficientText) {
-					// Use text extracted by pdfjs-dist
-					pageText = extractedText;
-					// console.log(`Page ${i}: Used pdfjs-dist text.`);
-				} else {
-					// Attempt OCR if text content is insufficient
-					// console.log(`Page ${i}: Insufficient text from pdfjs-dist, attempting OCR...`);
-					try {
-						const ocrText = await performOcrOnPage(page);
-						pageText = ocrText;
-						// console.log(`Page ${i}: OCR successful.`);
-					} catch (ocrError) {
-						console.error(`Error performing OCR on page ${i}:`, ocrError);
-						pageText = ""; // Fallback to empty string for this page on OCR failure
-					}
+		// Process the results, maintaining page order for text
+		const pageResultsMap: Map<number, PageParseResult> = new Map();
+		let overallStatus: PdfParseResult["status"] = "success";
+		let maxProcessedPageNum = 0;
+
+		for (const result of pageResultsSettled) {
+			if (result.status === "fulfilled") {
+				const pageResult = result.value;
+				pageResultsMap.set(pageResult.pageNum, pageResult); // Store result by page number
+
+				// Accumulate forms and tables directly
+				allForms = allForms.concat(pageResult.forms);
+				allTables = allTables.concat(pageResult.tables);
+
+				// Track max page number processed successfully or with error
+				maxProcessedPageNum = Math.max(maxProcessedPageNum, pageResult.pageNum);
+
+				// If any page resulted in an error, mark the overall status as error
+				if (pageResult.status === "error") {
+					overallStatus = "error";
 				}
-			} catch (pageError) {
-				console.error(`Error processing page ${i}:`, pageError);
-				pageText = ""; // Fallback for page processing errors
-				pageStatus = "error"; // Mark page status as error
-			}
-			// --- Form Field Extraction ---
-			try {
-				const annotations = await page.getAnnotations();
-				pageForms = annotations
-					.filter((anno) => anno.subtype === "Widget") // Filter for form field annotations
-					.map(
-						(anno): FormField => ({
-							// Extract relevant properties (adjust based on pdfjs-dist annotation structure)
-							fieldName: anno.fieldName || null,
-							fieldType: anno.fieldType || "Unknown",
-							fieldValue: anno.fieldValue ?? "", // Use nullish coalescing for default
-							isReadOnly: !!anno.readOnly, // Ensure boolean
-							rect: [...anno.rect], // Copy array
-							pageNum: i,
-						}),
+
+				// Call page processed callback if provided
+				try {
+					options?.onPageProcessed?.(pageResult);
+				} catch (callbackError) {
+					console.error(
+						`Error executing onPageProcessed callback for page ${pageResult.pageNum}:`,
+						callbackError,
 					);
-				// Accumulate for final result
-				allForms = allForms.concat(pageForms);
-				// console.log(`Page ${i}: Found ${formFields.length} form fields.`);
-			} catch (annotationError) {
+					// Don't let callback errors stop the main parsing process
+				}
+			} else {
+				// Promise rejected (e.g., getPage failed critically)
 				console.error(
-					`Error getting annotations for page ${i}:`,
-					annotationError,
+					"Critical error getting/processing PDF page:",
+					result.reason,
 				);
-				// Continue processing other pages even if annotations fail
-				// Note: We don't set pageStatus to 'error' here, as partial data might still be useful
+				overallStatus = "error";
+				// We don't know which page failed here without modifying promise creation
+				// Callback cannot be reliably called for the failed page in this case
 			}
-			// --- End Form Field Extraction ---
-
-			// Page text is already assigned in the if/else block above
-
-			// Add a single newline between pages
-			fullText += `${pageText.trim()}\n`;
-
-			// --- Call page processed callback if provided ---
-			try {
-				options?.onPageProcessed?.({
-					pageNum: i,
-					text: pageText.trim(),
-					forms: pageForms, // Pass forms extracted from this page
-					tables: pageTables, // Pass tables detected on this page
-					status: pageStatus,
-				});
-			} catch (callbackError) {
-				console.error(
-					`Error executing onPageProcessed callback for page ${i}:`,
-					callbackError,
-				);
-				// Don't let callback errors stop the main parsing process
-			}
-			// --- End callback ---
 		}
+
+		// Combine text in the correct page order
+		const textParts: string[] = [];
+		for (let i = 1; i <= maxProcessedPageNum; i++) {
+			const pageResult = pageResultsMap.get(i);
+			// Only include text if the page was successfully processed or exists in the map
+			if (pageResult) {
+				textParts.push(pageResult.text); // Already trimmed in processSinglePage
+			} else {
+				// Potentially handle missing pages if getPage failed, though less likely with allSettled
+				console.warn(`Result for page ${i} not found in map.`);
+			}
+		}
+		fullText = textParts.join("\n");
 
 		return {
 			text: fullText.trim(),
 			forms: allForms,
 			tables: allTables,
-			status: "success", // Add success status
+			status: overallStatus, // Use calculated overall status
 		};
 	} catch (error) {
 		console.error("Error parsing PDF with pdfjs-dist:", error);
@@ -204,6 +167,85 @@ export async function parsePdf(
 		// Return generic error status for other failures
 		return { text: "", forms: [], tables: [], status: "error" };
 	}
+}
+
+// Helper function to process a single page
+async function processSinglePage(
+	page: PDFPageProxy,
+	pageNum: number,
+): Promise<PageParseResult> {
+	let pageText = "";
+	let pageForms: FormField[] = [];
+	let pageTables: Table[] = [];
+	let pageStatus: "success" | "error" = "success";
+
+	try {
+		// Text Extraction and Sorting
+		const textContent = await page.getTextContent();
+		const textItems = textContent.items.filter(
+			(item): item is TextItem => "str" in item,
+		);
+		const sortedItems = groupAndSortTextItems(textItems); // Use improved sorting
+
+		// Table Detection (from sorted items)
+		pageTables = detectTablesFromTextItems(sortedItems);
+
+		// Determine if OCR is needed
+		const extractedText = sortedItems.map((item) => item.str).join(" ");
+		const hasSufficientText =
+			extractedText.replace(/\s+/g, "").length >= MIN_TEXT_THRESHOLD;
+
+		if (hasSufficientText) {
+			pageText = extractedText;
+		} else {
+			// Attempt OCR
+			try {
+				pageText = await performOcrOnPage(page);
+			} catch (ocrError) {
+				console.error(`Error performing OCR on page ${pageNum}:`, ocrError);
+				pageText = ""; // Fallback to empty string on OCR failure
+				// Consider if OCR failure should mark the page status as error
+				// pageStatus = "error";
+			}
+		}
+
+		// Form Field Extraction
+		try {
+			const annotations = await page.getAnnotations();
+			pageForms = annotations
+				.filter((anno) => anno.subtype === "Widget")
+				.map(
+					(anno): FormField => ({
+						fieldName: anno.fieldName || null,
+						fieldType: anno.fieldType || "Unknown",
+						fieldValue: anno.fieldValue ?? "",
+						isReadOnly: !!anno.readOnly,
+						rect: [...anno.rect],
+						pageNum: pageNum,
+					}),
+				);
+		} catch (annotationError) {
+			console.error(
+				`Error getting annotations for page ${pageNum}:`,
+				annotationError,
+			);
+			// Continue, but potentially incomplete data for this page
+		}
+	} catch (pageProcessingError) {
+		console.error(`Error processing page ${pageNum}:`, pageProcessingError);
+		pageText = "";
+		pageForms = [];
+		pageTables = [];
+		pageStatus = "error";
+	}
+
+	return {
+		pageNum,
+		text: pageText.trim(), // Trim text here before returning
+		forms: pageForms,
+		tables: pageTables,
+		status: pageStatus,
+	};
 }
 
 /**
@@ -338,4 +380,115 @@ function detectTablesFromTextItems(items: TextItem[]): Table[] {
 
 	// Filter out "tables" that only have one row, as they are likely not tables
 	return detectedTables.filter((table) => table.length > 1);
+}
+// --- Text Ordering Helper ---
+
+// Helper type for a block of text items
+interface TextBlock {
+	items: TextItem[];
+	minX: number;
+	maxX: number;
+	minY: number;
+	maxY: number;
+}
+
+// Function to group and sort text items, aiming for better reading order
+function groupAndSortTextItems(items: TextItem[]): TextItem[] {
+	if (!items || items.length === 0) {
+		return [];
+	}
+
+	// --- 1. Initial Sort (Primarily for block formation) ---
+	// Sort primarily by vertical position (top-down, using highest Y), then horizontal (left-right)
+	// Note: transform[5] is often bottom-left Y. So item top Y is roughly transform[5] + height.
+	// Sorting by bottom-left Y (descending) approximates top-down page flow.
+	const initialSortedItems = [...items].sort((a, b) => {
+		const yDiff = b.transform[5] - a.transform[5]; // Top-down sort (higher Y first)
+		if (Math.abs(yDiff) > 1) {
+			// Use a small tolerance
+			return yDiff;
+		}
+		return a.transform[4] - b.transform[4]; // Left-to-right sort
+	});
+
+	// --- 2. Group into Blocks ---
+	const blocks: TextBlock[] = [];
+	const maxVerticalGap = 10; // Max vertical distance to consider items part of the same block (adjust based on font size?)
+	const maxHorizontalGapRatio = 1.5; // Max horizontal gap relative to prev item width to join block
+
+	for (const item of initialSortedItems) {
+		const itemY = item.transform[5];
+		const itemX = item.transform[4];
+		const itemHeight = item.height;
+		const itemWidth = item.width;
+		const itemTopY = itemY + itemHeight; // Approximate top Y
+
+		let addedToBlock = false;
+		// Iterate blocks in reverse to check most recent/nearby first
+		for (let j = blocks.length - 1; j >= 0; j--) {
+			const block = blocks[j];
+			// Check vertical proximity (is item within or just below the block's vertical span?)
+			const isVerticallyClose =
+				itemTopY <= block.maxY + maxVerticalGap &&
+				itemY >= block.minY - maxVerticalGap;
+
+			if (isVerticallyClose) {
+				// Check horizontal proximity (does item overlap or sit closely to the right?)
+				// More complex check might be needed for multi-column within block detection
+				const isHorizontallyClose =
+					itemX <= block.maxX + itemWidth * maxHorizontalGapRatio && // Item starts not too far right of block end
+					itemX + itemWidth >= block.minX - itemWidth * maxHorizontalGapRatio; // Item ends not too far left of block start
+
+				if (isHorizontallyClose) {
+					block.items.push(item);
+					// Update block bounds
+					block.minX = Math.min(block.minX, itemX);
+					block.maxX = Math.max(block.maxX, itemX + itemWidth);
+					block.minY = Math.min(block.minY, itemY);
+					block.maxY = Math.max(block.maxY, itemTopY);
+					addedToBlock = true;
+					break; // Added to a block, move to next item
+				}
+			}
+		}
+
+		if (!addedToBlock) {
+			// Start a new block
+			blocks.push({
+				items: [item],
+				minX: itemX,
+				maxX: itemX + itemWidth,
+				minY: itemY,
+				maxY: itemTopY,
+			});
+		}
+	}
+
+	// --- 3. Sort Blocks ---
+	// Sort blocks top-down (using maxY), then left-to-right (using minX)
+	blocks.sort((a, b) => {
+		const yDiff = b.maxY - a.maxY; // Higher maxY first (top-most block)
+		const yTolerance = 5; // Tolerance for considering blocks at same vertical level
+		if (Math.abs(yDiff) > yTolerance) {
+			return yDiff;
+		}
+		return a.minX - b.minX; // Left-most block first
+	});
+
+	// --- 4. Sort within Blocks & Flatten ---
+	const finalSortedItems: TextItem[] = [];
+	for (const block of blocks) {
+		// Sort items within the block: top-down (Y descending), then left-to-right (X ascending)
+		block.items.sort((a, b) => {
+			const yDiff = b.transform[5] - a.transform[5];
+			const tolerance = 1;
+			if (Math.abs(yDiff) > tolerance) {
+				return yDiff; // Higher Y first
+			}
+			return a.transform[4] - b.transform[4]; // Lower X first
+		});
+		finalSortedItems.push(...block.items);
+	}
+
+	return finalSortedItems;
 }
