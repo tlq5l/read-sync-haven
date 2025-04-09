@@ -25,7 +25,21 @@ interface PdfParseResult {
 	text: string;
 	forms: FormField[];
 	tables: Table[];
-	status: "success" | "error" | "password_required"; // Add status field
+	status: "success" | "error" | "password_required"; // Overall document status
+}
+
+// Define structure for single-page results used by the callback
+interface PageParseResult {
+	pageNum: number;
+	text: string;
+	forms: FormField[];
+	tables: Table[];
+	status: "success" | "error"; // Page status
+}
+
+// Define options for the parsePdf function
+interface ParsePdfOptions {
+	onPageProcessed?: (pageResult: PageParseResult) => void;
 }
 
 /**
@@ -37,6 +51,7 @@ interface PdfParseResult {
  */
 export async function parsePdf(
 	pdfData: Buffer | ArrayBuffer,
+	options?: ParsePdfOptions, // Add optional options parameter
 ): Promise<PdfParseResult> {
 	try {
 		// pdfjs-dist works with Uint8Array, so convert if necessary
@@ -58,6 +73,9 @@ export async function parsePdf(
 		for (let i = 1; i <= pdfDoc.numPages; i++) {
 			const page = await pdfDoc.getPage(i);
 			let pageText = "";
+			let pageForms: FormField[] = [];
+			let pageTables: Table[] = [];
+			let pageStatus: "success" | "error" = "success";
 			try {
 				const textContent = await page.getTextContent();
 				const sortedItems = textContent.items
@@ -74,8 +92,9 @@ export async function parsePdf(
 				// Apply the heuristic table detection function to the sorted items
 				// Note: This happens *before* deciding whether to use OCR text for the page's full text,
 				// as table structure relies on coordinate data from pdfjs-dist.
-				const pageTables = detectTablesFromTextItems(sortedItems); // Ensure only one argument is passed
+				pageTables = detectTablesFromTextItems(sortedItems); // Assign to pageTables
 				if (pageTables.length > 0) {
+					// Accumulate for final result
 					allTables = allTables.concat(pageTables);
 					// console.log(`Page ${i}: Found ${pageTables.length} potential table(s).`);
 				}
@@ -104,11 +123,12 @@ export async function parsePdf(
 			} catch (pageError) {
 				console.error(`Error processing page ${i}:`, pageError);
 				pageText = ""; // Fallback for page processing errors
+				pageStatus = "error"; // Mark page status as error
 			}
 			// --- Form Field Extraction ---
 			try {
 				const annotations = await page.getAnnotations();
-				const formFields = annotations
+				pageForms = annotations
 					.filter((anno) => anno.subtype === "Widget") // Filter for form field annotations
 					.map(
 						(anno): FormField => ({
@@ -121,7 +141,8 @@ export async function parsePdf(
 							pageNum: i,
 						}),
 					);
-				allForms = allForms.concat(formFields);
+				// Accumulate for final result
+				allForms = allForms.concat(pageForms);
 				// console.log(`Page ${i}: Found ${formFields.length} form fields.`);
 			} catch (annotationError) {
 				console.error(
@@ -129,6 +150,7 @@ export async function parsePdf(
 					annotationError,
 				);
 				// Continue processing other pages even if annotations fail
+				// Note: We don't set pageStatus to 'error' here, as partial data might still be useful
 			}
 			// --- End Form Field Extraction ---
 
@@ -136,6 +158,24 @@ export async function parsePdf(
 
 			// Add a single newline between pages
 			fullText += `${pageText.trim()}\n`;
+
+			// --- Call page processed callback if provided ---
+			try {
+				options?.onPageProcessed?.({
+					pageNum: i,
+					text: pageText.trim(),
+					forms: pageForms, // Pass forms extracted from this page
+					tables: pageTables, // Pass tables detected on this page
+					status: pageStatus,
+				});
+			} catch (callbackError) {
+				console.error(
+					`Error executing onPageProcessed callback for page ${i}:`,
+					callbackError,
+				);
+				// Don't let callback errors stop the main parsing process
+			}
+			// --- End callback ---
 		}
 
 		return {

@@ -264,45 +264,7 @@ describe("parsePdf", () => {
 // }); // End of original describe block - this closing bracket should likely be moved to the end of the file
 
 it("should extract form fields using getAnnotations", async () => {
-	it("should extract form fields using getAnnotations", async () => {
-		const mockAnnotation = {
-			subtype: "Widget",
-			fieldName: "testField",
-			fieldType: "Tx",
-			fieldValue: "testValue",
-			readOnly: false,
-			rect: [10, 10, 100, 20],
-		};
-		const mockGetAnnotations = vi.fn().mockResolvedValue([mockAnnotation]);
-		const mockGetTextContent = vi.fn().mockResolvedValue({ items: [] }); // No text needed
-		const mockGetPage = vi.fn().mockResolvedValue({
-			getTextContent: mockGetTextContent,
-			getAnnotations: mockGetAnnotations,
-		});
-
-		mockedPdfjsLib.getDocument.mockReturnValue({
-			promise: Promise.resolve({
-				numPages: 1,
-				getPage: mockGetPage,
-			}),
-		} as MockedPdfDocumentLoadingTask);
-
-		const result = await parsePdf(mockBuffer);
-
-		expect(result.forms).toHaveLength(1);
-		expect(result.forms[0]).toEqual({
-			fieldName: "testField",
-			fieldType: "Tx",
-			fieldValue: "testValue",
-			isReadOnly: false,
-			rect: [10, 10, 100, 20],
-			pageNum: 1,
-		});
-		expect(result.text).toBe(""); // No text content mocked
-		expect(result.tables).toEqual([]); // No table content mocked
-		expect(result.status).toBe("success"); // Check status
-		expect(mockGetAnnotations).toHaveBeenCalledTimes(1);
-	});
+	// Removed duplicate test block
 
 	// Note: Testing the table heuristic precisely is hard without complex coordinate mocks.
 	// This test focuses on ensuring the table detection logic is called and returns the expected shape.
@@ -352,4 +314,68 @@ it("should extract form fields using getAnnotations", async () => {
 		expect(result.forms).toEqual([]);
 		expect(result.status).toBe("success"); // Check status
 	});
-}); // Moved the closing bracket from line 221 to here
+});
+
+it("should call onPageProcessed callback for each page", async () => {
+	const page1Text = "Page 1 text";
+	const page2Text = "Page 2 text";
+	const mockAnnotation = { subtype: "Widget", fieldName: "field1", pageNum: 1 }; // Simplified form
+	const mockGetTextContent1 = vi
+		.fn()
+		.mockResolvedValue({ items: [{ str: page1Text }] });
+	const mockGetAnnotations1 = vi.fn().mockResolvedValue([mockAnnotation]);
+	const mockGetTextContent2 = vi
+		.fn()
+		.mockResolvedValue({ items: [{ str: page2Text }] });
+	const mockGetAnnotations2 = vi.fn().mockResolvedValue([]); // No forms on page 2
+
+	const mockGetPage = vi
+		.fn()
+		.mockResolvedValueOnce({
+			getTextContent: mockGetTextContent1,
+			getAnnotations: mockGetAnnotations1,
+		})
+		.mockResolvedValueOnce({
+			getTextContent: mockGetTextContent2,
+			getAnnotations: mockGetAnnotations2,
+		});
+
+	mockedPdfjsLib.getDocument.mockReturnValue({
+		promise: Promise.resolve({ numPages: 2, getPage: mockGetPage }),
+	} as MockedPdfDocumentLoadingTask);
+
+	const onPageProcessedMock = vi.fn();
+	const options = { onPageProcessed: onPageProcessedMock };
+
+	const result = await parsePdf(mockBuffer, options);
+
+	// Check aggregated result still works
+	expect(result.text).toBe(`${page1Text}\n${page2Text}`);
+	expect(result.forms).toHaveLength(1); // Only one form field from page 1
+	expect(result.status).toBe("success");
+
+	// Check callback calls
+	expect(onPageProcessedMock).toHaveBeenCalledTimes(2);
+	// Check page 1 callback data (approximated - exact table/form format might vary)
+	expect(onPageProcessedMock).toHaveBeenCalledWith(
+		expect.objectContaining({
+			pageNum: 1,
+			text: page1Text,
+			forms: expect.arrayContaining([
+				expect.objectContaining({ fieldName: "field1" }),
+			]),
+			tables: expect.any(Array),
+			status: "success",
+		}),
+	);
+	// Check page 2 callback data
+	expect(onPageProcessedMock).toHaveBeenCalledWith(
+		expect.objectContaining({
+			pageNum: 2,
+			text: page2Text,
+			forms: [],
+			tables: expect.any(Array),
+			status: "success",
+		}),
+	);
+});
