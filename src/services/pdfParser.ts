@@ -24,7 +24,8 @@ interface FormField {
 interface PdfParseResult {
 	text: string;
 	forms: FormField[];
-	tables: Table[]; // Add tables
+	tables: Table[];
+	status: "success" | "error" | "password_required"; // Add status field
 }
 
 /**
@@ -140,12 +141,28 @@ export async function parsePdf(
 		return {
 			text: fullText.trim(),
 			forms: allForms,
-			tables: allTables, // Include detected tables
+			tables: allTables,
+			status: "success", // Add success status
 		};
 	} catch (error) {
 		console.error("Error parsing PDF with pdfjs-dist:", error);
-		// Return empty string on failure
-		return { text: "", forms: [], tables: [] }; // Return empty tables array on failure
+		// Check for password error specifically
+		// Use 'as any' for type assertion as error structure isn't strictly typed
+		const errorName = (error as any)?.name;
+		if (
+			errorName === "PasswordException" ||
+			errorName === "NeedPasswordError"
+		) {
+			console.log("PDF requires a password.");
+			return {
+				text: "",
+				forms: [],
+				tables: [],
+				status: "password_required",
+			};
+		}
+		// Return generic error status for other failures
+		return { text: "", forms: [], tables: [], status: "error" };
 	}
 }
 

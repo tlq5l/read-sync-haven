@@ -80,6 +80,7 @@ describe("parsePdf", () => {
 			text: page1Text,
 			forms: [],
 			tables: [], // Basic table detection might yield empty here depending on mock text items
+			status: "success", // Add status check
 		});
 		expect(mockedPdfjsLib.getDocument).toHaveBeenCalledWith({
 			data: mockUint8Array,
@@ -124,6 +125,7 @@ describe("parsePdf", () => {
 			text: `${page1Text}\n${page2Text}`,
 			forms: [],
 			tables: [], // Basic table detection might yield empty here
+			status: "success", // Add status check
 		});
 		expect(mockedPdfjsLib.getDocument).toHaveBeenCalledWith({
 			data: mockUint8Array,
@@ -147,7 +149,12 @@ describe("parsePdf", () => {
 
 		const result = await parsePdf(mockBuffer);
 
-		expect(result).toEqual({ text: "", forms: [], tables: [] });
+		expect(result).toEqual({
+			text: "",
+			forms: [],
+			tables: [],
+			status: "error",
+		}); // Expect error status
 		expect(mockedPdfjsLib.getDocument).toHaveBeenCalledWith({
 			data: mockUint8Array,
 		});
@@ -176,7 +183,13 @@ describe("parsePdf", () => {
 		const result = await parsePdf(mockBuffer);
 
 		// Expect empty text, forms, and tables (as getTextContent gave no basis for tables)
-		expect(result).toEqual({ text: "", forms: [], tables: [] });
+		// Expect empty text, empty forms/tables, but success status as page processing succeeded
+		expect(result).toEqual({
+			text: "",
+			forms: [],
+			tables: [],
+			status: "success",
+		});
 		expect(mockedPdfjsLib.getDocument).toHaveBeenCalledWith({
 			data: mockUint8Array,
 		});
@@ -207,12 +220,45 @@ describe("parsePdf", () => {
 			text: page1Text,
 			forms: [],
 			tables: [], // Basic table detection might yield empty here
+			status: "success", // Add status check
 		});
 		expect(mockedPdfjsLib.getDocument).toHaveBeenCalledWith({
 			data: mockUint8Array, // Implementation converts ArrayBuffer to Uint8Array
 		});
 		expect(mockGetPage).toHaveBeenCalledWith(1);
 		expect(mockGetTextContent).toHaveBeenCalledTimes(1);
+	});
+
+	it("should return status 'password_required' when getDocument rejects with PasswordException", async () => {
+		const mockPasswordError = {
+			name: "PasswordException",
+			message: "Password required",
+		};
+		mockedPdfjsLib.getDocument.mockReturnValue({
+			promise: Promise.reject(mockPasswordError),
+		} as MockedPdfDocumentLoadingTask);
+
+		const consoleErrorSpy = vi
+			.spyOn(console, "error")
+			.mockImplementation(() => {}); // Suppress console error during test
+
+		const result = await parsePdf(mockBuffer);
+
+		expect(result).toEqual({
+			text: "",
+			forms: [],
+			tables: [],
+			status: "password_required",
+		});
+		expect(mockedPdfjsLib.getDocument).toHaveBeenCalledWith({
+			data: mockUint8Array,
+		});
+		// Check if the specific password log message was printed (optional but good)
+		const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+		expect(consoleLogSpy).toHaveBeenCalledWith("PDF requires a password.");
+
+		consoleErrorSpy.mockRestore();
+		consoleLogSpy.mockRestore();
 	});
 });
 // }); // End of original describe block - this closing bracket should likely be moved to the end of the file
@@ -254,6 +300,7 @@ it("should extract form fields using getAnnotations", async () => {
 		});
 		expect(result.text).toBe(""); // No text content mocked
 		expect(result.tables).toEqual([]); // No table content mocked
+		expect(result.status).toBe("success"); // Check status
 		expect(mockGetAnnotations).toHaveBeenCalledTimes(1);
 	});
 
@@ -303,5 +350,6 @@ it("should extract form fields using getAnnotations", async () => {
 
 		expect(result.text).toContain("R1C1 R1C2 R2C1 R2C2 Not a table"); // Check combined text
 		expect(result.forms).toEqual([]);
+		expect(result.status).toBe("success"); // Check status
 	});
 }); // Moved the closing bracket from line 221 to here

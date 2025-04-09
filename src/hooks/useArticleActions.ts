@@ -124,11 +124,26 @@ async function processPdfFile(
 
 	const arrayBuffer = await file.arrayBuffer();
 	// Removed Buffer conversion - parsePdf now accepts ArrayBuffer directly
-	const parseResult = await parsePdf(arrayBuffer); // Returns { text: string, forms: FormField[], tables: Table[] }
+	const parseResult = await parsePdf(arrayBuffer); // Returns { text: string, forms: FormField[], tables: Table[], status: string }
+
+	// Check the parsing status
+	if (parseResult.status === "password_required") {
+		throw new Error("PDF is password protected. Cannot process.");
+	} // Re-add missing closing brace
+	// Refactored to remove useless else after throw
+	if (parseResult.status === "error") {
+		throw new Error("Failed to parse PDF content.");
+	}
+	// Refactored to remove useless else after throw
+	if (parseResult.status !== "success") {
+		// Handle unexpected status defensively
+		throw new Error("Unknown error occurred during PDF parsing.");
+	}
+
+	// Proceed only if status is 'success'
 	const extractedText = parseResult.text; // Extract text for content
 	// TODO: Decide how/where to store extracted form fields (parseResult.forms) and tables (parseResult.tables)
 	// They could be added as new properties to DexieArticle or stored separately.
-
 	// Removed metadata extraction and base64 conversion
 	// Removed old estimation logic relying on pageCount
 
