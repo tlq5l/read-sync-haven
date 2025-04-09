@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2022", // Changed target to ES2022 for better async iterator support
     "useDefineForClassFields": true,
-    "lib": ["ES2021", "DOM", "DOM.Iterable"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"], // Ensure lib matches target or is higher, and includes DOM.Iterable
     "module": "ESNext",
     "skipLibCheck": true,
 
