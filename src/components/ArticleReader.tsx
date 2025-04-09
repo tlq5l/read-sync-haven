@@ -181,11 +181,9 @@ export default function ArticleReader() {
 						<SheetDescription /> {/* Keep for accessibility */}
 					</SheetHeader>
 					<Tabs defaultValue="summary" className="mt-4">
-						<TabsList className="grid w-full grid-cols-4">
+						<TabsList className="grid w-full grid-cols-2">
 							<TabsTrigger value="summary">Summary</TabsTrigger>
 							<TabsTrigger value="chat">Chat</TabsTrigger>
-							<TabsTrigger value="notes">Notes</TabsTrigger>
-							<TabsTrigger value="metadata">Metadata</TabsTrigger>
 						</TabsList>
 
 						{/* Summary Tab */}
@@ -291,18 +289,6 @@ export default function ArticleReader() {
 									<Send className="h-4 w-4" />
 								</Button>
 							</form>
-						</TabsContent>
-
-						{/* Notes Tab */}
-						<TabsContent value="notes" className="mt-4">
-							<p>Notes functionality to be added.</p>
-						</TabsContent>
-
-						{/* Metadata Tab */}
-						<TabsContent value="metadata" className="mt-4">
-							<p>Metadata display to be added.</p>
-							{/* Example: Display some article metadata */}
-							{/* <pre className="text-xs">{JSON.stringify(article, null, 2)}</pre> */}
 						</TabsContent>
 					</Tabs>
 				</SheetContent>
