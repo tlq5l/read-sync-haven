@@ -15,12 +15,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useArticles } from "@/context/ArticleContext";
 import { useArticleData } from "@/hooks/useArticleData";
-import { useChat } from "@/hooks/useChat";
+import { useChat } from "@/hooks/useChat"; // Rename imported ChatMessage if needed
+import { useChatHistory } from "@/hooks/useChatHistory";
 import { useSummarize } from "@/hooks/useSummarize";
 import { cn } from "@/lib/utils";
 import { debounce } from "lodash"; // Import debounce
 import { Loader2, Send } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+	type FormEvent,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 export default function ArticleReader() {
@@ -47,7 +54,13 @@ export default function ArticleReader() {
 		chatError,
 		handleChatSubmit,
 		chatScrollAreaRef,
-	} = useChat(fullTextContent); // Pass extracted content to chat hook
+	} = useChat(fullTextContent); // Pass extracted content to chat hook (Existing active chat)
+	const {
+		messages: historyMessages,
+		addMessage: addMessageHistory,
+		isLoading: isLoadingHistory,
+		error: historyError,
+	} = useChatHistory(id || ""); // Instantiate the history hook, provide default empty string for id if undefined initially
 
 	// --- Callbacks ---
 	const handleTextExtracted = useCallback((text: string | null) => {
@@ -85,6 +98,7 @@ export default function ArticleReader() {
 	const toggleSidebar = useCallback((open: boolean) => {
 		setIsSidebarOpen(open);
 	}, []);
+	const lastProcessedAiContent = useRef<string | null>(null); // Ref to track last saved AI message content
 
 	// --- Effects ---
 	// Track reading progress for HTML content
@@ -121,6 +135,79 @@ export default function ArticleReader() {
 		};
 		// Ensure debounce is recreated if dependencies change, though unlikely here
 	}, [article, updateReadingProgress]);
+
+	// Effect to save AI responses to history when they appear in the active chat
+	useEffect(() => {
+		if (!id) return; // Ensure we have an article ID
+
+		const latestChatMessage =
+			chatHistory.length > 0 ? chatHistory[chatHistory.length - 1] : null;
+
+		if (latestChatMessage && latestChatMessage.sender === "ai") {
+			// Check if this AI message (based on content) is different from the last one we processed
+			if (latestChatMessage.text !== lastProcessedAiContent.current) {
+				// Check if it *likely* already exists in historyMessages (simple content check for recent items)
+				// This isn't foolproof without IDs but prevents rapid duplicates.
+				const likelyExists = historyMessages.slice(-5).some(
+					// Check recent 5 history items
+					(histMsg) =>
+						histMsg.sender === "ai" &&
+						histMsg.content === latestChatMessage.text,
+				);
+
+				if (!likelyExists) {
+					console.log(
+						"Attempting to save new AI message to history:",
+						`${latestChatMessage.text.substring(0, 50)}...`,
+					);
+					addMessageHistory({
+						articleId: id,
+						sender: "ai",
+						content: latestChatMessage.text,
+					})
+						.then((newId) => {
+							console.log("AI message saved to history with ID:", newId);
+							lastProcessedAiContent.current = latestChatMessage.text; // Mark as processed
+						})
+						.catch((err) => {
+							console.error("Failed to save AI message to history:", err);
+							// Optional: Potentially clear lastProcessedAiContent.current if saving failed?
+						});
+				} else {
+					// It likely exists or is the same as the last processed one, update the ref anyway
+					lastProcessedAiContent.current = latestChatMessage.text;
+				}
+			}
+		}
+		// Dependencies: chatHistory to react to new messages, historyMessages to check for existence, addMessageHistory function, id
+	}, [chatHistory, historyMessages, addMessageHistory, id]);
+
+	// Wrapper for chat submission to include saving to history
+	const handleChatSubmitWithHistory = async (
+		event: FormEvent<HTMLFormElement>,
+	) => {
+		event.preventDefault(); // Prevent default form submission
+		if (!chatInput.trim() || !id) return; // Ensure id and input exist
+
+		const userMessageContent = chatInput; // Capture input before it might be cleared by original handler
+
+		try {
+			// 1. Save user message to history database FIRST
+			await addMessageHistory({
+				articleId: id,
+				sender: "user",
+				content: userMessageContent,
+			});
+			console.log("User message saved to history");
+
+			// 2. Call the original chat submission logic from useChat hook
+			// This will likely clear the input field and add the user message to the *active* chat state
+			await handleChatSubmit(event); // Pass the event if the original handler needs it
+		} catch (error) {
+			console.error("Error during chat submission or history saving:", error);
+			// TODO: Consider showing a user-facing error message
+		}
+	};
 
 	// --- Render Logic ---
 	if (loading) {
@@ -181,9 +268,13 @@ export default function ArticleReader() {
 						<SheetDescription /> {/* Keep for accessibility */}
 					</SheetHeader>
 					<Tabs defaultValue="summary" className="mt-4">
-						<TabsList className="grid w-full grid-cols-2">
+						<TabsList className="grid w-full grid-cols-3">
+							{" "}
+							{/* Changed to 3 cols */}
 							<TabsTrigger value="summary">Summary</TabsTrigger>
 							<TabsTrigger value="chat">Chat</TabsTrigger>
+							<TabsTrigger value="history">History</TabsTrigger>{" "}
+							{/* Added History Trigger */}
 						</TabsList>
 
 						{/* Summary Tab */}
@@ -266,7 +357,7 @@ export default function ArticleReader() {
 								</p>
 							)}
 							<form
-								onSubmit={handleChatSubmit} // Use handler from useChat hook
+								onSubmit={handleChatSubmitWithHistory} // Use the new wrapper handler
 								className="flex items-center gap-2"
 							>
 								<Input
@@ -291,6 +382,60 @@ export default function ArticleReader() {
 							</form>
 						</TabsContent>
 					</Tabs>
+
+					{/* History Tab */}
+					<TabsContent
+						value="history"
+						className="mt-4 flex flex-col h-[calc(100vh-200px)]" // Adjust height as needed
+					>
+						<ScrollArea className="flex-1 mb-4 pr-4">
+							{isLoadingHistory && (
+								<p className="text-sm text-muted-foreground">
+									Loading history...
+								</p>
+							)}
+							{historyError && (
+								<p className="text-sm text-destructive">
+									History Error: {historyError}
+								</p>
+							)}
+							{!isLoadingHistory &&
+								!historyError &&
+								historyMessages.length === 0 && (
+									<p className="text-sm text-muted-foreground text-center py-4">
+										No chat history found for this article.
+									</p>
+								)}
+							{!isLoadingHistory &&
+								!historyError &&
+								historyMessages.length > 0 && (
+									<div className="space-y-4">
+										{historyMessages.map((msg) => (
+											<div
+												key={msg.messageId} // Use the unique ID from the history hook
+												className={cn(
+													"p-3 rounded-lg max-w-[80%] break-words", // Added break-words
+													msg.sender === "user"
+														? "bg-primary text-primary-foreground self-end ml-auto"
+														: "bg-muted text-muted-foreground self-start mr-auto",
+												)}
+											>
+												<p className="text-sm whitespace-pre-wrap">
+													{msg.content}
+												</p>
+												{/* Optional: Display timestamp */}
+												<p className="text-xs text-muted-foreground/60 mt-1 text-right">
+													{new Date(msg.timestamp).toLocaleTimeString([], {
+														hour: "2-digit",
+														minute: "2-digit",
+													})}
+												</p>
+											</div>
+										))}
+									</div>
+								)}
+						</ScrollArea>
+					</TabsContent>
 				</SheetContent>
 			</Sheet>
 		</div>
