@@ -49,7 +49,7 @@ export function useChat(fullTextContent: string | null) {
 					Authorization: `Bearer ${customApiKey}`,
 				};
 				// Construct OpenAI-compatible request body for chat
-				requestBody = JSON.stringify({
+				const customApiPayload = {
 					model: customApiModel || "gpt-3.5-turbo", // Use custom model or fallback
 					messages: [
 						{
@@ -60,7 +60,10 @@ export function useChat(fullTextContent: string | null) {
 						{ role: "user", content: userMessage },
 					],
 					// Add other parameters like temperature if needed
-				});
+				};
+				requestBody = JSON.stringify(customApiPayload);
+
+				console.log('Custom API Request Payload (Reduced):', customApiPayload); // <-- ADDED LOG
 
 				try {
 					response = await fetch(apiUrl, {
@@ -69,7 +72,7 @@ export function useChat(fullTextContent: string | null) {
 						body: requestBody,
 					});
 				} catch (error) {
-					console.error('Custom API Error:', error); // Added specific logging
+					console.error('Custom API Error:', error); // Existing specific logging
 					// Keep original error message for context
 					console.error("Original error calling custom API endpoint:", error);
 					throw new Error(
@@ -110,6 +113,7 @@ export function useChat(fullTextContent: string | null) {
 
 			// --- Handle Response (Common Logic) ---
 			const data = await response.json();
+			console.log('Custom API Raw Response Data (Reduced Context):', data); // <-- ADDED LOG (Logs regardless of source, but relevant for custom API debugging)
 
 			if (!response.ok) {
 				const errorSource =
@@ -128,7 +132,7 @@ export function useChat(fullTextContent: string | null) {
 				aiResponseText = data?.choices?.[0]?.message?.content ?? null;
 				if (!aiResponseText) {
 					console.error( // Log the problematic data structure too
-						"Missing AI content. Custom API Raw Response Data:",
+						"Missing AI content. Custom API Raw Response Data:", // Note: This is slightly redundant with the log above, but keeps the specific error context
 						data,
 					);
 					throw new Error(
