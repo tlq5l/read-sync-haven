@@ -50,7 +50,7 @@ export function useChat(fullTextContent: string | null) {
 				};
 				// Construct OpenAI-compatible request body for chat
 				const customApiPayload = {
-					model: customApiModel || "gpt-3.5-turbo", // Use custom model or fallback
+					model: "openai/gpt-3.5-turbo", // TEMP: Hardcoded for debugging OpenRouter issue
 					messages: [
 						{
 							role: "system",
