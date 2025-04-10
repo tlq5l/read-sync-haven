@@ -324,10 +324,10 @@ export default function ArticleReader() {
 						{/* Chat Tab */}
 						<TabsContent
 							value="chat"
-							className="mt-4 flex flex-col flex-1 overflow-hidden" // Added overflow-hidden
+							className="mt-4 flex flex-col flex-1 overflow-hidden h-full" // Added h-full, Added overflow-hidden
 						>
 							<ScrollArea
-								className="flex-1 min-h-0 pr-4"
+								className="flex-grow min-h-0 pr-4" // Changed flex-1 to flex-grow
 								ref={chatScrollAreaRef}
 							>
 								{" "}
@@ -365,7 +365,7 @@ export default function ArticleReader() {
 							)}
 							<form
 								onSubmit={handleChatSubmit} // Use the handler directly from useChat
-								className="flex items-center gap-2 mt-auto" // Use mt-auto to push to bottom
+								className="flex items-center gap-2 p-2" // Added padding
 							>
 								<Input
 									type="text"
