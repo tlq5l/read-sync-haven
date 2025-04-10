@@ -212,10 +212,12 @@ export function useChat(
 				let errorDetails = `Request failed with status ${response.status}`;
 				try {
 					const errorData = await response.json();
+					// Refined logic: Prefer nested message, then direct error string, then top-level message, then stringify
 					errorDetails =
-						errorData?.error?.message ||
-						errorData?.message ||
-						JSON.stringify(errorData);
+						errorData?.error?.message || // Nested message like { error: { message: "..." } }
+						(typeof errorData?.error === "string" ? errorData.error : null) || // Direct error string like { error: "..." }
+						errorData?.message || // Top-level message like { message: "..." }
+						JSON.stringify(errorData); // Fallback
 				} catch (e) {
 					try {
 						const textError = await response.text();
@@ -383,17 +385,23 @@ export function useChat(
 			// Add error message to *active* chat UI
 			// Check if the last message is already the error placeholder from mutationFn
 			setChatHistory((prev) => {
-				const lastMsg = prev[prev.length - 1];
-				if (lastMsg?.sender === "ai" && lastMsg.text.startsWith("Error:")) {
-					// If error happened during API call *after* placeholder was added, update it
-					return prev.map((msg, index) =>
-						index === prev.length - 1
-							? { ...msg, text: `Error: ${error.message}` }
-							: msg,
-					);
+				const lastMsgIndex = prev.length - 1;
+				// Check if the last message is the AI placeholder (empty text)
+				if (
+					lastMsgIndex >= 0 &&
+					prev[lastMsgIndex].sender === "ai" &&
+					prev[lastMsgIndex].text === ""
+				) {
+					// If the placeholder exists, update its text with the error
+					const updatedHistory = [...prev];
+					updatedHistory[lastMsgIndex] = {
+						...updatedHistory[lastMsgIndex],
+						text: `Error: ${error.message}`,
+					};
+					return updatedHistory;
 				}
-				// If error happened before placeholder (e.g., saving user msg), add new error msg
-				return [...prev, { sender: "ai", text: `Error: ${error.message}` }];
+					// Otherwise (e.g., error happened before placeholder was added, or history is empty), add a new error message
+					return [...prev, { sender: "ai", text: `Error: ${error.message}` }];
 			});
 		},
 		onSettled: () => {

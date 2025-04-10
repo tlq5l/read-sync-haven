@@ -8,7 +8,7 @@ import {
 	waitFor, // Ensure waitFor is imported
 	within,
 } from "@testing-library/react";
-import { renderHook, act as actHook } from "@testing-library/react-hooks"; // Use actHook for hook updates
+import { act as actHook, renderHook } from "@testing-library/react-hooks"; // Use actHook for hook updates
 import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -201,6 +201,8 @@ describe("useChat Hook", () => {
 	});
 
 	it("should handle unauthorized (401) error from worker", async () => {
+		// Reset handlers first to ensure a clean slate, then apply test-specific handler
+		server.resetHandlers();
 		server.use(
 			http.post(WORKER_CHAT_URL, () => {
 				// Directly return the 401 error without checking auth here
@@ -218,12 +220,15 @@ describe("useChat Hook", () => {
 			},
 		);
 		const userMessage = "Test 401 message";
-		// Match the full error string added to history by onError
-		const expectedError = /^Error: Error from chat service: Mock Chat Unauthorized$/;
+		// Define separate regex for error.message and history text
+		const expectedErrorMessage =
+			/^Error from chat service: Mock Chat Unauthorized$/;
+		const expectedHistoryText =
+			/^Error: Error from chat service: Mock Chat Unauthorized$/;
 
-		await act(async () => {
-			result.current.setChatInput(userMessage);
-			// Call handleChatSubmit, don't catch error here, let waitFor check state
+		result.current.setChatInput(userMessage);
+		// Wrap submit in actHook to ensure state updates from onError are processed
+		await actHook(async () => {
 			result.current.handleChatSubmit();
 		});
 
@@ -233,33 +238,28 @@ describe("useChat Hook", () => {
 		// Wait for the mutation to settle (isChatting becomes false)
 		// Wait for both the error state and the history to reflect the error
 		// Wait for the mutation to settle (isChatting becomes false)
-		// Wait directly for the error state to be populated
+		// Wait for the mutation to settle (isChatting becomes false)
 		await waitFor(() => {
-			expect(result.current.chatError).not.toBeNull();
+			expect(result.current.isChatting).toBe(false);
 		});
-		// Now assert the details of the error state and history
-		expect(result.current.chatError).toBeInstanceOf(Error);
-		expect(result.current.chatError?.message).toMatch(expectedError);
-		expect(
-			result.current.chatHistory.some(
-				(m) => m.sender === "ai" && m.text?.match(expectedError)
-			),
-		).toBe(true);
-		expect(result.current.isChatting).toBe(false); // Ensure chatting stopped
 
-		// Assert the final state *after* waiting for the mutation to settle.
-		expect(result.current.isChatting).toBe(false); // Should be false after settlement
+		// Now assert the final state after settlement
 		expect(result.current.chatError).toBeInstanceOf(Error); // Error object should be set
-		expect(result.current.chatError?.message).toMatch(expectedError); // Error message should match
+		expect(result.current.chatError?.message).toMatch(expectedErrorMessage); // Check error.message content
 		expect(
+			// Check history contains the text with "Error: " prefix
 			result.current.chatHistory.some(
-				(m) => m.sender === "ai" && m.text?.match(expectedError) // Error message should be in history
+				(m) => m.sender === "ai" && m.text?.match(expectedHistoryText),
 			),
 		).toBe(true);
+		// Expectation below is redundant with the waitFor, but kept for clarity
+		expect(result.current.isChatting).toBe(false);
 		expect(mockGetToken).toHaveBeenCalledTimes(1);
 	});
 
 	it("should handle server error (500) from worker", async () => {
+		// Reset handlers first to ensure a clean slate, then apply test-specific handler
+		server.resetHandlers();
 		server.use(
 			http.post(WORKER_CHAT_URL, () => {
 				// Directly return the 500 error
@@ -277,11 +277,14 @@ describe("useChat Hook", () => {
 			},
 		);
 		const userMessage = "Test 500 message";
-		// Match the full error string added to history by onError
-		const expectedError = /^Error: Error from chat service: Mock Server Error$/;
+		// Define separate regex for error.message and history text
+		const expectedErrorMessage = /^Error from chat service: Mock Server Error$/;
+		const expectedHistoryText =
+			/^Error: Error from chat service: Mock Server Error$/;
 
-		await act(async () => {
-			result.current.setChatInput(userMessage);
+		result.current.setChatInput(userMessage);
+		// Wrap submit in actHook to ensure state updates from onError are processed
+		await actHook(async () => {
 			result.current.handleChatSubmit();
 		});
 
@@ -297,16 +300,18 @@ describe("useChat Hook", () => {
 		await waitFor(() => {
 			expect(result.current.isChatting).toBe(false);
 		});
-		// Now assert the final error state AND history after settlement
+
+		// Now assert the final state after settlement
 		expect(result.current.chatError).toBeInstanceOf(Error); // Check error state object
-		expect(result.current.chatError?.message).toMatch(expectedError); // Check error message
+		expect(result.current.chatError?.message).toMatch(expectedErrorMessage); // Check error.message content
 		expect(
+			// Check history contains the text with "Error: " prefix
 			result.current.chatHistory.some(
-				(m) => m.sender === "ai" && m.text?.match(expectedError) // Check history for error message
+				(m) => m.sender === "ai" && m.text?.match(expectedHistoryText),
 			),
 		).toBe(true);
-		expect(result.current.isChatting).toBe(false); // Ensure chatting stopped
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
+		expect(result.current.isChatting).toBe(false); // Ensure chatting stopped (already checked by waitFor, but good explicit check)
+		expect(mockGetToken).toHaveBeenCalledTimes(1); // Ensure token was fetched
 	});
 
 	it("should handle invalid JSON response from worker", async () => {
