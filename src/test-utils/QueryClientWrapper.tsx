@@ -6,8 +6,11 @@ import type { ReactNode } from "react"; // Use 'import type'
 const testQueryClient = new QueryClient({
 	defaultOptions: {
 		queries: {
-			retry: false, // Disable retries for tests
-			gcTime: Number.POSITIVE_INFINITY, // Prevent garbage collection during tests
+			retry: false,
+			gcTime: Number.POSITIVE_INFINITY,
+		},
+		mutations: {
+			retry: false, // Disable retries for mutations too
 		},
 	},
 });
