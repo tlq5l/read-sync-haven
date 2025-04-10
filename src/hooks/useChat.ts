@@ -400,8 +400,8 @@ export function useChat(
 					};
 					return updatedHistory;
 				}
-					// Otherwise (e.g., error happened before placeholder was added, or history is empty), add a new error message
-					return [...prev, { sender: "ai", text: `Error: ${error.message}` }];
+				// Otherwise (e.g., error happened before placeholder was added, or history is empty), add a new error message
+				return [...prev, { sender: "ai", text: `Error: ${error.message}` }];
 			});
 		},
 		onSettled: () => {
