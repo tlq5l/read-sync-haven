@@ -5,19 +5,20 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useUser } from "@clerk/clerk-react";
+import { authClient } from "@/lib/authClient"; // Import authClient
 import { ChevronDown } from "lucide-react";
 import type React from "react";
 
 const HomePage: React.FC = () => {
-	const { user } = useUser();
+	const { data: session } = authClient.useSession(); // Use session hook
 
 	return (
 		<div className="p-4 space-y-6">
 			{/* Header Section */}
 			<div className="flex justify-between items-center">
 				<h1 className="text-xl font-semibold">
-					Welcome {user?.firstName || "User"}
+					{/* Use name from session, default to "User" */}
+					Welcome {session?.user?.name || "User"}
 				</h1>
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>

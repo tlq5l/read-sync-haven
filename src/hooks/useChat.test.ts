@@ -1,56 +1,53 @@
-import { useAuth } from "@clerk/clerk-react";
-import { act, renderHook } from "@testing-library/react"; // Removed waitFor
-import { http, HttpResponse } from "msw";
+import { authClient } from "@/lib/authClient"; // Import the actual client
+import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { server } from "../mocks/server"; // MSW server
 import {
 	QueryClientWrapper,
 	getTestQueryClient,
-} from "../test-utils/QueryClientWrapper"; // Import the wrapper
-import { useChat } from "./useChat"; // Removed unused ChatMessage type
+} from "../test-utils/QueryClientWrapper";
+import { useChat } from "./useChat";
 
-// Mock the useAuth hook from Clerk
-vi.mock("@clerk/clerk-react", () => ({
-	useAuth: vi.fn(),
+// Mock the authClient
+vi.mock("@/lib/authClient", () => ({
+	authClient: {
+		useSession: vi.fn(),
+		$fetch: vi.fn(), // Mock the fetch method
+	},
 }));
 
-// Mock console.log/error - Removed as they are unused
-// const mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
-// const mockConsoleError = vi
-// 	.spyOn(console, "error")
-// 	.mockImplementation(() => {});
+// Type assertion for mocked methods
+const mockUseSession = authClient.useSession as ReturnType<typeof vi.fn>;
+const mockFetch = authClient.$fetch as ReturnType<typeof vi.fn>;
 
 // Constants
-const MOCK_CLERK_TOKEN = "mock-clerk-jwt-token";
-const WORKER_CHAT_URL =
-	"https://bondwise-sync-api.vikione.workers.dev/api/chat";
 const MOCK_CHAT_RESPONSE = "This is a mock AI chat response.";
 const MOCK_ARTICLE_CONTENT = "This is the article content for chat.";
+const MOCK_USER_ID = "test-user-id";
+const MOCK_SESSION = { user: { id: MOCK_USER_ID } }; // Simplified mock session
 
 // Get the test query client instance
 const queryClient = getTestQueryClient();
 
 describe("useChat Hook", () => {
-	const wrapper = QueryClientWrapper; // Use the imported wrapper component
-	let mockGetToken: ReturnType<typeof vi.fn>;
+	const wrapper = QueryClientWrapper;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		queryClient.clear(); // Clear query cache
-		mockGetToken = vi.fn();
-		(useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
-			getToken: mockGetToken,
-			userId: "test-user-id",
-			isLoaded: true,
-			isSignedIn: true,
+		queryClient.clear();
+		// Default mocks: authenticated, successful fetch
+		mockUseSession.mockReturnValue({
+			data: MOCK_SESSION,
+			isPending: false,
+			error: null,
+			refetch: vi.fn(),
 		});
-		mockGetToken.mockResolvedValue(MOCK_CLERK_TOKEN);
-		window.HTMLElement.prototype.scrollTo = vi.fn();
+		mockFetch.mockResolvedValue({ response: MOCK_CHAT_RESPONSE });
+		window.HTMLElement.prototype.scrollTo = vi.fn(); // Mock scrollTo
 	});
 
 	afterEach(() => {
 		vi.restoreAllMocks();
-		server.resetHandlers();
+		// No MSW reset needed
 	});
 
 	it("should initialize with correct default states", () => {
@@ -76,7 +73,7 @@ describe("useChat Hook", () => {
 		expect(result.current.chatError?.message).toBe(
 			"Article content not yet extracted or available.",
 		);
-		expect(mockGetToken).not.toHaveBeenCalled();
+		expect(mockFetch).not.toHaveBeenCalled();
 	});
 
 	it("should not trigger mutation if message is empty when handleChatSubmit is called", () => {
@@ -91,37 +88,38 @@ describe("useChat Hook", () => {
 
 		expect(result.current.isChatting).toBe(false);
 		expect(result.current.chatError).toBeNull();
-		expect(mockGetToken).not.toHaveBeenCalled();
+		expect(mockFetch).not.toHaveBeenCalled();
 	});
 
-	it("should return error if getToken fails", async () => {
-		mockGetToken.mockResolvedValue(null);
+	it("should return error if user is not authenticated", async () => {
+		mockUseSession.mockReturnValue({
+			data: null,
+			isPending: false,
+			error: null,
+			refetch: vi.fn(),
+		}); // Unauthenticated
 		const { result } = renderHook(() => useChat(MOCK_ARTICLE_CONTENT), {
 			wrapper,
 		});
 		const userMessage = "Test message";
+		const expectedError = "User not authenticated for chat.";
 
-		// Use mutateAsync and catch the expected error
 		await act(async () => {
 			result.current.setChatInput(userMessage);
 			await expect(
 				result.current.chatMutation.mutateAsync(userMessage),
-			).rejects.toThrow("User not authenticated (Clerk token missing).");
+			).rejects.toThrow(expectedError);
 		});
 
-		// Check final state after rejection
 		expect(result.current.isChatting).toBe(false);
 		expect(result.current.chatError).toBeInstanceOf(Error);
-		expect(result.current.chatError?.message).toBe(
-			"User not authenticated (Clerk token missing).",
-		);
-		// Check history includes the AI error message added by onError
+		expect(result.current.chatError?.message).toBe(expectedError);
 		expect(
 			result.current.chatHistory.some(
-				(m) => m.sender === "ai" && m.text.includes("User not authenticated"),
+				(m) => m.sender === "ai" && m.text.includes(expectedError),
 			),
 		).toBe(true);
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
+		expect(mockFetch).not.toHaveBeenCalled();
 	});
 
 	it("should successfully send message, get response, and update state", async () => {
@@ -135,122 +133,50 @@ describe("useChat Hook", () => {
 			await result.current.chatMutation.mutateAsync(userMessage);
 		});
 
-		// Check final state after success
 		expect(result.current.isChatting).toBe(false);
 		expect(result.current.chatError).toBeNull();
 		expect(result.current.chatHistory).toEqual([
 			{ sender: "user", text: userMessage },
 			{ sender: "ai", text: MOCK_CHAT_RESPONSE },
 		]);
-		expect(result.current.chatInput).toBe(""); // Input cleared by onMutate
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
-	});
-
-	it("should handle unauthorized (401) error from worker", async () => {
-		server.use(
-			http.post(WORKER_CHAT_URL, () => {
-				return new HttpResponse(
-					JSON.stringify({ error: "Mock Chat Unauthorized" }),
-					{ status: 401 },
-				);
+		expect(result.current.chatInput).toBe("");
+		expect(mockFetch).toHaveBeenCalledTimes(1);
+		expect(mockFetch).toHaveBeenCalledWith(
+			"/api/chat", // Assuming relative URL
+			expect.objectContaining({
+				method: "POST",
+				body: { content: MOCK_ARTICLE_CONTENT, message: userMessage },
 			}),
 		);
+	});
+
+	it("should handle API error from $fetch", async () => {
+		const mockError = new Error("Mock API Chat Error");
+		mockFetch.mockRejectedValue(mockError);
 		const { result } = renderHook(() => useChat(MOCK_ARTICLE_CONTENT), {
 			wrapper,
 		});
-		const userMessage = "Test 401 message";
-		const expectedError =
-			/Mock Chat Unauthorized|Chat request failed with status 401/;
+		const userMessage = "Test API error";
 
 		await act(async () => {
 			result.current.setChatInput(userMessage);
 			await expect(
 				result.current.chatMutation.mutateAsync(userMessage),
-			).rejects.toThrow(expectedError);
+			).rejects.toThrow(mockError);
 		});
 
 		expect(result.current.isChatting).toBe(false);
-		expect(result.current.chatError).toBeInstanceOf(Error);
-		expect(result.current.chatError?.message).toMatch(expectedError);
+		expect(result.current.chatError).toBe(mockError);
 		expect(
 			result.current.chatHistory.some(
-				(m) => m.sender === "ai" && m.text?.match(expectedError),
+				(m) => m.sender === "ai" && m.text.includes(mockError.message),
 			),
 		).toBe(true);
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
-	});
-
-	it("should handle server error (500) from worker", async () => {
-		server.use(
-			http.post(WORKER_CHAT_URL, () => {
-				return new HttpResponse(
-					JSON.stringify({ error: "Mock Server Error" }),
-					{ status: 500 },
-				);
-			}),
-		);
-		const { result } = renderHook(() => useChat(MOCK_ARTICLE_CONTENT), {
-			wrapper,
-		});
-		const userMessage = "Test 500 message";
-		const expectedError =
-			/Mock Server Error|Chat request failed with status 500/;
-
-		await act(async () => {
-			result.current.setChatInput(userMessage);
-			await expect(
-				result.current.chatMutation.mutateAsync(userMessage),
-			).rejects.toThrow(expectedError);
-		});
-
-		expect(result.current.isChatting).toBe(false);
-		expect(result.current.chatError).toBeInstanceOf(Error);
-		expect(result.current.chatError?.message).toMatch(expectedError);
-		expect(
-			result.current.chatHistory.some(
-				(m) => m.sender === "ai" && m.text?.match(expectedError),
-			),
-		).toBe(true);
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
-	});
-
-	it("should handle invalid JSON response from worker", async () => {
-		server.use(
-			http.post(WORKER_CHAT_URL, () => {
-				return new HttpResponse("<html>Invalid JSON</html>", { status: 200 });
-			}),
-		);
-		const { result } = renderHook(() => useChat(MOCK_ARTICLE_CONTENT), {
-			wrapper,
-		});
-		const userMessage = "Test invalid JSON";
-		const expectedError = /Unexpected token '<'/;
-
-		await act(async () => {
-			result.current.setChatInput(userMessage);
-			// The error happens during JSON parsing after fetch resolves
-			await expect(
-				result.current.chatMutation.mutateAsync(userMessage),
-			).rejects.toThrow(expectedError);
-		});
-
-		expect(result.current.isChatting).toBe(false);
-		expect(result.current.chatError).toBeInstanceOf(Error);
-		expect(result.current.chatError?.message).toMatch(expectedError);
-		expect(
-			result.current.chatHistory.some(
-				(m) => m.sender === "ai" && m.text?.match(expectedError),
-			),
-		).toBe(true);
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
+		expect(mockFetch).toHaveBeenCalledTimes(1);
 	});
 
 	it("should handle response missing response field", async () => {
-		server.use(
-			http.post(WORKER_CHAT_URL, () => {
-				return HttpResponse.json({ status: "success", otherData: "abc" });
-			}),
-		);
+		mockFetch.mockResolvedValue({ status: "success", otherData: "abc" }); // Missing 'response'
 		const { result } = renderHook(() => useChat(MOCK_ARTICLE_CONTENT), {
 			wrapper,
 		});
@@ -273,6 +199,6 @@ describe("useChat Hook", () => {
 				(msg) => msg.sender === "ai" && msg.text === `Error: ${expectedError}`,
 			),
 		).toBe(true);
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
+		expect(mockFetch).toHaveBeenCalledTimes(1);
 	});
 });

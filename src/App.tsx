@@ -8,7 +8,7 @@ import {
 	prefersReducedMotion,
 	setupGlobalAnimationTimings,
 } from "@/lib/animation";
-import { ClerkProvider } from "@clerk/clerk-react";
+// Removed AuthProvider import as it's not used
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 
@@ -26,14 +26,18 @@ import ReadPage from "./pages/ReadPage";
 import SearchPage from "./pages/SearchPage";
 import SettingsPage from "./pages/SettingsPage";
 import SignInPage from "./pages/SignInPage";
-import SignUpPage from "./pages/SignUpPage";
+// import SignUpPage from "./pages/SignUpPage"; // Removed as page is deleted
 
-// Import publishable key from environment variables
-const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+// Env var checks removed from here, now handled in src/lib/authClient.ts
+// const BETTER_AUTH_CLIENT_ID = import.meta.env.VITE_BETTER_AUTH_CLIENT_ID;
+// const BETTER_AUTH_DOMAIN = import.meta.env.VITE_BETTER_AUTH_DOMAIN;
 
-if (!PUBLISHABLE_KEY) {
-	throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
-}
+// if (!BETTER_AUTH_CLIENT_ID) {
+// 	throw new Error("Missing VITE_BETTER_AUTH_CLIENT_ID");
+// }
+// if (!BETTER_AUTH_DOMAIN) {
+// 	throw new Error("Missing VITE_BETTER_AUTH_DOMAIN");
+// }
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -84,7 +88,7 @@ const AppWithRouter = () => (
 			<Routes>
 				{/* Public auth routes */}
 				<Route path="/sign-in/*" element={<SignInPage />} />
-				<Route path="/sign-up/*" element={<SignUpPage />} />
+				{/* <Route path="/sign-up/*" element={<SignUpPage />} /> Removed route */}
 
 				{/* Protected routes */}
 				<Route element={<ProtectedRoute />}>
@@ -109,27 +113,22 @@ const AppWithRouter = () => (
 	</BrowserRouter>
 );
 
+// App component no longer needs AuthProvider wrapper
 const App = () => (
-	<ClerkProvider
-		publishableKey={PUBLISHABLE_KEY}
-		signInUrl="/sign-in"
-		signUpUrl="/sign-up"
-	>
-		<ThemeProvider defaultTheme="system" storageKey="bondwise-ui-theme">
-			<ThemeSupport />
-			<AnimationProvider>
-				<MotionPreferenceHandler>
-					<QueryClientProvider client={queryClient}>
-						<TooltipProvider>
-							<Toaster />
-							<Sonner />
-							<AppWithRouter />
-						</TooltipProvider>
-					</QueryClientProvider>
-				</MotionPreferenceHandler>
-			</AnimationProvider>
-		</ThemeProvider>
-	</ClerkProvider>
-);
+	<ThemeProvider defaultTheme="system" storageKey="bondwise-ui-theme">
+		<ThemeSupport />
+		<AnimationProvider>
+			<MotionPreferenceHandler>
+				<QueryClientProvider client={queryClient}>
+					<TooltipProvider>
+						<Toaster />
+						<Sonner />
+						<AppWithRouter />
+					</TooltipProvider>
+				</QueryClientProvider>
+			</MotionPreferenceHandler>
+		</AnimationProvider>
+	</ThemeProvider>
+); // Removed closing AuthProvider tag
 
 export default App;

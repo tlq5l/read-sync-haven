@@ -1,20 +1,23 @@
-import { TooltipProvider } from "@/components/ui/tooltip"; // Import TooltipProvider
-import { ThemeProvider } from "@/context/ThemeContext"; // Import ThemeProvider
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"; // Import QueryClientProvider
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { authClient } from "@/lib/authClient"; // Import authClient
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "./HomePage";
 
-// Mock Clerk's useUser hook
-vi.mock("@clerk/clerk-react", () => ({
-	useUser: vi.fn(),
-	useAuth: vi.fn(() => ({ isSignedIn: true })), // Mock useAuth as well if needed by sub-components
+// Mock the authClient module
+vi.mock("@/lib/authClient", () => ({
+	authClient: {
+		useSession: vi.fn(),
+	},
 }));
 
-const mockUseUser = vi.mocked((await import("@clerk/clerk-react")).useUser);
+// Type assertion for mocked methods
+const mockUseSession = authClient.useSession as ReturnType<typeof vi.fn>;
 
-// Mock Dropdown components if they cause issues in tests
+// Mock Dropdown components
 vi.mock("@/components/ui/dropdown-menu", async () => {
 	const actual = await vi.importActual<
 		typeof import("@/components/ui/dropdown-menu")
@@ -24,7 +27,6 @@ vi.mock("@/components/ui/dropdown-menu", async () => {
 		DropdownMenu: ({ children }: { children: React.ReactNode }) => (
 			<div>{children}</div>
 		),
-		// Render children directly to avoid extra button wrapper
 		DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => (
 			<>{children}</>
 		),
@@ -53,66 +55,71 @@ const renderHomePage = () => {
 	);
 };
 
+// Constants for mock session data
+const MOCK_USER_ID = "test-user-id-123";
+const MOCK_USER_NAME = "Testy McTestFace";
+const MOCK_SESSION_WITH_NAME = {
+	user: { id: MOCK_USER_ID, name: MOCK_USER_NAME },
+};
+const MOCK_SESSION_WITHOUT_NAME = {
+	user: { id: "user-no-name", name: null },
+};
+
 describe("HomePage", () => {
 	beforeEach(() => {
-		// Reset mocks before each test
 		vi.clearAllMocks();
+		// Default mock: authenticated user with a name
+		mockUseSession.mockReturnValue({
+			data: MOCK_SESSION_WITH_NAME,
+			isPending: false,
+			error: null,
+			refetch: vi.fn(),
+		});
 	});
 
-	it("renders welcome message with user's first name", () => {
-		mockUseUser.mockReturnValue({
-			isLoaded: true,
-			isSignedIn: true,
-			user: {
-				id: "user_123",
-				firstName: "Testy",
-				lastName: "McTestFace",
-				// Add other necessary user properties if needed
-			} as any, // Use 'as any' to bypass strict type checking for mock
-		});
-
+	it("renders welcome message with user's name", () => {
 		renderHomePage();
-		expect(screen.getByText(/Welcome Testy/i)).toBeInTheDocument();
+		// Check for the name defined in MOCK_SESSION_WITH_NAME
+		expect(screen.getByText(`Welcome ${MOCK_USER_NAME}`)).toBeInTheDocument();
 	});
 
-	it("renders welcome message with 'User' if first name is not available", () => {
-		mockUseUser.mockReturnValue({
-			isLoaded: true,
-			isSignedIn: true,
-			user: { id: "user_456", firstName: null } as any,
+	it("renders welcome message with 'User' if name is not available in session", () => {
+		// Override mock for this test case
+		mockUseSession.mockReturnValue({
+			data: MOCK_SESSION_WITHOUT_NAME,
+			isPending: false,
+			error: null,
+			refetch: vi.fn(),
 		});
+		renderHomePage();
+		expect(screen.getByText(/Welcome User/i)).toBeInTheDocument();
+	});
 
+	it("renders welcome message with 'User' if session is null (though unlikely if protected)", () => {
+		// Override mock for this test case
+		mockUseSession.mockReturnValue({
+			data: null,
+			isPending: false,
+			error: null,
+			refetch: vi.fn(),
+		});
 		renderHomePage();
 		expect(screen.getByText(/Welcome User/i)).toBeInTheDocument();
 	});
 
 	it("renders the Configure button", () => {
-		mockUseUser.mockReturnValue({
-			isLoaded: true,
-			isSignedIn: true,
-			user: { id: "user_789", firstName: "Config" } as any,
-		});
-
 		renderHomePage();
 		expect(
 			screen.getByRole("button", { name: /Configure/i }),
 		).toBeInTheDocument();
 	});
 
-	// Basic test for dropdown interaction (can be expanded)
 	it("shows dropdown items when Configure button is clicked (mocked)", async () => {
-		mockUseUser.mockReturnValue({
-			isLoaded: true,
-			isSignedIn: true,
-			user: { id: "user_abc", firstName: "Dropdown" } as any,
-		});
-
 		renderHomePage();
 		const configureButton = screen.getByRole("button", { name: /Configure/i });
 		fireEvent.click(configureButton);
 
-		// Since dropdown is mocked, we check for the mocked items
-		// In a real scenario with unmocked dropdown, you'd wait for items
+		// Check for mocked dropdown items
 		expect(screen.getByText("Option 1")).toBeInTheDocument();
 		expect(screen.getByText("Option 2")).toBeInTheDocument();
 		expect(screen.getByText("Option 3")).toBeInTheDocument();

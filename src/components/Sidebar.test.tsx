@@ -1,20 +1,26 @@
 import { AnimationProvider } from "@/context/AnimationContext";
 import { ThemeProvider } from "@/context/ThemeContext";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { authClient } from "@/lib/authClient"; // Import authClient
+import { fireEvent, render, screen, within } from "@testing-library/react"; // Import within
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Sidebar from "./Sidebar";
 
 // --- Mocks ---
 
-// Mock Clerk hooks
-vi.mock("@clerk/clerk-react", () => ({
-	useAuth: () => ({ isSignedIn: true }),
-	useUser: () => ({ user: { firstName: "Test" } }),
-	UserButton: () => <div data-testid="user-button">User Button</div>,
+// Mock the authClient module
+vi.mock("@/lib/authClient", () => ({
+	authClient: {
+		useSession: vi.fn(),
+		signOut: vi.fn().mockResolvedValue(undefined), // Mock signOut if UserMenu calls it
+	},
 }));
 
-// Mock useArticles hook
+// Type assertion for mocked methods
+const mockUseSession = authClient.useSession as ReturnType<typeof vi.fn>;
+// const mockSignOut = authClient.signOut as ReturnType<typeof vi.fn>; // Removed unused mock variable
+
+// Mock useArticles hook (keep existing mock)
 const mockSetCurrentView = vi.fn();
 vi.mock("@/context/ArticleContext", async (importOriginal) => {
 	const actual =
@@ -29,7 +35,7 @@ vi.mock("@/context/ArticleContext", async (importOriginal) => {
 			refreshArticles: vi.fn().mockResolvedValue([]),
 			retryLoading: vi.fn(),
 			currentView: "all",
-			setCurrentView: mockSetCurrentView, // Use the mock function here
+			setCurrentView: mockSetCurrentView,
 			addArticleByUrl: vi.fn().mockResolvedValue(null),
 			addArticleByFile: vi.fn().mockResolvedValue(null),
 			updateArticleStatus: vi.fn().mockResolvedValue(undefined),
@@ -40,23 +46,21 @@ vi.mock("@/context/ArticleContext", async (importOriginal) => {
 	};
 });
 
-// Mock react-router-dom hooks
+// Mock react-router-dom hooks (keep existing mock)
 const mockNavigate = vi.fn();
 vi.mock("react-router-dom", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("react-router-dom")>();
 	return {
 		...actual,
 		useNavigate: () => mockNavigate,
-		useLocation: () => ({ pathname: "/" }), // Mock location, adjust if needed per test
+		useLocation: () => ({ pathname: "/" }),
 	};
 });
 
-// Mock lucide-react icons
+// Mock lucide-react icons (keep existing mock)
 vi.mock("lucide-react", async (importOriginal) => {
-	const actual = await importOriginal<Record<string, any>>(); // Import as Record
-	const mockedIcons: Record<string, React.FC<{ "data-testid"?: string }>> = {}; // Define type for mockedIcons
-
-	// Create simple mock components for icons used in Sidebar
+	const actual = await importOriginal<Record<string, any>>();
+	const mockedIcons: Record<string, React.FC<{ "data-testid"?: string }>> = {};
 	const iconNames = [
 		"Home",
 		"Library",
@@ -64,22 +68,17 @@ vi.mock("lucide-react", async (importOriginal) => {
 		"Sun",
 		"Moon",
 		"LogIn",
+		"LogOut", // Added LogOut
 		"Plus",
 		"ChevronLeft",
 		"MenuIcon",
-		// Add any other icons used if necessary
 	];
-
 	for (const name of iconNames) {
 		mockedIcons[name] = (props) => (
 			<svg data-testid={`icon-${name}`} {...props} />
 		);
 	}
-
-	return {
-		...actual, // Keep actual exports
-		...mockedIcons, // Override specific icons with mocks
-	};
+	return { ...actual, ...mockedIcons };
 });
 
 // --- Test Setup ---
@@ -92,10 +91,29 @@ const MockProviders = ({ children }: { children: React.ReactNode }) => (
 	</MemoryRouter>
 );
 
+// Mock session data
+const MOCK_USER_ID = "user-sidebar-test";
+const MOCK_USER_NAME = "Sidebar User";
+const MOCK_USER_EMAIL = "sidebar@test.com";
+const MOCK_SESSION = {
+	user: {
+		id: MOCK_USER_ID,
+		name: MOCK_USER_NAME,
+		email: MOCK_USER_EMAIL,
+		image: null,
+	},
+};
+
 describe("Sidebar Component", () => {
 	beforeEach(() => {
-		// Reset mocks before each test
 		vi.clearAllMocks();
+		// Default mock: authenticated user
+		mockUseSession.mockReturnValue({
+			data: MOCK_SESSION,
+			isPending: false,
+			error: null,
+			refetch: vi.fn(),
+		});
 	});
 
 	it("renders the Home button with Home icon and navigates to '/' on click", () => {
@@ -106,11 +124,7 @@ describe("Sidebar Component", () => {
 		);
 		const homeButton = screen.getByRole("button", { name: /home/i });
 		expect(homeButton).toBeInTheDocument();
-		// Check for the mocked Home icon within the button
-		expect(
-			homeButton.querySelector('[data-testid="icon-Home"]'),
-		).toBeInTheDocument();
-
+		expect(within(homeButton).getByTestId("icon-Home")).toBeInTheDocument(); // Use within
 		fireEvent.click(homeButton);
 		expect(mockSetCurrentView).toHaveBeenCalledWith("all");
 		expect(mockNavigate).toHaveBeenCalledWith("/");
@@ -124,11 +138,9 @@ describe("Sidebar Component", () => {
 		);
 		const libraryButton = screen.getByRole("button", { name: /library/i });
 		expect(libraryButton).toBeInTheDocument();
-		// Check for the mocked Library icon within the button
 		expect(
-			libraryButton.querySelector('[data-testid="icon-Library"]'),
+			within(libraryButton).getByTestId("icon-Library"),
 		).toBeInTheDocument();
-
 		fireEvent.click(libraryButton);
 		expect(mockSetCurrentView).toHaveBeenCalledWith("all");
 		expect(mockNavigate).toHaveBeenCalledWith("/inbox");
@@ -140,9 +152,11 @@ describe("Sidebar Component", () => {
 				<Sidebar />
 			</MockProviders>,
 		);
-		expect(screen.getByRole("link", { name: /settings/i })).toBeInTheDocument();
-		// Check for Settings icon
-		expect(screen.getByTestId("icon-Settings")).toBeInTheDocument();
+		const settingsLink = screen.getByRole("link", { name: /settings/i });
+		expect(settingsLink).toBeInTheDocument();
+		expect(
+			within(settingsLink).getByTestId("icon-Settings"),
+		).toBeInTheDocument();
 	});
 
 	it("renders theme toggle button", () => {
@@ -151,24 +165,97 @@ describe("Sidebar Component", () => {
 				<Sidebar />
 			</MockProviders>,
 		);
-		// Check for either Sun or Moon icon depending on default theme mock if needed
-		// Or just check for the button role
 		expect(
 			screen.getByRole("button", { name: /light mode|dark mode/i }),
 		).toBeInTheDocument();
 	});
 
 	it("renders Add Content button when signed in", () => {
+		// Uses default mock (signed in)
+		render(
+			<MockProviders>
+				<Sidebar />
+			</MockProviders>,
+		);
+		const addContentLink = screen.getByRole("link", { name: /add content/i });
+		expect(addContentLink).toBeInTheDocument();
+		expect(within(addContentLink).getByTestId("icon-Plus")).toBeInTheDocument();
+	});
+
+	it("does NOT render Add Content button when signed out", () => {
+		mockUseSession.mockReturnValue({
+			data: null,
+			isPending: false,
+			error: null,
+			refetch: vi.fn(),
+		}); // Signed out
 		render(
 			<MockProviders>
 				<Sidebar />
 			</MockProviders>,
 		);
 		expect(
-			screen.getByRole("link", { name: /add content/i }),
-		).toBeInTheDocument();
-		expect(screen.getByTestId("icon-Plus")).toBeInTheDocument();
+			screen.queryByRole("link", { name: /add content/i }),
+		).not.toBeInTheDocument();
 	});
 
-	// Add more tests as needed for collapse/expand, sign-in state etc.
+	it("renders Sign In link when signed out", () => {
+		mockUseSession.mockReturnValue({
+			data: null,
+			isPending: false,
+			error: null,
+			refetch: vi.fn(),
+		}); // Signed out
+		render(
+			<MockProviders>
+				<Sidebar />
+			</MockProviders>,
+		);
+		const signInLink = screen.getByRole("link", { name: /sign in/i });
+		expect(signInLink).toBeInTheDocument();
+		expect(within(signInLink).getByTestId("icon-LogIn")).toBeInTheDocument();
+	});
+
+	it("does NOT render Sign In link when signed in", () => {
+		// Uses default mock (signed in)
+		render(
+			<MockProviders>
+				<Sidebar />
+			</MockProviders>,
+		);
+		expect(
+			screen.queryByRole("link", { name: /sign in/i }),
+		).not.toBeInTheDocument();
+	});
+
+	// Test UserMenu rendering (indirectly)
+	it("renders UserMenu components when signed in", () => {
+		// Uses default mock (signed in)
+		render(
+			<MockProviders>
+				<Sidebar />
+			</MockProviders>,
+		);
+		// Check for elements expected within UserMenu (Avatar, Dropdown trigger)
+		expect(screen.getByRole("button", { name: "" })).toBeInTheDocument(); // Avatar trigger button usually has no name initially
+		// Maybe check for avatar text/image if possible, though it's an implementation detail
+	});
+
+	it("does NOT render UserMenu components when signed out", () => {
+		mockUseSession.mockReturnValue({
+			data: null,
+			isPending: false,
+			error: null,
+			refetch: vi.fn(),
+		}); // Signed out
+		render(
+			<MockProviders>
+				<Sidebar />
+			</MockProviders>,
+		);
+		// Assert that elements expected within UserMenu are not present
+		expect(screen.queryByRole("button", { name: "" })).not.toBeInTheDocument();
+	});
+
+	// Add more tests as needed for collapse/expand, sign-out interaction etc.
 });

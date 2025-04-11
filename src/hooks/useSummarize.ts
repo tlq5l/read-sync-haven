@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+import { authClient } from "@/lib/authClient"; // Import authClient
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -7,51 +7,51 @@ import { useState } from "react";
  * Manages loading state, error handling, and the resulting summary.
  */
 export function useSummarize() {
-	const { getToken } = useAuth();
+	const { data: session } = authClient.useSession(); // Use session to ensure user is logged in
 	const [isSummarizing, setIsSummarizing] = useState(false);
 	const [summary, setSummary] = useState<string | null>(null);
-	const [summaryError, setSummaryError] = useState<string | null>(null);
+	const [summaryError, setSummaryError] = useState<Error | null>(null); // Store Error object
 
 	const summarizeMutation = useMutation({
 		mutationFn: async (fullTextContent: string | null) => {
+			if (!session) {
+				// Check if user is authenticated first
+				throw new Error("User not authenticated for summarization.");
+			}
 			if (!fullTextContent) {
 				throw new Error("Article content not available for summarization.");
 			}
-			const requestBody = JSON.stringify({ content: fullTextContent });
 
-			// Check if running in development environment
-			// Note: This relies on Vite's import.meta.env feature.
-			// Ensure your vite-env.d.ts includes `/// <reference types="vite/client" />`
-			// --- Always call Cloudflare Worker Proxy (for both Dev and Prod) ---
 			console.log("Calling Cloudflare Worker proxy for summarize...");
-			// 1. Get Clerk token
-			const clerkToken = await getToken();
-			if (!clerkToken) {
-				throw new Error("User not authenticated (Clerk token missing).");
-			}
 
-			// 2. Call the worker endpoint
-			const response = await fetch(
-				"https://bondwise-sync-api.vikione.workers.dev/api/summarize", // Use production worker URL always
+			// Use authClient.$fetch - it should handle auth automatically
+			const response = await authClient.$fetch(
+				// URL should be relative to the baseURL configured in authClient
+				// Assuming baseURL is "https://bondwise-sync-api.vikione.workers.dev"
+				"/api/summarize",
 				{
 					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${clerkToken}`, // Use Clerk token
-					},
-					body: requestBody,
+					body: { content: fullTextContent }, // Send content in body
+					// $fetch handles headers like Content-Type and Authorization
 				},
 			);
 
-			// --- Handle Response (Common for Dev/Prod) ---
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					data?.message ||
-						data?.error ||
-						`Request failed with status ${response.status}`,
-				);
+			// $fetch likely throws on error, but check response just in case
+			// Depending on $fetch config, 'response' might already be the parsed JSON data
+			let data: { summary?: string; message?: string; error?: string };
+			if (response instanceof Response) {
+				// If $fetch returned the raw Response object
+				data = await response.json();
+				if (!response.ok) {
+					throw new Error(
+						data?.message ||
+							data?.error ||
+							`Request failed with status ${response.status}`,
+					);
+				}
+			} else {
+				// If $fetch returned parsed data directly
+				data = response as any; // Assume structure matches
 			}
 
 			if (!data.summary) {
@@ -69,10 +69,9 @@ export function useSummarize() {
 		},
 		onSuccess: (data) => {
 			setSummary(data);
-			// Note: Opening the sidebar is UI logic, should be handled in the component
 		},
 		onError: (error: Error) => {
-			setSummaryError(error.message);
+			setSummaryError(error); // Store the full Error object
 		},
 		onSettled: () => {
 			setIsSummarizing(false);
@@ -80,7 +79,7 @@ export function useSummarize() {
 	});
 
 	return {
-		summarize: summarizeMutation.mutate, // Expose the mutate function
+		summarize: summarizeMutation.mutate,
 		isSummarizing,
 		summary,
 		summaryError,

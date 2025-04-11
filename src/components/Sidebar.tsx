@@ -1,4 +1,13 @@
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
 	TransitionGroup,
 	TransitionItem,
@@ -7,15 +16,14 @@ import { useAnimation } from "@/context/AnimationContext";
 import { useArticles } from "@/context/ArticleContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useSynchronizedAnimation } from "@/hooks/use-synchronized-animation";
+import { authClient } from "@/lib/authClient"; // Import authClient
 import { cn } from "@/lib/utils";
-import { UserButton, useAuth } from "@clerk/clerk-react"; // Removed unused useUser
 import {
-	// Bookmark, // Removed unused icon
 	ChevronLeft,
-	// Clock, // Removed unused icon
 	Home,
 	Library,
 	LogIn,
+	LogOut, // Added for Sign Out button
 	MenuIcon,
 	Moon,
 	Plus,
@@ -25,15 +33,83 @@ import {
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+// New UserMenu component to replace Clerk's UserButton
+const UserMenu = () => {
+	const { data: session } = authClient.useSession();
+
+	const handleSignOut = async () => {
+		try {
+			// Assume signOut exists on the client
+			await authClient.signOut();
+			// Redirect happens via ProtectedRoute or similar logic after session invalidation
+		} catch (error) {
+			console.error("Sign out failed:", error);
+		}
+	};
+
+	// Assuming session.user structure based on common patterns
+	const user = session?.user;
+
+	if (!user) {
+		// Shouldn't happen if rendered correctly, but good practice
+		return null;
+	}
+
+	// Extract initials for fallback
+	const initials =
+		user.name
+			?.split(" ")
+			.map((n) => n[0])
+			.join("")
+			.toUpperCase() || "?";
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
+					<Avatar className="h-8 w-8">
+						{/* Assuming 'image' property exists on user */}
+						<AvatarImage
+							src={user.image || undefined}
+							alt={user.name || "User"}
+						/>
+						<AvatarFallback>{initials}</AvatarFallback>
+					</Avatar>
+				</Button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent className="w-56" align="end" forceMount>
+				<DropdownMenuLabel className="font-normal">
+					<div className="flex flex-col space-y-1">
+						<p className="text-sm font-medium leading-none">
+							{user.name || "User"}
+						</p>
+						{/* Assuming email is available */}
+						{user.email && (
+							<p className="text-xs leading-none text-muted-foreground">
+								{user.email}
+							</p>
+						)}
+					</div>
+				</DropdownMenuLabel>
+				<DropdownMenuSeparator />
+				{/* Can add links to Profile/Settings here */}
+				<DropdownMenuItem onClick={handleSignOut}>
+					<LogOut className="mr-2 h-4 w-4" />
+					<span>Sign out</span>
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+};
+
 export default function Sidebar() {
 	const [collapsed, setCollapsed] = useState(false);
 	const location = useLocation();
 	const navigate = useNavigate();
-	const { setCurrentView } = useArticles(); // Removed unused currentView
+	const { setCurrentView } = useArticles();
 	const { theme, setTheme } = useTheme();
 	const { synchronizeAnimations } = useAnimation();
-	const { isSignedIn } = useAuth();
-	// const { user } = useUser(); // Removed as unused
+	const { data: session } = authClient.useSession(); // Use session data
 	const [isDarkMode, setIsDarkMode] = useState(false);
 
 	// Create synchronized animations for the sidebar
@@ -44,14 +120,12 @@ export default function Sidebar() {
 	});
 
 	useEffect(() => {
-		// Update dark mode state when theme changes
 		const darkMode =
 			theme === "dark" ||
 			(theme === "system" &&
 				window.matchMedia("(prefers-color-scheme: dark)").matches);
 		setIsDarkMode(darkMode);
 
-		// Add listener for system preference changes
 		const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 		const handleChange = (e: MediaQueryListEvent) => {
 			if (theme === "system") {
@@ -64,21 +138,17 @@ export default function Sidebar() {
 	}, [theme]);
 
 	const isActive = (path: string) => location.pathname === path;
-	// const isViewActive = (view: "all" | "unread" | "favorites") =>
-	// 	currentView === view; // Removed unused function
 
 	const toggleTheme = () => {
 		setTheme(theme === "dark" ? "light" : "dark");
 	};
 
 	const toggleCollapsed = () => {
-		// Use synchronizeAnimations to ensure smooth transitions
 		synchronizeAnimations(() => {
 			setCollapsed(!collapsed);
 		});
 	};
 
-	// Define styles directly to ensure visibility
 	const styles = {
 		container: {
 			backgroundColor: isDarkMode ? "#131825" : "#ffffff",
@@ -99,9 +169,6 @@ export default function Sidebar() {
 		activeLink: {
 			backgroundColor: isDarkMode ? "#1e293b" : "#f3f4f6",
 			color: isDarkMode ? "#ffffff" : "#111827",
-		},
-		userGreeting: {
-			color: isDarkMode ? "#d1d5db" : "#4b5563",
 		},
 	};
 
@@ -130,34 +197,20 @@ export default function Sidebar() {
 				<div
 					className={cn(
 						"flex items-center",
-						collapsed ? "w-full justify-center" : "ml-auto", // Center content when collapsed
+						collapsed ? "w-full justify-center" : "ml-auto",
 					)}
 				>
-					{isSignedIn && (
-						<UserButton
-							afterSignOutUrl="/sign-in"
-							appearance={{
-								elements: {
-									userButtonAvatarBox: "w-8 h-8",
-								},
-							}}
-						/>
-					)}
+					{!!session && <UserMenu />} {/* Use UserMenu */}
 					<Button
 						variant="ghost"
 						size="icon"
 						onClick={toggleCollapsed}
-						className={cn(
-							"transition-transform duration-200",
-							// Removed conditional margin, parent div handles centering/alignment
-						)}
+						className={cn("transition-transform duration-200")}
 					>
 						{collapsed ? <MenuIcon size={20} /> : <ChevronLeft size={20} />}
 					</Button>
 				</div>
 			</div>
-
-			{/* User greeting section removed */}
 
 			<div className="flex-grow overflow-y-auto py-4">
 				<TransitionGroup
@@ -168,12 +221,11 @@ export default function Sidebar() {
 					autoAnimate={true}
 				>
 					<TransitionItem showFrom="left" className="w-full">
-						{/* Home Button */}
 						<Button
 							variant="ghost"
 							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
 							onClick={() => {
-								setCurrentView("all"); // Reset view when going home
+								setCurrentView("all");
 								navigate("/");
 							}}
 							style={isActive("/") ? styles.activeLink : styles.link}
@@ -186,12 +238,11 @@ export default function Sidebar() {
 					</TransitionItem>
 
 					<TransitionItem showFrom="left" className="w-full">
-						{/* Library Button */}
 						<Button
 							variant="ghost"
 							className="w-full flex items-center justify-start gap-3 py-2 transition-all duration-200"
 							onClick={() => {
-								setCurrentView("all"); // Reset view similar to Home
+								setCurrentView("all");
 								navigate("/inbox");
 							}}
 							style={isActive("/inbox") ? styles.activeLink : styles.link}
@@ -202,8 +253,6 @@ export default function Sidebar() {
 							)}
 						</Button>
 					</TransitionItem>
-
-					{/* Removed Unread and Favorites buttons - handled by TopBar */}
 				</TransitionGroup>
 
 				<div className="mt-8 px-3">
@@ -222,8 +271,6 @@ export default function Sidebar() {
 						staggerDelay={30}
 						autoAnimate={true}
 					>
-						{/* Show these navigation items regardless of authentication state */}
-
 						<TransitionItem showFrom="left" className="w-full">
 							<Button
 								variant="ghost"
@@ -262,7 +309,7 @@ export default function Sidebar() {
 							</Button>
 						</TransitionItem>
 
-						{!isSignedIn && (
+						{!session && ( // Check !session instead of !isSignedIn
 							<TransitionItem showFrom="left" className="w-full">
 								<Button
 									variant="ghost"
@@ -284,7 +331,7 @@ export default function Sidebar() {
 				</div>
 			</div>
 
-			{isSignedIn && (
+			{!!session && ( // Check !!session instead of isSignedIn
 				<div
 					className="p-4 border-t"
 					style={{ borderColor: styles.container.borderColor }}

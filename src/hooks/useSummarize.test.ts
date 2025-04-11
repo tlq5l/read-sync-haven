@@ -1,59 +1,57 @@
-import { useAuth } from "@clerk/clerk-react";
+import { authClient } from "@/lib/authClient"; // Import the actual client to mock its methods
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { server } from "../mocks/server"; // MSW server
 import {
 	QueryClientWrapper,
 	getTestQueryClient,
-} from "../test-utils/QueryClientWrapper"; // Import the wrapper
-// Remove direct QueryClient imports
-// import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-// import React from 'react';
+} from "../test-utils/QueryClientWrapper";
 import { useSummarize } from "./useSummarize";
 
-// Mock the useAuth hook from Clerk
-vi.mock("@clerk/clerk-react", () => ({
-	useAuth: vi.fn(),
+// Mock the authClient
+vi.mock("@/lib/authClient", () => ({
+	authClient: {
+		useSession: vi.fn(),
+		$fetch: vi.fn(), // Mock the fetch method used internally
+	},
 }));
 
-// Mock console.log/error - Removed as they are unused
-// const mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
-// const mockConsoleError = vi
-// 	.spyOn(console, "error")
-// 	.mockImplementation(() => {});
+// Type assertion for mocked methods
+const mockUseSession = authClient.useSession as ReturnType<typeof vi.fn>;
+const mockFetch = authClient.$fetch as ReturnType<typeof vi.fn>;
 
 // Constants
-const MOCK_CLERK_TOKEN = "mock-clerk-jwt-token";
-const WORKER_SUMMARIZE_URL =
-	"https://bondwise-sync-api.vikione.workers.dev/api/summarize";
 const MOCK_SUMMARY = "This is a mock summary.";
+const MOCK_USER_ID = "test-user-id";
+const MOCK_SESSION = {
+	user: { id: MOCK_USER_ID /* other fields if needed */ },
+};
 
 // Get the test query client instance
 const queryClient = getTestQueryClient();
 
 describe("useSummarize Hook", () => {
-	const wrapper = QueryClientWrapper; // Use the imported wrapper component
-	let mockGetToken: ReturnType<typeof vi.fn>;
+	const wrapper = QueryClientWrapper;
 
 	beforeEach(() => {
 		// Reset mocks before each test
-		vi.clearAllMocks(); // Use clearAllMocks to reset spies too
-		queryClient.clear(); // Clear query cache between tests
-		mockGetToken = vi.fn();
-		(useAuth as ReturnType<typeof vi.fn>).mockReturnValue({
-			getToken: mockGetToken,
-			userId: "test-user-id", // Add userId if needed by other parts
-			isLoaded: true,
-			isSignedIn: true,
-		});
+		vi.clearAllMocks();
+		queryClient.clear();
+
 		// Default mock implementations
-		mockGetToken.mockResolvedValue(MOCK_CLERK_TOKEN);
+		// Mock authenticated state by default
+		mockUseSession.mockReturnValue({
+			data: MOCK_SESSION,
+			isPending: false,
+			error: null,
+			refetch: vi.fn(),
+		});
+		// Mock successful API call by default
+		mockFetch.mockResolvedValue({ summary: MOCK_SUMMARY });
 	});
 
 	afterEach(() => {
-		vi.restoreAllMocks(); // Restore console mocks etc.
-		server.resetHandlers(); // Reset MSW handlers between tests
+		vi.restoreAllMocks();
+		// No need to reset MSW handlers as we mock $fetch directly
 	});
 
 	it("should initialize with correct default states", () => {
@@ -72,16 +70,24 @@ describe("useSummarize Hook", () => {
 
 		await waitFor(() => {
 			expect(result.current.isSummarizing).toBe(false);
-			expect(result.current.summaryError).toBe(
+			// Check the exact error message from the hook's validation
+			expect(result.current.summaryError?.message).toBe(
+				// Accessing .message should work now
 				"Article content not available for summarization.",
 			);
 			expect(result.current.summary).toBeNull();
 		});
-		expect(mockGetToken).not.toHaveBeenCalled();
+		expect(mockFetch).not.toHaveBeenCalled(); // Should not call fetch if content is null
 	});
 
-	it("should return error if getToken fails", async () => {
-		mockGetToken.mockResolvedValue(null); // Simulate token failure
+	it("should return error if user is not authenticated", async () => {
+		// Mock unauthenticated state
+		mockUseSession.mockReturnValue({
+			data: null,
+			isPending: false,
+			error: null,
+			refetch: vi.fn(),
+		});
 		const { result } = renderHook(() => useSummarize(), { wrapper });
 
 		act(() => {
@@ -90,144 +96,63 @@ describe("useSummarize Hook", () => {
 
 		await waitFor(() => {
 			expect(result.current.isSummarizing).toBe(false);
-			expect(result.current.summaryError).toBe(
-				"User not authenticated (Clerk token missing).",
+			// Check the exact error message from the hook's auth check
+			expect(result.current.summaryError?.message).toBe(
+				// Accessing .message should work now
+				"User not authenticated for summarization.",
 			);
 			expect(result.current.summary).toBeNull();
 		});
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
+		expect(mockFetch).not.toHaveBeenCalled(); // Should not call fetch if not authenticated
 	});
 
 	it("should successfully summarize content and update state", async () => {
 		const { result } = renderHook(() => useSummarize(), { wrapper });
 		const testContent = "This is the content to summarize.";
 
-		// MSW will intercept the fetch call defined in src/mocks/handlers.ts
-
 		act(() => {
 			result.current.summarize(testContent);
 		});
 
-		// // Check initial mutation state - This runs before onMutate sets state
-		// expect(result.current.isSummarizing).toBe(true);
-		// expect(result.current.summary).toBeNull();
-		// expect(result.current.summaryError).toBeNull();
-
-		// Wait for the mutation to complete (MSW will respond)
 		await waitFor(() => {
 			expect(result.current.isSummarizing).toBe(false);
 			expect(result.current.summary).toBe(MOCK_SUMMARY);
 			expect(result.current.summaryError).toBeNull();
 		});
 
-		// Verify dependencies were called
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
-	});
-
-	it("should handle unauthorized (401) error from worker", async () => {
-		// Override MSW handler for this specific test
-		server.use(
-			http.post(WORKER_SUMMARIZE_URL, () => {
-				return new HttpResponse(
-					JSON.stringify({ error: "Mock Unauthorized" }),
-					{
-						status: 401,
-						headers: { "Content-Type": "application/json" },
-					},
-				);
+		// Verify fetch was called correctly
+		expect(mockFetch).toHaveBeenCalledTimes(1);
+		expect(mockFetch).toHaveBeenCalledWith(
+			"/api/summarize", // Assuming relative URL based on hook implementation
+			expect.objectContaining({
+				method: "POST",
+				body: { content: testContent },
 			}),
 		);
+	});
+
+	it("should handle API error from $fetch", async () => {
+		const mockError = new Error("Mock API Error");
+		mockFetch.mockRejectedValue(mockError); // Simulate fetch failure
 
 		const { result } = renderHook(() => useSummarize(), { wrapper });
-		const testContent = "Content causing auth error.";
+		const testContent = "Content causing API error.";
 
 		act(() => {
 			result.current.summarize(testContent);
 		});
 
-		// expect(result.current.isSummarizing).toBe(true); // Runs before onMutate
-
 		await waitFor(() => {
 			expect(result.current.isSummarizing).toBe(false);
 			expect(result.current.summary).toBeNull();
-			// Check if the error message includes the status or the message from the body
-			expect(result.current.summaryError).toMatch(
-				/Mock Unauthorized|Request failed with status 401/,
-			);
+			expect(result.current.summaryError).toBe(mockError); // Check for the exact error object
 		});
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
-	});
-
-	it("should handle server error (500) from worker", async () => {
-		// Override MSW handler for this specific test
-		server.use(
-			http.post(WORKER_SUMMARIZE_URL, () => {
-				return new HttpResponse(
-					JSON.stringify({ error: "Internal Server Error" }),
-					{
-						status: 500,
-						headers: { "Content-Type": "application/json" },
-					},
-				);
-			}),
-		);
-
-		const { result } = renderHook(() => useSummarize(), { wrapper });
-		const testContent = "Content causing server error.";
-
-		act(() => {
-			result.current.summarize(testContent);
-		});
-
-		// expect(result.current.isSummarizing).toBe(true); // Runs before onMutate
-
-		await waitFor(() => {
-			expect(result.current.isSummarizing).toBe(false);
-			expect(result.current.summary).toBeNull();
-			expect(result.current.summaryError).toMatch(
-				/Internal Server Error|Request failed with status 500/,
-			);
-		});
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
-	});
-
-	it("should handle invalid JSON response from worker", async () => {
-		// Override MSW handler for this specific test
-		server.use(
-			http.post(WORKER_SUMMARIZE_URL, () => {
-				// Return non-JSON response
-				return new HttpResponse("<html><body>Invalid JSON</body></html>", {
-					status: 200,
-					headers: { "Content-Type": "text/html" }, // Incorrect content type
-				});
-			}),
-		);
-
-		const { result } = renderHook(() => useSummarize(), { wrapper });
-		const testContent = "Content resulting in invalid JSON response.";
-
-		act(() => {
-			result.current.summarize(testContent);
-		});
-
-		// expect(result.current.isSummarizing).toBe(true); // Runs before onMutate
-
-		await waitFor(() => {
-			expect(result.current.isSummarizing).toBe(false);
-			expect(result.current.summary).toBeNull();
-			// Error comes from JSON.parse failing
-			expect(result.current.summaryError).toMatch(/Unexpected token '<'/);
-		});
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
+		expect(mockFetch).toHaveBeenCalledTimes(1);
 	});
 
 	it("should handle response missing summary field", async () => {
-		// Override MSW handler for this specific test
-		server.use(
-			http.post(WORKER_SUMMARIZE_URL, () => {
-				return HttpResponse.json({ status: "success", wrongField: "data" }); // Missing 'summary'
-			}),
-		);
+		// Mock fetch to return object without summary
+		mockFetch.mockResolvedValue({ status: "success", wrongField: "data" });
 
 		const { result } = renderHook(() => useSummarize(), { wrapper });
 		const testContent = "Content resulting in missing summary field.";
@@ -236,15 +161,14 @@ describe("useSummarize Hook", () => {
 			result.current.summarize(testContent);
 		});
 
-		// expect(result.current.isSummarizing).toBe(true); // Runs before onMutate
-
 		await waitFor(() => {
 			expect(result.current.isSummarizing).toBe(false);
 			expect(result.current.summary).toBeNull();
-			expect(result.current.summaryError).toBe(
+			expect(result.current.summaryError?.message).toBe(
+				// Accessing .message should work now
 				"Invalid response from summarization service (missing summary).",
 			);
 		});
-		expect(mockGetToken).toHaveBeenCalledTimes(1);
+		expect(mockFetch).toHaveBeenCalledTimes(1);
 	});
 });

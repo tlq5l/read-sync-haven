@@ -211,7 +211,8 @@ export default function ArticleReader() {
 							)}
 							{summaryError && (
 								<p className="text-sm text-destructive">
-									Error: {summaryError}
+									{/* Display the error message */}
+									Error: {summaryError.message}
 								</p>
 							)}
 							{summary && (

@@ -1,4 +1,5 @@
 import { useToast } from "@/hooks/use-toast";
+import { authClient } from "@/lib/authClient"; // Import authClient
 import { debounce } from "@/lib/utils"; // Import debounce
 import {
 	type CloudSyncStatus, // Import the status type
@@ -13,20 +14,7 @@ import {
 	saveArticle,
 	updateArticle,
 } from "@/services/db";
-// Removed static imports for dynamic loading below
-// import {
-// 	arrayBufferToBase64 as epubToBase64,
-// 	extractEpubMetadata,
-// 	isValidEpub,
-// } from "@/services/epub";
 import { parseArticle } from "@/services/parser";
-// Removed static imports for dynamic loading below
-// import {
-// 	extractPdfMetadata,
-// 	isValidPdf,
-// 	arrayBufferToBase64 as pdfToBase64,
-// } from "@/services/pdf";
-import { useAuth } from "@clerk/clerk-react"; // Removed useUser as unused
 import { useCallback, useMemo } from "react"; // Import useMemo
 
 /**
@@ -36,12 +24,18 @@ import { useCallback, useMemo } from "react"; // Import useMemo
  */
 export function useArticleActions(refreshArticles: () => Promise<void>) {
 	const { toast } = useToast();
-	const { userId, isSignedIn } = useAuth();
+	const { data: session } = authClient.useSession(); // Use session hook
+	const userId = session?.user?.id; // Derive userId
 
 	// Debounced function for syncing progress updates to the cloud
 	const debouncedSyncProgress = useMemo(
 		() =>
 			debounce((articleToSync: Article) => {
+				// Check if session exists before syncing
+				if (!session) {
+					console.warn("Debounced sync skipped: User not authenticated.");
+					return;
+				}
 				saveItemToCloud(articleToSync)
 					.then((status: CloudSyncStatus) => {
 						if (status !== "success") {
@@ -49,7 +43,6 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 								`Debounced sync for progress update ${articleToSync._id} failed with status: ${status}`,
 							);
 						}
-						// No console log on success to reduce noise
 					})
 					.catch((err) => {
 						console.error(
@@ -57,14 +50,15 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 							err,
 						);
 					});
-			}, 1500), // Debounce for 1.5 seconds
-		[], // No dependencies, saveItemToCloud is a stable import
+			}, 1500),
+		[session], // Depend on session
 	);
 
 	// Add article by URL
 	const addArticleByUrl = useCallback(
 		async (url: string): Promise<Article | null> => {
-			if (!isSignedIn || !userId) {
+			// Check session and derived userId
+			if (!session || !userId) {
 				toast({
 					title: "Authentication Required",
 					description: "Please sign in to save articles.",
@@ -76,19 +70,18 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 			try {
 				const parsedArticle = await parseArticle(url);
 
-				// Add default status when creating article from URL
 				const articleWithUser: Omit<Article, "_id" | "_rev"> & {
 					_id?: string;
 					_rev?: string;
 				} = {
 					...parsedArticle,
-					userId, // Assign the current Clerk user ID
+					userId, // Use derived userId
 					savedAt: Date.now(),
-					status: "inbox", // Default status
+					status: "inbox",
 					isRead: false,
 					favorite: false,
 					tags: [],
-					readingProgress: 0, // Initialize progress
+					readingProgress: 0,
 				};
 
 				const savedArticle = await saveArticle(articleWithUser);
@@ -98,7 +91,6 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					description: `"${parsedArticle.title}" has been saved.`,
 				});
 
-				// Trigger refresh after successful save
 				await refreshArticles();
 
 				return savedArticle;
@@ -115,13 +107,14 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				return null;
 			}
 		},
-		[toast, userId, isSignedIn, refreshArticles],
+		[toast, session, userId, refreshArticles], // Updated dependencies
 	);
 
 	// Add article by file (EPUB or PDF)
 	const addArticleByFile = useCallback(
 		async (file: File): Promise<Article | null> => {
-			if (!isSignedIn || !userId) {
+			// Check session and derived userId
+			if (!session || !userId) {
 				toast({
 					title: "Authentication Required",
 					description: "Please sign in to save files.",
@@ -137,7 +130,6 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				};
 				let fileType: "epub" | "pdf" | null = null;
 
-				// Dynamically import epub functions first
 				const epubModule = await import("@/services/epub");
 				if (epubModule.isValidEpub(file)) {
 					fileType = "epub";
@@ -149,7 +141,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					);
 
 					articleToSave = {
-						userId,
+						userId, // Use derived userId
 						title: metadata.title || file.name.replace(/\.epub$/i, ""),
 						type: "epub",
 						fileData: base64Content,
@@ -170,7 +162,6 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 						fileSize: fileBuffer.byteLength,
 					};
 				} else {
-					// Dynamically import pdf functions only if not epub
 					const pdfModule = await import("@/services/pdf");
 					if (pdfModule.isValidPdf(file)) {
 						fileType = "pdf";
@@ -187,10 +178,10 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 							);
 
 						articleToSave = {
-							userId,
+							userId, // Use derived userId
 							title: metadata.title || file.name.replace(/\.pdf$/i, ""),
 							type: "pdf",
-							content: base64Content,
+							content: base64Content, // For PDFs, content might still be used? Revisit if fileData preferred.
 							url: `local-pdf://${file.name}`,
 							savedAt: Date.now(),
 							status: "inbox",
@@ -208,17 +199,14 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 							fileSize: fileBuffer.byteLength,
 						};
 					} else {
-						// If neither EPUB nor PDF is valid
 						throw new Error(
 							"Invalid file type. Only EPUB and PDF formats are supported.",
 						);
 					}
 				}
 
-				// Save the article locally
 				const savedArticle = await saveArticle(articleToSave);
 
-				// Sync to Cloud (fire and forget)
 				saveItemToCloud(savedArticle)
 					.then((status: CloudSyncStatus) => {
 						if (status === "success") {
@@ -238,18 +226,15 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 						);
 					});
 
-				// Show success toast
 				toast({
 					title: `${fileType?.toUpperCase()} saved`,
 					description: `"${savedArticle.title}" has been saved.`,
 				});
 
-				// Trigger refresh after successful save
 				await refreshArticles();
 
-				return savedArticle; // Return the saved article on success
+				return savedArticle;
 			} catch (err) {
-				// Catch any error during the process (import, validation, save)
 				console.error("Failed to add file:", err);
 				toast({
 					title: "Failed to save file",
@@ -259,13 +244,13 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 							: "An error occurred while saving the file.",
 					variant: "destructive",
 				});
-				return null; // Return null on failure
+				return null;
 			}
-		}, // End of async function passed to useCallback
-		[toast, userId, isSignedIn, refreshArticles], // Dependencies for useCallback
-	); // End of useCallback
+		},
+		[toast, session, userId, refreshArticles], // Updated dependencies
+	);
 
-	// Update article status (isRead, favorite, status)
+	// Update article status
 	const updateArticleStatus = useCallback(
 		async (
 			id: string,
@@ -275,7 +260,8 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				status?: "inbox" | "later" | "archived";
 			},
 		) => {
-			if (!isSignedIn || !userId) {
+			// Check session and derived userId
+			if (!session || !userId) {
 				toast({
 					title: "Authentication Required",
 					description: "Please sign in to update articles.",
@@ -292,8 +278,8 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					);
 				}
 
-				// Basic permission check (can be enhanced)
 				if (fetchedArticle.userId !== userId) {
+					// Use derived userId
 					throw new Error("Permission denied to update this article.");
 				}
 
@@ -325,14 +311,12 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				}
 
 				if (Object.keys(updatePayload).length <= 2) {
-					// Only _id and _rev
 					console.log("No actual updates provided to updateArticleStatus");
-					return; // No actual updates to perform
+					return;
 				}
 
 				const updatedArticle = await updateArticle(updatePayload);
 
-				// Sync update to cloud (fire and forget)
 				saveItemToCloud(updatedArticle)
 					.then((status: CloudSyncStatus) => {
 						if (status === "success") {
@@ -354,7 +338,6 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					description: `Article ${statusUpdateMessage}.`,
 				});
 
-				// Trigger refresh to reflect changes everywhere
 				await refreshArticles();
 			} catch (err) {
 				console.error("Failed to update article status:", err);
@@ -368,13 +351,14 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				});
 			}
 		},
-		[toast, userId, isSignedIn, refreshArticles],
+		[toast, session, userId, refreshArticles], // Updated dependencies
 	);
 
 	// Update reading progress
 	const updateReadingProgress = useCallback(
 		async (id: string, progress: number) => {
-			if (!isSignedIn || !userId) return; // Silently fail if not signed in
+			// Check session and derived userId first
+			if (!session || !userId) return; // Silently fail if not signed in
 
 			try {
 				const fetchedArticle = await getArticle(id);
@@ -385,18 +369,16 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					return;
 				}
 
-				// Basic permission check
 				if (fetchedArticle.userId !== userId) {
+					// Use derived userId
 					console.warn(
 						`Permission denied to update progress for article ${id}.`,
 					);
 					return;
 				}
 
-				// Avoid unnecessary updates if progress hasn't changed significantly
 				const currentProgress = fetchedArticle.readingProgress ?? 0;
 				if (Math.abs(progress - currentProgress) < 1 && progress !== 100) {
-					// Allow explicit 100%
 					return;
 				}
 
@@ -413,50 +395,39 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 
 				const updatedArticle = await updateArticle(updates);
 
-				// Sync progress update to cloud using the debounced function
 				debouncedSyncProgress(updatedArticle);
-
-				// No refresh needed here, UI should update optimistically or via direct state update if required elsewhere
-				// await refreshArticles(); // Avoid refreshing on every progress update
 			} catch (err) {
 				console.error("Failed to update reading progress:", err);
-				// No toast for progress updates
 			}
 		},
-		[userId, isSignedIn, debouncedSyncProgress], // Add stable debounced function
+		[session, userId, debouncedSyncProgress], // Updated dependencies
 	);
 
-	// Remove article - Returns true on successful DB delete, false otherwise.
-	// Refresh is handled by the caller/context optimistically.
+	// Remove article
 	const removeArticle = useCallback(
 		async (id: string): Promise<boolean> => {
-			if (!isSignedIn || !userId) {
+			// Check session and derived userId
+			if (!session || !userId) {
 				toast({
 					title: "Authentication Required",
 					description: "Please sign in to remove articles.",
 					variant: "destructive",
 				});
-				return false; // Indicate failure
+				return false;
 			}
 
 			try {
-				// Fetch article first to verify ownership before deleting
 				const articleToDelete = await getArticle(id);
 				if (!articleToDelete) {
-					// Already deleted or doesn't exist locally.
-					// Refresh will reconcile with the cloud state.
 					console.log(`Article ${id} not found locally during remove attempt.`);
-					// Don't refresh here, let the caller handle UI state.
-					// Consider if returning true is appropriate if already deleted locally.
-					// For now, let's return true as the desired state (gone) is achieved locally.
 					return true;
 				}
 
 				if (articleToDelete.userId !== userId) {
+					// Use derived userId
 					throw new Error("Permission denied to remove this article.");
 				}
 
-				// Use the revision from the fetched article for safety, ignore passed 'rev'
 				if (!articleToDelete._rev) {
 					throw new Error("Cannot delete article without revision ID.");
 				}
@@ -468,7 +439,6 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					description: "The article has been removed.",
 				});
 
-				// Trigger cloud deletion (fire and forget, but log errors)
 				deleteItemFromCloud(id)
 					.then((status: CloudSyncStatus) => {
 						if (status === "success") {
@@ -478,19 +448,16 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 								`Item ${id} already deleted or not found in cloud during deletion trigger.`,
 							);
 						} else {
-							// Log other failures but don't block UI return, as local delete succeeded
 							console.warn(
 								`Cloud deletion trigger for ${id} failed with status: ${status}`,
 							);
 						}
 					})
 					.catch((err) => {
-						// Log error but don't block UI return, as local delete succeeded
 						console.error(`Error triggering cloud deletion for ${id}:`, err);
 					});
 
-				// No refresh here - handled optimistically by caller.
-				return true; // Indicate success of local deletion
+				return true;
 			} catch (err) {
 				console.error("Failed to remove article:", err);
 				toast({
@@ -501,15 +468,16 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 							: "An error occurred while removing the article.",
 					variant: "destructive",
 				});
-				return false; // Indicate failure
+				return false;
 			}
 		},
-		[toast, userId, isSignedIn], // Removed refreshArticles dependency
+		[toast, session, userId], // Updated dependencies
 	);
 
 	// Remove duplicate articles locally
 	const removeDuplicateLocalArticles = useCallback(async () => {
-		if (!isSignedIn || !userId) {
+		// Check session and derived userId
+		if (!session || !userId) {
 			toast({
 				title: "Authentication Required",
 				description: "Please sign in to manage articles.",
@@ -520,6 +488,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 
 		try {
 			console.log("Attempting to remove duplicate articles...");
+			// removeDuplicateArticles likely doesn't need userId if it operates globally or fetches internally
 			const removedCount = await removeDuplicateArticles();
 
 			if (removedCount > 0) {
@@ -527,7 +496,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 					title: "Duplicates Removed",
 					description: `${removedCount} duplicate article(s) removed locally.`,
 				});
-				await refreshArticles(); // Refresh the list
+				await refreshArticles();
 			} else {
 				toast({
 					title: "No Duplicates Found",
@@ -545,7 +514,7 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 				variant: "destructive",
 			});
 		}
-	}, [toast, userId, isSignedIn, refreshArticles]);
+	}, [toast, session, userId, refreshArticles]); // Updated dependencies
 
 	return {
 		addArticleByUrl,
@@ -553,6 +522,6 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 		updateArticleStatus,
 		updateReadingProgress,
 		removeArticle,
-		removeDuplicateLocalArticles, // Ensure the function is returned
+		removeDuplicateLocalArticles,
 	};
 }

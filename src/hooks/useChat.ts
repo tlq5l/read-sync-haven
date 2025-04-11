@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/clerk-react";
+import { authClient } from "@/lib/authClient"; // Import authClient
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -12,15 +12,19 @@ export type ChatMessage = {
  * Handles API calls, chat history, input state, and loading/error states.
  */
 export function useChat(fullTextContent: string | null) {
-	const { getToken } = useAuth();
+	const { data: session } = authClient.useSession(); // Get session state
 	const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
 	const [chatInput, setChatInput] = useState("");
 	const [isChatting, setIsChatting] = useState(false);
-	const [chatError, setChatError] = useState<Error | null>(null); // Use Error type
-	const chatScrollAreaRef = useRef<HTMLDivElement>(null); // Ref for scrolling
+	const [chatError, setChatError] = useState<Error | null>(null);
+	const chatScrollAreaRef = useRef<HTMLDivElement>(null);
 
 	const chatMutation = useMutation({
 		mutationFn: async (userMessage: string) => {
+			if (!session) {
+				// Check authentication first
+				throw new Error("User not authenticated for chat.");
+			}
 			if (!fullTextContent) {
 				throw new Error("Article content not available for chat.");
 			}
@@ -28,39 +32,34 @@ export function useChat(fullTextContent: string | null) {
 				throw new Error("Cannot send an empty message.");
 			}
 
-			const requestBody = JSON.stringify({
-				content: fullTextContent,
-				message: userMessage,
-			});
-
-			// Always call the worker proxy
 			console.log("Calling Cloudflare Worker proxy for chat...");
-			const clerkToken = await getToken();
-			if (!clerkToken) {
-				throw new Error("User not authenticated (Clerk token missing).");
-			}
 
-			// Always use the production worker URL
-			const chatApiUrl =
-				"https://bondwise-sync-api.vikione.workers.dev/api/chat";
+			// Always use the production worker URL relative to baseURL
+			const chatApiUrl = "/api/chat"; // Assuming baseURL is set in authClient
 
-			const response = await fetch(chatApiUrl, {
+			// Use authClient.$fetch for the API call
+			const response = await authClient.$fetch(chatApiUrl, {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${clerkToken}`,
+				body: {
+					content: fullTextContent,
+					message: userMessage,
 				},
-				body: requestBody,
+				// $fetch handles auth headers
 			});
 
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					data?.message ||
-						data?.error ||
-						`Chat request failed with status ${response.status}`,
-				);
+			// Process response (assuming $fetch might return parsed data or Response)
+			let data: { response?: string; message?: string; error?: string };
+			if (response instanceof Response) {
+				data = await response.json();
+				if (!response.ok) {
+					throw new Error(
+						data?.message ||
+							data?.error ||
+							`Chat request failed with status ${response.status}`,
+					);
+				}
+			} else {
+				data = response as any;
 			}
 
 			if (!data.response) {
@@ -74,29 +73,24 @@ export function useChat(fullTextContent: string | null) {
 		onMutate: (userMessage: string) => {
 			setIsChatting(true);
 			setChatError(null);
-			// Add user message to history immediately
 			setChatHistory((prev) => [
 				...prev,
 				{ sender: "user", text: userMessage },
 			]);
-			setChatInput(""); // Clear input field
+			setChatInput("");
 		},
 		onSuccess: (aiResponse: string) => {
-			// Add AI response to history
 			setChatHistory((prev) => [...prev, { sender: "ai", text: aiResponse }]);
 		},
 		onError: (error: Error) => {
-			// error is already type Error
-			setChatError(error); // Set the whole Error object
-			// Add error message to chat history
+			setChatError(error);
 			setChatHistory((prev) => [
 				...prev,
-				{ sender: "ai", text: `Error: ${error.message}` }, // Display message in history
+				{ sender: "ai", text: `Error: ${error.message}` },
 			]);
 		},
 		onSettled: () => {
 			setIsChatting(false);
-			// Scroll to bottom after message exchange
 			scrollToBottom();
 		},
 	});
@@ -109,13 +103,12 @@ export function useChat(fullTextContent: string | null) {
 					behavior: "smooth",
 				});
 			}
-		}, 100); // Small delay to allow DOM update
+		}, 100);
 	}, []);
 
-	// Scroll chat to bottom when the scroll function reference changes (effectively on mount)
 	useEffect(() => {
 		scrollToBottom();
-	}, [scrollToBottom]); // Remove chatHistory dependency, scrolling is handled in onSettled and on mount
+	}, [scrollToBottom]);
 
 	const handleChatSubmit = useCallback(
 		(e?: React.FormEvent<HTMLFormElement>) => {
@@ -123,7 +116,6 @@ export function useChat(fullTextContent: string | null) {
 			if (chatInput.trim() && !isChatting && fullTextContent) {
 				chatMutation.mutate(chatInput.trim());
 			} else if (!fullTextContent) {
-				// Keep setting string here for consistency, or create new Error()
 				setChatError(
 					new Error("Article content not yet extracted or available."),
 				);
@@ -139,8 +131,7 @@ export function useChat(fullTextContent: string | null) {
 		isChatting,
 		chatError,
 		handleChatSubmit,
-		chatScrollAreaRef, // Expose ref for the component to use
-		// Expose mutation object for more control in tests if needed
+		chatScrollAreaRef,
 		chatMutation,
 	};
 }

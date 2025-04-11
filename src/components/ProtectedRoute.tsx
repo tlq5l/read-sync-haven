@@ -1,11 +1,12 @@
-import { useAuth } from "@clerk/clerk-react";
+import { authClient } from "@/lib/authClient"; // Import the initialized client
 import { Navigate, Outlet } from "react-router-dom";
 
 export default function ProtectedRoute() {
-	const { isSignedIn, isLoaded } = useAuth();
+	// Use the useSession hook from the initialized client
+	const { data: session, isPending } = authClient.useSession();
 
-	// Show loading state while Clerk is initializing
-	if (!isLoaded) {
+	// Show loading state while session is being checked
+	if (isPending) {
 		return (
 			<div className="flex items-center justify-center h-screen">
 				<p className="text-muted-foreground">Loading...</p>
@@ -13,8 +14,8 @@ export default function ProtectedRoute() {
 		);
 	}
 
-	// Redirect to sign-in if not authenticated
-	if (!isSignedIn) {
+	// Redirect to sign-in if not authenticated (session data is null/undefined)
+	if (!session) {
 		return <Navigate to="/sign-in" />;
 	}
 
