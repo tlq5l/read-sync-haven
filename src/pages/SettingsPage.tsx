@@ -13,15 +13,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { useTheme } from "@/context/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
-import { useArticleActions } from "@/hooks/useArticleActions";
-// Removed unused type imports:
-// import {
-// 	type Article,
-// 	type Highlight,
-// 	type Tag,
-// } from "@/services/db/types";
+import { ApiError, apiClient } from "@/lib/apiClient"; // Import apiClient and ApiError
+// import { useArticleActions } from "@/hooks/useArticleActions"; // Likely not needed directly here anymore for settings
+// Removed unused type imports
 import { db, removeDuplicateArticles } from "@/services/db/dexie"; // Import dexie instance and removeDuplicateArticles
-import { UserProfile } from "@clerk/clerk-react"; // Import Clerk's UserProfile
+import { UserProfile, useAuth } from "@clerk/clerk-react"; // Import Clerk's UserProfile and useAuth
 // Removed unused dark theme import
 import {
 	ArrowLeft,
@@ -31,100 +27,229 @@ import {
 	ShieldCheck,
 	// User, // Removed unused User icon
 } from "lucide-react"; // Added ShieldCheck for Account
-import { useEffect, useState } from "react"; // Import useEffect
+import { useCallback, useEffect, useState } from "react"; // Import useEffect, useState, useCallback
 import { Link } from "react-router-dom";
+
+// Define a type for the settings object for clarity
+interface UserSettings {
+	apiKey?: string;
+	endpointUrl?: string;
+	modelName?: string;
+	theme?: "light" | "dark" | "system"; // Match useTheme type
+	// Add other settings fields as needed
+}
 
 export default function SettingsPage() {
 	const { toast } = useToast();
-	// Resolved hook usage: Kept theme, setTheme, t, i18n
+	const { isSignedIn, getToken } = useAuth(); // Get authentication status and getToken function
 	const { theme, setTheme } = useTheme(); // Keep theme hooks
 	const [isExportingData, setIsExportingData] = useState(false);
 	const [isCleaningDuplicates, setIsCleaningDuplicates] = useState(false);
-	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false); // Add state for metadata update button
-	const [activeTab, setActiveTab] = useState("account"); // Default to account tab
-	const [apiKey, setApiKey] = useState(""); // State for API Key input
-	const [endpointUrl, setEndpointUrl] = useState(""); // State for Endpoint URL input
-	const [modelName, setModelName] = useState(""); // State for Model Name input
-	const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
-		"idle",
-	); // State for save button feedback
+	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false);
+	const [activeTab, setActiveTab] = useState("account");
+	// API Provider Settings State
+	const [apiKey, setApiKey] = useState("");
+	const [endpointUrl, setEndpointUrl] = useState("");
+	const [modelName, setModelName] = useState("");
+	// Sync/Loading/Error State for Settings
+	const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+	const [settingsError, setSettingsError] = useState<string | null>(null);
+	const [saveStatus, setSaveStatus] = useState<
+		"idle" | "saving" | "saved" | "error"
+	>("idle");
+	const [lastSavedSettings, setLastSavedSettings] =
+		useState<UserSettings | null>(null); // Store last successfully saved state
+
+	// Test Connection State (Keep separate for now)
 	const [testStatus, setTestStatus] = useState<
 		"idle" | "testing" | "success" | "error"
 	>("idle");
 	const [testResult, setTestResult] = useState<string | null>(null);
-	// Removed clerkBaseTheme state
 
-	// Get the action function - needs a refresh callback, maybe null for now or a dummy?
-	// Let's assume a refresh isn't strictly needed immediately after cleanup,
-	// but ideally, the parent component provides a way to refresh the main article list.
-	// For now, provide a dummy refresh that does nothing.
-	// Removed unused destructuring: const { removeDuplicateLocalArticles } = useArticleActions(...);
-	useArticleActions(async () => {
-		// Call hook without destructuring if only needed for setup/side-effects
-		console.log("Dummy refresh called (if needed by action hook internals).");
-	});
+	// Removed useArticleActions hook call as it's not directly related to settings sync
 
 	// --- Logic for Custom API Settings ---
-	const STORAGE_KEYS = {
-		API_KEY: "customApiKey",
-		ENDPOINT_URL: "customApiEndpoint",
-		MODEL_NAME: "customApiModel", // Added key for model name
-	};
-
-	// Load settings from localStorage on mount
+	// Fetch settings from backend on mount or when auth status changes
 	useEffect(() => {
-		const storedApiKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
-		const storedEndpointUrl = localStorage.getItem(STORAGE_KEYS.ENDPOINT_URL);
-		const storedModelName = localStorage.getItem(STORAGE_KEYS.MODEL_NAME); // Load model name
+		const fetchSettings = async () => {
+			if (!isSignedIn) {
+				// Optionally clear local state if user signs out, or load defaults
+				setApiKey("");
+				setEndpointUrl("");
+				setModelName("");
+				// On sign out, clear API config, but leave theme as is for now.
+				setSettingsError(null);
+				setIsLoadingSettings(false);
+				setLastSavedSettings(null);
+				return;
+			}
 
-		if (storedApiKey) {
-			setApiKey(storedApiKey);
-		}
-		if (storedEndpointUrl) {
-			setEndpointUrl(storedEndpointUrl);
-		}
-		if (storedModelName) {
-			setModelName(storedModelName); // Set model name state
-		}
-	}, []); // Empty dependency array ensures this runs only once on mount
+			setIsLoadingSettings(true);
+			setSettingsError(null);
+			console.log("Attempting to fetch user settings...");
 
-	// Save settings to localStorage
-	const handleSaveSettings = () => {
-		setSaveStatus("saving"); // Indicate saving process start (optional)
-		try {
-			localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
-			localStorage.setItem(STORAGE_KEYS.ENDPOINT_URL, endpointUrl);
-			localStorage.setItem(STORAGE_KEYS.MODEL_NAME, modelName); // Save model name
-			setSaveStatus("saved");
-			toast({
-				title: "Settings Saved",
-				description: "Your custom AI provider settings have been saved.",
-			});
-			// Revert button text after a short delay
-			setTimeout(() => {
-				setSaveStatus("idle");
-			}, 2000); // Revert after 2 seconds
-		} catch (error) {
-			console.error("Failed to save settings:", error);
-			toast({
-				title: "Save Failed",
-				description: "Could not save settings to local storage.",
-				variant: "destructive",
-			});
-			setSaveStatus("idle"); // Revert button state on error
-		}
+			try {
+				if (!getToken) {
+					throw new Error("getToken function is not available from useAuth.");
+				}
+				// Pass getToken to apiClient
+				const fetchedSettings = await apiClient<UserSettings>(
+					"/user/settings",
+					getToken,
+				);
+				console.log("Fetched settings:", fetchedSettings);
+
+				// Update local state with fetched data
+				setApiKey(fetchedSettings.apiKey || "");
+				setEndpointUrl(fetchedSettings.endpointUrl || "");
+				setModelName(fetchedSettings.modelName || "");
+				// Update theme context if a theme was fetched
+				if (fetchedSettings.theme) {
+					setTheme(fetchedSettings.theme); // Update theme context
+				}
+				setLastSavedSettings(fetchedSettings); // Store the fetched state
+				setSaveStatus("idle"); // Reset save status after successful load
+			} catch (error) {
+				console.error("Failed to fetch settings:", error);
+				if (error instanceof ApiError && error.status === 404) {
+					// User might not have settings saved yet, treat as empty/default
+					console.log("No settings found for user (404), using defaults.");
+					setApiKey("");
+					setEndpointUrl("");
+					setModelName("");
+					setLastSavedSettings({}); // Indicate fetch occurred but no data
+				} else if (error instanceof ApiError) {
+					setSettingsError(
+						`Failed to load settings: ${error.status} ${error.message}${error.body ? ` - ${JSON.stringify(error.body)}` : ""}`,
+					);
+				} else {
+					setSettingsError(
+						"Failed to load settings due to an unexpected error.",
+					);
+				}
+				setSaveStatus("idle"); // Ensure save status is reset on error
+			} finally {
+				setIsLoadingSettings(false);
+			}
+		};
+
+		fetchSettings();
+	}, [isSignedIn, getToken, setTheme]); // Add setTheme to dependency array
+
+	// Save settings to backend
+	const saveSettingsToBackend = useCallback(
+		async (settingsToSave: UserSettings) => {
+			if (!isSignedIn) {
+				toast({
+					title: "Authentication Required",
+					description: "You must be signed in to save settings.",
+					variant: "destructive",
+				});
+				return false; // Indicate failure
+			}
+
+			setSaveStatus("saving");
+			setSettingsError(null); // Clear previous errors on new save attempt
+			console.log("Attempting to save settings:", settingsToSave);
+
+			try {
+				if (!getToken) {
+					throw new Error("getToken function is not available from useAuth.");
+				}
+				// Pass getToken to apiClient
+				await apiClient(
+					"/user/settings",
+					getToken, // Pass the function here
+					{
+						method: "POST",
+						body: JSON.stringify(settingsToSave),
+					},
+				);
+				setSaveStatus("saved");
+				setLastSavedSettings(settingsToSave); // Update last saved state
+				toast({
+					title: "Settings Saved",
+					description: "Your settings have been saved successfully.",
+				});
+				// Revert button text after a short delay
+				setTimeout(() => {
+					// Only revert if still 'saved', prevents reverting during a new save
+					if (saveStatus === "saved") {
+						setSaveStatus("idle");
+					}
+				}, 2000); // Revert after 2 seconds
+				return true; // Indicate success
+			} catch (error) {
+				console.error("Failed to save settings:", error);
+				setSaveStatus("error"); // Set error state for the button
+				let errorDesc = "Could not save settings.";
+				if (error instanceof ApiError) {
+					errorDesc += ` Error: ${error.status} ${error.message}`;
+					if (error.body) {
+						try {
+							errorDesc += ` - ${JSON.stringify(error.body)}`;
+						} catch {
+							/* ignore stringify error */
+						}
+					}
+					setSettingsError(errorDesc); // Set specific error message
+				} else if (error instanceof Error) {
+					errorDesc += ` Error: ${error.message}`;
+					setSettingsError(errorDesc);
+				} else {
+					setSettingsError("An unknown error occurred while saving settings.");
+				}
+				toast({
+					title: "Save Failed",
+					description: errorDesc,
+					variant: "destructive",
+				});
+				// Optionally revert button state after a delay on error too
+				// setTimeout(() => {
+				//   if (saveStatus === 'error') { // Check if still in error state
+				//       setSaveStatus('idle');
+				//   }
+				// }, 3000);
+				return false; // Indicate failure
+			}
+		},
+		[isSignedIn, toast, saveStatus, getToken], // Add getToken to dependency array
+	);
+
+	const handleSaveApiConfigSettings = () => {
+		const settings: UserSettings = {
+			...(lastSavedSettings || {}), // Start with last known settings (including theme)
+			apiKey: apiKey,
+			endpointUrl: endpointUrl,
+			modelName: modelName,
+		};
+		saveSettingsToBackend(settings);
 	};
-	// --- End Logic for Custom API Settings ---
+
+	// Handler for theme change
+	const handleThemeChange = (newTheme: "light" | "dark") => {
+		setTheme(newTheme); // Update context immediately for responsiveness
+		const settings: UserSettings = {
+			...(lastSavedSettings || {}), // Include other saved settings
+			theme: newTheme,
+		};
+		// Save *only* the theme change to the backend
+		saveSettingsToBackend(settings);
+	};
+
+	// handleSaveSettings is now handleSaveApiConfigSettings above
+	// --- End Logic for Custom API Settings (refactored to use backend) ---
 
 	// --- Logic for Test Connection ---
 	const handleTestConnection = async () => {
 		setTestStatus("testing");
 		setTestResult(null); // Clear previous result
 
-		const storedApiKey = localStorage.getItem(STORAGE_KEYS.API_KEY);
-		const storedEndpointUrl = localStorage.getItem(STORAGE_KEYS.ENDPOINT_URL);
-
-		if (!storedApiKey || !storedEndpointUrl) {
+		// Use current state instead of localStorage for testing
+		// Note: This tests the connection using the *currently entered* values,
+		// which might differ from the *last saved* values if changes are pending.
+		// This seems reasonable behaviour for a test button.
+		if (!apiKey || !endpointUrl) {
 			setTestStatus("error");
 			setTestResult(
 				"Error: API Key and/or Endpoint URL not configured. Please configure and save them in the 'Configuration' tab first.",
@@ -133,16 +258,16 @@ export default function SettingsPage() {
 		}
 
 		// Ensure the endpoint doesn't end with a slash, and append /v1/models
-		const baseUrl = storedEndpointUrl.endsWith("/")
-			? storedEndpointUrl.slice(0, -1)
-			: storedEndpointUrl;
+		const baseUrl = endpointUrl.endsWith("/")
+			? endpointUrl.slice(0, -1)
+			: endpointUrl;
 		const testUrl = `${baseUrl}/v1/models`;
 
 		try {
 			const response = await fetch(testUrl, {
 				method: "GET",
 				headers: {
-					Authorization: `Bearer ${storedApiKey}`,
+					Authorization: `Bearer ${apiKey}`,
 					"Content-Type": "application/json",
 				},
 			});
@@ -391,9 +516,10 @@ export default function SettingsPage() {
 											<Switch
 												id="theme-switch"
 												checked={theme === "dark"}
-												onCheckedChange={(checked) =>
-													setTheme(checked ? "dark" : "light")
-												}
+												onCheckedChange={(checked) => {
+													handleThemeChange(checked ? "dark" : "light");
+												}}
+												disabled={!isSignedIn || isLoadingSettings} // Disable if not signed in or loading
 											/>
 											<Label
 												htmlFor="theme-switch"
@@ -495,17 +621,36 @@ export default function SettingsPage() {
 											{/* Slightly adjust title */}
 										</CardHeader>
 										<CardContent className="space-y-4">
+											{isLoadingSettings && (
+												<p className="text-sm text-muted-foreground">
+													Loading settings...
+												</p>
+											)}
+											{settingsError && (
+												<p className="text-sm text-red-600">{settingsError}</p>
+											)}
+											{!isSignedIn && (
+												<p className="text-sm text-yellow-600">
+													Sign in to load and save your settings.
+												</p>
+											)}
 											<div className="space-y-2">
 												<Label htmlFor="apiKey">API Key</Label>
 												<Input
 													id="apiKey"
 													type="password"
-													placeholder="Enter your API Key"
+													placeholder={
+														isSignedIn
+															? "Enter your API Key"
+															: "Sign in to load"
+													}
 													value={apiKey}
 													onChange={(e) => setApiKey(e.target.value)}
+													disabled={!isSignedIn || isLoadingSettings}
 												/>
 												<p className="text-sm text-muted-foreground">
-													Your custom OpenAI-compatible API key.
+													Your custom OpenAI-compatible API key (stored
+													securely).
 												</p>
 											</div>
 											<div className="space-y-2">
@@ -513,24 +658,32 @@ export default function SettingsPage() {
 												<Input
 													id="endpointUrl"
 													type="url"
-													placeholder="https://api.example.com/v1"
+													placeholder={
+														isSignedIn
+															? "https://api.example.com/v1"
+															: "Sign in to load"
+													}
 													value={endpointUrl}
 													onChange={(e) => setEndpointUrl(e.target.value)}
+													disabled={!isSignedIn || isLoadingSettings}
 												/>
 												<p className="text-sm text-muted-foreground">
-													The base URL for the OpenAI-compatible API endpoint
-													(e.g., https://api.groq.com/openai/v1).
+													The base URL for the OpenAI-compatible API endpoint.
 												</p>
 											</div>
-											{/* Added Model Name Input */}
 											<div className="space-y-2">
 												<Label htmlFor="modelName">Model Name</Label>
 												<Input
 													id="modelName"
 													type="text"
-													placeholder="Enter model name (e.g., gpt-4o)"
+													placeholder={
+														isSignedIn
+															? "Enter model name (e.g., gpt-4o)"
+															: "Sign in to load"
+													}
 													value={modelName}
 													onChange={(e) => setModelName(e.target.value)}
+													disabled={!isSignedIn || isLoadingSettings}
 												/>
 												<p className="text-sm text-muted-foreground">
 													Specify the exact model to use with the custom
@@ -538,14 +691,20 @@ export default function SettingsPage() {
 												</p>
 											</div>
 											<Button
-												onClick={handleSaveSettings}
-												disabled={saveStatus === "saving"}
+												onClick={handleSaveApiConfigSettings} // Use the renamed handler
+												disabled={
+													!isSignedIn ||
+													isLoadingSettings ||
+													saveStatus === "saving"
+												}
 											>
 												{saveStatus === "saved"
 													? "Saved!"
 													: saveStatus === "saving"
 														? "Saving..."
-														: "Save Settings"}
+														: saveStatus === "error"
+															? "Save Failed" // Indicate error state
+															: "Save Settings"}
 											</Button>
 										</CardContent>
 									</Card>

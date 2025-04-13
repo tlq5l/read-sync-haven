@@ -1,11 +1,9 @@
+import { ApiError, apiClient } from "@/lib/apiClient"; // Import apiClient
+import { useAuth } from "@clerk/clerk-react"; // Import useAuth
 import { useCallback, useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 
-const DB_NAME = "readSyncHavenDB";
-const DB_VERSION = 2; // <<< Increment DB version for schema change
-const SESSION_STORE_NAME = "chatSessions";
-const ARTICLE_ID_INDEX = "articleIdIndex";
-// const SESSION_ID_INDEX = "sessionIdIndex"; // Optional index, not currently used
+// Removed IndexedDB constants
 
 // Keep ChatMessage simple, context provided by session
 export interface ChatMessage {
@@ -34,10 +32,26 @@ export interface ChatSessionMetadata {
 	messageCount: number; // Add message count
 }
 
+// Define a type for the combined Article Data (including sessions)
+// This structure depends on the backend API response for GET /api/user/articles
+// Assuming it returns an object where keys are articleIds
+// Removed unused UserArticleData interface
+
+// Or, if the GET endpoint is specific to one articleId:
+interface SingleArticleData {
+	articleId: string;
+	sessions: ChatSession[];
+	// other data...
+}
+
 export function useChatHistory(articleId: string | null) {
-	const [db, setDb] = useState<IDBDatabase | null>(null);
-	// State for session list (metadata only)
-	const [sessions, setSessions] = useState<ChatSessionMetadata[]>([]);
+	const { isSignedIn, getToken } = useAuth(); // Get auth status and getToken
+	// Store all fetched sessions for the current article
+	const [articleSessions, setArticleSessions] = useState<ChatSession[]>([]);
+	// State for session list (metadata only) - derived from articleSessions
+	const [sessionsMetadata, setSessionsMetadata] = useState<
+		ChatSessionMetadata[]
+	>([]);
 	// State for messages of the currently selected session
 	const [selectedSessionMessages, setSelectedSessionMessages] = useState<
 		ChatMessage[]
@@ -45,512 +59,298 @@ export function useChatHistory(articleId: string | null) {
 	const [selectedSessionId, setSelectedSessionIdState] = useState<
 		string | null
 	>(null);
-	const [isLoadingSessions, setIsLoadingSessions] = useState<boolean>(true);
-	const [isLoadingMessages, setIsLoadingMessages] = useState<boolean>(false); // Separate loading for messages
+	// Combined loading state for fetching article data (which includes sessions)
+	const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
+	const [isUpdatingData, setIsUpdatingData] = useState<boolean>(false); // For POST operations
 	const [error, setError] = useState<string | null>(null);
 
-	// --- IndexedDB Initialization ---
-	useEffect(() => {
-		if (!window.indexedDB) {
-			console.error("Your browser doesn't support IndexedDB.");
-			setError("IndexedDB is not supported in this browser.");
-			setIsLoadingSessions(false);
+	// --- Fetch Article Data (including sessions) ---
+	const fetchArticleData = useCallback(async () => {
+		if (!isSignedIn || !articleId) {
+			setArticleSessions([]);
+			setIsLoadingData(false);
+			setSelectedSessionIdState(null);
+			setSelectedSessionMessages([]);
+			setError(null);
 			return;
 		}
 
-		const request: IDBOpenDBRequest = indexedDB.open(DB_NAME, DB_VERSION); // Initialize directly
-		let dbInstance: IDBDatabase | null = null;
-		setIsLoadingSessions(true);
+		setIsLoadingData(true);
 		setError(null);
-		// request = indexedDB.open(DB_NAME, DB_VERSION); // Removed as it's initialized above
+		console.log(`Fetching article data for articleId: ${articleId}`);
 
-		request.onupgradeneeded = (event) => {
-			dbInstance = (event.target as IDBOpenDBRequest).result;
-			console.log(`Upgrading DB to version ${DB_VERSION}`);
+		try {
+			// Adjust endpoint if needed, e.g., /api/user/articles/${articleId}
+			// Assuming the endpoint returns data structured like SingleArticleData
+			if (!getToken) {
+				throw new Error("getToken function is not available from useAuth.");
+			}
+			// Pass getToken to apiClient
+			const data = await apiClient<SingleArticleData>(
+				`/api/user/articles?articleId=${encodeURIComponent(articleId)}`,
+				getToken, // Pass getToken here
+			); // Assuming query param filtering
 
-			// Create new store if it doesn't exist
-			if (!dbInstance.objectStoreNames.contains(SESSION_STORE_NAME)) {
-				const store = dbInstance.createObjectStore(SESSION_STORE_NAME, {
-					keyPath: "sessionId",
-				});
-				store.createIndex(ARTICLE_ID_INDEX, "articleId", { unique: false });
-				// Optional: Index for direct session lookup if needed frequently outside article context
-				// store.createIndex(SESSION_ID_INDEX, "sessionId", { unique: true });
-				console.log(
-					`Object store '${SESSION_STORE_NAME}' created with index '${ARTICLE_ID_INDEX}'.`,
+			const fetchedSessions = data?.sessions || [];
+			// Sort sessions by creation time, newest first
+			fetchedSessions.sort((a, b) => b.createdAt - a.createdAt);
+
+			console.log(`Fetched ${fetchedSessions.length} sessions.`);
+			setArticleSessions(fetchedSessions);
+
+			// Update selected session if it still exists
+			if (
+				selectedSessionId &&
+				!fetchedSessions.some((s) => s.sessionId === selectedSessionId)
+			) {
+				setSelectedSessionIdState(null); // Deselect if it disappeared
+				setSelectedSessionMessages([]);
+			} else if (selectedSessionId) {
+				// If selected session still exists, update its messages
+				const currentSelected = fetchedSessions.find(
+					(s) => s.sessionId === selectedSessionId,
+				);
+				setSelectedSessionMessages(currentSelected?.messages || []);
+			}
+		} catch (error) {
+			console.error("Failed to fetch article data:", error);
+			if (error instanceof ApiError && error.status === 404) {
+				console.log("No data found for article (404), using empty list.");
+				setArticleSessions([]);
+			} else if (error instanceof ApiError) {
+				setError(
+					`Failed to load data: ${error.status} ${error.message}${error.body ? ` - ${JSON.stringify(error.body)}` : ""}`,
 				);
 			} else {
-				// If store exists, ensure indexes are present (for upgrades from v1 if needed, though unlikely with keyPath change)
-				const transaction = (event.target as IDBOpenDBRequest).transaction;
-				if (transaction) {
-					const store = transaction.objectStore(SESSION_STORE_NAME);
-					if (!store.indexNames.contains(ARTICLE_ID_INDEX)) {
-						store.createIndex(ARTICLE_ID_INDEX, "articleId", { unique: false });
-						console.log(
-							`Index '${ARTICLE_ID_INDEX}' created on existing store '${SESSION_STORE_NAME}'.`,
-						);
-					}
-				}
+				setError("Failed to load data due to an unexpected error.");
 			}
+			setArticleSessions([]); // Clear data on error
+			setSelectedSessionIdState(null);
+			setSelectedSessionMessages([]);
+		} finally {
+			setIsLoadingData(false);
+		}
+	}, [isSignedIn, articleId, selectedSessionId, getToken]); // Add getToken dependency
 
-			// **Important:** Handle removal/migration of the old 'chatMessages' store if necessary.
-			// For simplicity, we'll assume starting fresh. If migration needed, add logic here.
-			if (dbInstance.objectStoreNames.contains("chatMessages")) {
-				// Example: dbInstance.deleteObjectStore("chatMessages");
-				console.log(
-					"Old 'chatMessages' store detected (optional: remove/migrate).",
-				);
-			}
-		};
+	// Effect to fetch data when auth/articleId changes
+	useEffect(() => {
+		fetchArticleData();
+	}, [fetchArticleData]);
 
-		request.onsuccess = (event) => {
-			dbInstance = (event.target as IDBOpenDBRequest).result;
-			setDb(dbInstance);
-			console.log(`IndexedDB '${DB_NAME}' v${DB_VERSION} opened successfully.`);
-			// Fetch sessions automatically when DB is ready (handled by fetchSessions effect)
-		};
+	// Derive metadata whenever articleSessions change
+	useEffect(() => {
+		const metadata = articleSessions.map(
+			({
+				sessionId,
+				articleId: artId,
+				createdAt,
+				firstMessageSnippet,
+				messages,
+			}) => ({
+				sessionId,
+				articleId: artId,
+				createdAt,
+				firstMessageSnippet,
+				messageCount: messages?.length ?? 0,
+			}),
+		);
+		setSessionsMetadata(metadata);
+	}, [articleSessions]);
 
-		request.onerror = (event) => {
-			console.error(
-				"IndexedDB error:",
-				(event.target as IDBOpenDBRequest).error,
-			);
-			setError(
-				`Failed to open IndexedDB: ${(event.target as IDBOpenDBRequest).error?.message}`,
-			);
-			setIsLoadingSessions(false);
-		};
+	// Removed fetchSessions (now integrated into fetchArticleData)
 
-		// Cleanup
-		return () => {
-			if (dbInstance) {
-				dbInstance.close();
-				console.log(`IndexedDB '${DB_NAME}' connection closed.`);
-				setDb(null);
-			}
-		};
-	}, []); // Run only once on mount
+	// Removed useEffect for fetchSessions
 
-	// --- Fetch Session Metadata ---
-	const fetchSessions = useCallback(() => {
-		if (!db || !articleId) {
-			setSessions([]);
-			setIsLoadingSessions(db === null); // Still loading if DB is null
-			setSelectedSessionIdState(null); // Reset selection if article changes
+	// --- Update Selected Session Messages (triggered by selectedSessionId change) ---
+	useEffect(() => {
+		if (!selectedSessionId) {
 			setSelectedSessionMessages([]);
 			return;
 		}
+		const selected = articleSessions.find(
+			(s) => s.sessionId === selectedSessionId,
+		);
+		setSelectedSessionMessages(selected?.messages || []);
+	}, [selectedSessionId, articleSessions]);
 
-		setIsLoadingSessions(true);
-		setError(null);
-		console.log(`Fetching session metadata for articleId: ${articleId}`);
-
-		try {
-			const transaction = db.transaction(SESSION_STORE_NAME, "readonly");
-			const store = transaction.objectStore(SESSION_STORE_NAME);
-			const index = store.index(ARTICLE_ID_INDEX);
-			const request = index.openCursor(articleId); // Use cursor to get metadata efficiently
-			const results: ChatSessionMetadata[] = [];
-
-			request.onsuccess = (event) => {
-				const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
-				if (cursor) {
-					// Extract only metadata, not the large 'messages' array
-					const {
-						sessionId,
-						articleId: artId,
-						createdAt,
-						firstMessageSnippet,
-						messages,
-					} = cursor.value as ChatSession;
-					results.push({
-						sessionId,
-						articleId: artId,
-						createdAt,
-						firstMessageSnippet,
-						messageCount: messages?.length ?? 0,
-					});
-					cursor.continue();
-				} else {
-					// Sort sessions by creation time, newest first
-					results.sort((a, b) => b.createdAt - a.createdAt);
-					console.log(`Fetched ${results.length} session metadata items.`);
-					setSessions(results);
-					setIsLoadingSessions(false);
-					// Automatically select the latest session if none is selected? Or require user click?
-					// Let's require user click for now.
-					// if (!selectedSessionId && results.length > 0) {
-					//     setSelectedSessionIdState(results[0].sessionId);
-					// }
-				}
-			};
-
-			request.onerror = (event) => {
-				console.error(
-					"Error fetching session metadata:",
-					(event.target as IDBRequest).error,
-				);
-				setError(
-					`Failed to fetch session metadata: ${(event.target as IDBRequest).error?.message}`,
-				);
-				setIsLoadingSessions(false);
-			};
-
-			transaction.onerror = (event) => {
-				console.error(
-					"Session fetch transaction error:",
-					(event.target as IDBTransaction).error,
-				);
-				setError(
-					`Session fetch transaction failed: ${(event.target as IDBTransaction).error?.message}`,
-				);
-				setIsLoadingSessions(false);
-			};
-		} catch (err) {
-			console.error("Error initiating session fetch transaction:", err);
-			setError(
-				err instanceof Error ? err.message : "Unknown error fetching sessions",
-			);
-			setIsLoadingSessions(false);
-		}
-	}, [db, articleId]); // Re-fetch if db or articleId changes
-
-	// Effect to fetch sessions when DB/articleId changes
-	useEffect(() => {
-		fetchSessions();
-	}, [fetchSessions]);
-
-	// --- Fetch Messages for Selected Session ---
-	const fetchSessionMessages = useCallback(
-		(sessionId: string | null) => {
-			if (!db || !sessionId) {
-				setSelectedSessionMessages([]);
-				setIsLoadingMessages(false);
-				return;
-			}
-
-			setIsLoadingMessages(true);
-			setError(null);
-			console.log(`Fetching messages for sessionId: ${sessionId}`);
-
-			try {
-				const transaction = db.transaction(SESSION_STORE_NAME, "readonly");
-				const store = transaction.objectStore(SESSION_STORE_NAME);
-				const request = store.get(sessionId);
-
-				request.onsuccess = (event) => {
-					const result = (event.target as IDBRequest<ChatSession>).result;
-					if (result?.messages) {
-						// Use optional chaining
-						// Sort messages just in case they weren't stored sorted (should be though)
-						result.messages.sort((a, b) => a.timestamp - b.timestamp);
-						console.log(
-							`Fetched ${result.messages.length} messages for session ${sessionId}.`,
-						);
-						setSelectedSessionMessages(result.messages);
-					} else {
-						console.warn(`Session ${sessionId} not found or has no messages.`);
-						setSelectedSessionMessages([]);
-						// Optionally clear selectedSessionId if session not found?
-						// setSelectedSessionIdState(null);
-					}
-					setIsLoadingMessages(false);
-				};
-
-				request.onerror = (event) => {
-					console.error(
-						"Error fetching session messages:",
-						(event.target as IDBRequest).error,
-					);
-					setError(
-						`Failed to fetch session messages: ${(event.target as IDBRequest).error?.message}`,
-					);
-					setIsLoadingMessages(false);
-				};
-
-				transaction.onerror = (event) => {
-					console.error(
-						"Message fetch transaction error:",
-						(event.target as IDBTransaction).error,
-					);
-					setError(
-						`Message fetch transaction failed: ${(event.target as IDBTransaction).error?.message}`,
-					);
-					setIsLoadingMessages(false);
-				};
-			} catch (err) {
-				console.error("Error initiating message fetch transaction:", err);
-				setError(
-					err instanceof Error
-						? err.message
-						: "Unknown error fetching messages",
-				);
-				setIsLoadingMessages(false);
-			}
-		},
-		[db],
-	);
-
-	// Effect to fetch messages when selectedSessionId changes
-	useEffect(() => {
-		fetchSessionMessages(selectedSessionId);
-	}, [selectedSessionId, fetchSessionMessages]);
+	// Removed useEffect for fetchSessionMessages
 
 	// --- Set Selected Session ID ---
 	// Renamed state setter to avoid conflict with function name
 	const setSelectedSessionId = useCallback((sessionId: string | null) => {
 		console.log("Setting selected session ID:", sessionId);
 		setSelectedSessionIdState(sessionId);
-		if (!sessionId) {
-			setSelectedSessionMessages([]); // Clear messages if deselecting
-		}
-		// Fetching messages is handled by the useEffect watching selectedSessionId
+		// Message update is handled by the useEffect watching selectedSessionId and articleSessions
 	}, []);
+
+	// --- Update Backend Data ---
+	const updateBackendData = useCallback(
+		async (updatedSessions: ChatSession[]) => {
+			if (!isSignedIn || !articleId) {
+				setError("Not signed in or no article selected.");
+				return false; // Indicate failure
+			}
+
+			setIsUpdatingData(true);
+			setError(null);
+			console.log(`Updating backend for articleId: ${articleId}`);
+
+			// Prepare payload - assuming POST expects the full session list for the article
+			const payload = {
+				articleId: articleId,
+				sessions: updatedSessions,
+				// Include other article data if managed by this endpoint
+			};
+
+			try {
+				if (!getToken) {
+					throw new Error("getToken function is not available from useAuth.");
+				}
+				// Assuming POST /api/user/articles updates the specific article's data
+				// Pass getToken to apiClient
+				await apiClient(
+					"/api/user/articles", // Use double quotes instead of template literal
+					getToken, // Pass getToken here
+					{
+						method: "POST",
+						body: JSON.stringify(payload),
+					},
+				);
+				console.log("Backend update successful.");
+				// Update local state *after* successful backend update
+				setArticleSessions(updatedSessions);
+				// Re-derive metadata is handled by useEffect
+				// Update selected messages if the selected session was modified
+				if (selectedSessionId) {
+					const currentSelected = updatedSessions.find(
+						(s) => s.sessionId === selectedSessionId,
+					);
+					setSelectedSessionMessages(currentSelected?.messages || []);
+				}
+				setIsUpdatingData(false);
+				return true; // Indicate success
+			} catch (error) {
+				console.error("Failed to update backend data:", error);
+				if (error instanceof ApiError) {
+					setError(
+						`Failed to save data: ${error.status} ${error.message}${error.body ? ` - ${JSON.stringify(error.body)}` : ""}`,
+					);
+				} else {
+					setError("Failed to save data due to an unexpected error.");
+				}
+				setIsUpdatingData(false);
+				// Optionally: trigger a re-fetch to revert local state to last known good state?
+				// fetchArticleData();
+				return false; // Indicate failure
+			}
+		},
+		[isSignedIn, articleId, selectedSessionId, getToken], // Remove apiClient dependency
+	);
 
 	// --- Create New Session ---
 	const createNewSession = useCallback(
-		(initialMessage: Omit<ChatMessage, "timestamp">): Promise<string> => {
-			return new Promise((resolve, reject) => {
-				if (!db || !articleId) {
-					return reject(new Error("Database not initialized or no Article ID"));
-				}
+		async (
+			initialMessage: Omit<ChatMessage, "timestamp">,
+		): Promise<string | null> => {
+			if (!articleId) {
+				setError("No article selected.");
+				return null;
+			}
 
-				const now = Date.now();
-				const newSessionId = uuidv4(); // Use UUID for robustness
-				const messageWithTimestamp: ChatMessage = {
-					...initialMessage,
-					timestamp: now,
-				};
-				const newSession: ChatSession = {
-					sessionId: newSessionId,
-					articleId: articleId,
-					createdAt: now,
-					messages: [messageWithTimestamp],
-					firstMessageSnippet: messageWithTimestamp.content.substring(0, 50), // Store snippet
-				};
+			const now = Date.now();
+			const newSessionId = uuidv4();
+			const messageWithTimestamp: ChatMessage = {
+				...initialMessage,
+				timestamp: now,
+			};
+			const newSession: ChatSession = {
+				sessionId: newSessionId,
+				articleId: articleId,
+				createdAt: now,
+				messages: [messageWithTimestamp],
+				firstMessageSnippet: messageWithTimestamp.content.substring(0, 50),
+			};
 
-				try {
-					const transaction = db.transaction(SESSION_STORE_NAME, "readwrite");
-					const store = transaction.objectStore(SESSION_STORE_NAME);
-					const request = store.add(newSession);
+			const updatedSessions = [...articleSessions, newSession];
+			updatedSessions.sort((a, b) => b.createdAt - a.createdAt); // Keep sorted
 
-					request.onsuccess = () => {
-						console.log("New session created successfully:", newSessionId);
-						fetchSessions(); // Re-fetch session list
-						setSelectedSessionIdState(newSessionId); // Automatically select the new session
-						// setSelectedSessionMessages(newSession.messages); // Update messages directly
-						resolve(newSessionId);
-					};
+			const success = await updateBackendData(updatedSessions);
 
-					request.onerror = (event) => {
-						console.error(
-							"Error creating new session:",
-							(event.target as IDBRequest).error,
-						);
-						reject(
-							new Error(
-								`Failed to create session: ${(event.target as IDBRequest).error?.message}`,
-							),
-						);
-					};
-
-					transaction.onerror = (event) => {
-						console.error(
-							"Create session transaction error:",
-							(event.target as IDBTransaction).error,
-						);
-						reject(
-							new Error(
-								`Create session transaction failed: ${(event.target as IDBTransaction).error?.message}`,
-							),
-						);
-					};
-				} catch (err) {
-					console.error("Error initiating create session transaction:", err);
-					reject(
-						err instanceof Error
-							? err
-							: new Error("Unknown error creating session"),
-					);
-				}
-			});
+			if (success) {
+				setSelectedSessionIdState(newSessionId); // Select the new session locally
+				return newSessionId;
+			}
+			return null; // Indicate failure
 		},
-		[db, articleId, fetchSessions],
+		[articleId, articleSessions, updateBackendData],
 	);
 
 	// --- Add Message to Existing Session ---
 	const addMessageToSession = useCallback(
-		(
+		async (
 			sessionId: string,
 			newMessage: Omit<ChatMessage, "timestamp">,
-		): Promise<void> => {
-			return new Promise((resolve, reject) => {
-				if (!db) {
-					return reject(new Error("Database not initialized"));
-				}
+		): Promise<boolean> => {
+			const sessionIndex = articleSessions.findIndex(
+				(s) => s.sessionId === sessionId,
+			);
+			if (sessionIndex === -1) {
+				setError(`Session ${sessionId} not found locally.`);
+				return false;
+			}
 
-				const messageWithTimestamp: ChatMessage = {
-					...newMessage,
-					timestamp: Date.now(),
-				};
+			const messageWithTimestamp: ChatMessage = {
+				...newMessage,
+				timestamp: Date.now(),
+			};
 
-				try {
-					const transaction = db.transaction(SESSION_STORE_NAME, "readwrite");
-					const store = transaction.objectStore(SESSION_STORE_NAME);
-					const request = store.get(sessionId); // Get the existing session
+			const updatedSession = {
+				...articleSessions[sessionIndex],
+				messages: [
+					...articleSessions[sessionIndex].messages,
+					messageWithTimestamp,
+				].sort((a, b) => a.timestamp - b.timestamp), // Ensure sorted
+			};
 
-					request.onsuccess = (event) => {
-						const currentSession = (event.target as IDBRequest<ChatSession>)
-							.result;
-						if (currentSession) {
-							// Add new message and sort
-							const updatedMessages = [
-								...currentSession.messages,
-								messageWithTimestamp,
-							];
-							updatedMessages.sort((a, b) => a.timestamp - b.timestamp);
+			const updatedSessions = [...articleSessions];
+			updatedSessions[sessionIndex] = updatedSession;
 
-							const updatedSession: ChatSession = {
-								...currentSession,
-								messages: updatedMessages,
-							};
+			// No need to re-sort sessions array as only messages changed
 
-							const updateRequest = store.put(updatedSession); // Put the updated session back
-
-							updateRequest.onsuccess = () => {
-								console.log(`Message added to session ${sessionId}`);
-								// If this is the currently selected session, update its messages in state
-								if (selectedSessionId === sessionId) {
-									setSelectedSessionMessages(updatedSession.messages);
-								}
-								// Update message count in metadata (requires re-fetching sessions or updating in place)
-								fetchSessions(); // Simple approach: re-fetch session list
-								resolve();
-							};
-
-							updateRequest.onerror = (event) => {
-								console.error(
-									"Error updating session:",
-									(event.target as IDBRequest).error,
-								);
-								reject(
-									new Error(
-										`Failed to update session: ${(event.target as IDBRequest).error?.message}`,
-									),
-								);
-							};
-						} else {
-							console.error(`Session ${sessionId} not found to add message.`);
-							reject(new Error(`Session ${sessionId} not found.`));
-						}
-					};
-
-					request.onerror = (event) => {
-						console.error(
-							"Error getting session to add message:",
-							(event.target as IDBRequest).error,
-						);
-						reject(
-							new Error(
-								`Failed to get session: ${(event.target as IDBRequest).error?.message}`,
-							),
-						);
-					};
-
-					transaction.onerror = (event) => {
-						console.error(
-							"Add message transaction error:",
-							(event.target as IDBTransaction).error,
-						);
-						reject(
-							new Error(
-								`Add message transaction failed: ${(event.target as IDBTransaction).error?.message}`,
-							),
-						);
-					};
-				} catch (err) {
-					console.error("Error initiating add message transaction:", err);
-					reject(
-						err instanceof Error
-							? err
-							: new Error("Unknown error adding message"),
-					);
-				}
-			});
+			return await updateBackendData(updatedSessions);
 		},
-		[db, selectedSessionId, fetchSessions], // Include selectedSessionId and fetchSessions
+		[articleSessions, updateBackendData],
 	);
 
-	// --- Delete Session --- Optional but good practice
+	// --- Delete Session ---
 	const deleteSession = useCallback(
-		(sessionIdToDelete: string): Promise<void> => {
-			return new Promise((resolve, reject) => {
-				if (!db) {
-					return reject(new Error("Database not initialized"));
-				}
+		async (sessionIdToDelete: string): Promise<boolean> => {
+			const updatedSessions = articleSessions.filter(
+				(s) => s.sessionId !== sessionIdToDelete,
+			);
 
-				try {
-					const transaction = db.transaction(SESSION_STORE_NAME, "readwrite");
-					const store = transaction.objectStore(SESSION_STORE_NAME);
-					const request = store.delete(sessionIdToDelete);
+			// No need to re-sort as filter maintains order
 
-					request.onsuccess = () => {
-						console.log(`Session ${sessionIdToDelete} deleted successfully.`);
-						// If the deleted session was selected, clear selection
-						if (selectedSessionId === sessionIdToDelete) {
-							setSelectedSessionIdState(null);
-							setSelectedSessionMessages([]);
-						}
-						fetchSessions(); // Re-fetch the session list
-						resolve();
-					};
+			const success = await updateBackendData(updatedSessions);
 
-					request.onerror = (event) => {
-						console.error(
-							"Error deleting session:",
-							(event.target as IDBRequest).error,
-						);
-						reject(
-							new Error(
-								`Failed to delete session: ${(event.target as IDBRequest).error?.message}`,
-							),
-						);
-					};
-
-					transaction.onerror = (event) => {
-						console.error(
-							"Delete session transaction error:",
-							(event.target as IDBTransaction).error,
-						);
-						reject(
-							new Error(
-								`Delete session transaction failed: ${(event.target as IDBTransaction).error?.message}`,
-							),
-						);
-					};
-				} catch (err) {
-					console.error("Error initiating delete session transaction:", err);
-					reject(
-						err instanceof Error
-							? err
-							: new Error("Unknown error deleting session"),
-					);
-				}
-			});
+			if (success && selectedSessionId === sessionIdToDelete) {
+				setSelectedSessionIdState(null); // Clear selection if deleted session was selected
+			}
+			return success;
 		},
-		[db, fetchSessions, selectedSessionId],
+		[articleSessions, updateBackendData, selectedSessionId],
 	);
 
 	return {
-		sessions, // List of session metadata
-		selectedSessionId, // ID of the selected session
-		selectedSessionMessages, // Messages of the selected session
-		setSelectedSessionId, // Function to change selected session
+		sessions: sessionsMetadata, // Use derived metadata state
+		selectedSessionId,
+		selectedSessionMessages,
+		setSelectedSessionId,
 		createNewSession,
 		addMessageToSession,
-		deleteSession, // Expose delete function
-		isLoadingSessions,
-		isLoadingMessages,
+		deleteSession,
+		isLoading: isLoadingData, // Use combined loading state
+		isUpdating: isUpdatingData, // Expose updating state
 		error,
 	};
 }

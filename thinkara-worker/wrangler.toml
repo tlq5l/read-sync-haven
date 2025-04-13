@@ -9,6 +9,14 @@ kv_namespaces = [
   { binding = "SAVED_ITEMS_KV", id = "19a1b73a994f4e99b583d29485bf6d26" }
 ]
 
+# Declare the D1 database binding
+# The user needs to create a D1 database in the Cloudflare dashboard
+# and replace "YOUR_D1_DATABASE_ID_HERE" with the actual ID.
+[[d1_databases]]
+binding = "USER_DATA_DB" # Name used to access the DB in the worker code
+database_name = "user-data" # A nickname for the DB in the dashboard
+database_id = "YOUR_D1_DATABASE_ID_HERE"
+
 # Declare environment variables used by the worker
 # Actual values are set in Cloudflare dashboard for deployment
 # and in .env file for local development
@@ -21,6 +29,12 @@ GCLOUD_PROJECT_NUMBER = "98706481155"
 GCLOUD_WORKLOAD_IDENTITY_POOL_ID = "cf-worker-pool"
 GCLOUD_WORKLOAD_IDENTITY_PROVIDER_ID = "cf-oidc-provider"
 GCLOUD_SERVICE_ACCOUNT_EMAIL = "frontend-summarizer-invoker@thinkara-455112.iam.gserviceaccount.com" # Assuming project ID should also be renamed, needs verification
+
+# Declare secrets needed for the worker
+# Actual values must be set using 'wrangler secret put <KEY>'
+# e.g., wrangler secret put CLERK_SECRET_KEY
+[secrets]
+# CLERK_SECRET_KEY = "" # Uncomment and set value via wrangler secret put
 
 [observability.logs]
 enabled = true

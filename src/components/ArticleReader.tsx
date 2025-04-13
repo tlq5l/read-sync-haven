@@ -55,18 +55,19 @@ export default function ArticleReader() {
 	// --- Feature Hooks ---
 	const { summarize, isSummarizing, summary, summaryError } = useSummarize();
 	// Updated useChatHistory hook usage
+	// Updated useChatHistory hook usage
 	const {
-		sessions, // List of session metadata
-		selectedSessionId, // ID of the selected session
-		selectedSessionMessages, // Messages of the selected session
-		setSelectedSessionId, // Function to change selected session
-		createNewSession, // Will be used by useChat
-		addMessageToSession, // Will be used by useChat
-		deleteSession, // Function to delete a session
-		isLoadingSessions, // Loading state for session list
-		isLoadingMessages, // Loading state for messages of selected session
-		error: historyError, // Combined error state (can be improved)
-	} = useChatHistory(id || null); // Pass null if id is undefined initially
+		sessions,
+		selectedSessionId,
+		selectedSessionMessages,
+		setSelectedSessionId,
+		createNewSession,
+		addMessageToSession,
+		deleteSession,
+		isLoading: isLoadingHistory, // Renamed from isLoadingSessions/isLoadingMessages
+		isUpdating: isUpdatingHistory, // New state for background updates
+		error: historyError,
+	} = useChatHistory(id || null);
 
 	// --- Integrate Chat and History ---
 	// Prepare props for useChat hook
@@ -148,16 +149,22 @@ export default function ArticleReader() {
 			if (!sessionIdToDelete) return;
 			// Optional: Add confirmation dialog here
 			try {
-				await deleteSession(sessionIdToDelete);
-				toast.success("Chat session deleted.");
+				const success = await deleteSession(sessionIdToDelete);
+				if (success) {
+					toast.success("Chat session deleted.");
+				} else {
+					// Error is handled internally by the hook now, but we might want general feedback
+					toast.error("Failed to delete session. Check console for details.");
+				}
 			} catch (err) {
-				console.error("Failed to delete session:", err);
+				// Catch unexpected errors during the await/call itself
+				console.error("Unexpected error calling deleteSession:", err);
 				toast.error(
-					`Failed to delete session: ${err instanceof Error ? err.message : "Unknown error"}`,
+					"An unexpected error occurred while trying to delete the session.",
 				);
 			}
 		},
-		[deleteSession],
+		[deleteSession], // Keep dependency on the function itself
 	);
 
 	// --- Effects ---
@@ -396,69 +403,84 @@ export default function ArticleReader() {
 							{/* Session List */}
 							<div className="mb-4 border-b pb-2">
 								<h4 className="text-sm font-medium mb-2">Saved Sessions</h4>
-								{isLoadingSessions && (
-									<p className="text-sm text-muted-foreground">
-										Loading sessions...
-									</p>
+								{isLoadingHistory && ( // Use isLoadingHistory
+									<div className="flex items-center justify-center py-2">
+										<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+										<span className="ml-2 text-sm text-muted-foreground">
+											Loading sessions...
+										</span>
+									</div>
 								)}
-								{!isLoadingSessions && sessions.length === 0 && (
-									<p className="text-sm text-muted-foreground">
-										No saved sessions.
-									</p>
-								)}
-								{!isLoadingSessions && sessions.length > 0 && (
-									<ScrollArea className="h-[100px] pr-3">
-										{" "}
-										{/* Adjust height as needed */}
-										<div className="space-y-1">
-											{sessions.map((session: ChatSessionMetadata) => (
-												<div
-													key={session.sessionId}
-													className="flex items-center justify-between gap-2"
-												>
-													<Button
-														variant="ghost"
-														size="sm"
-														className={cn(
-															"flex-1 justify-start text-left h-auto py-1 px-2",
-															selectedSessionId === session.sessionId &&
-																"bg-accent text-accent-foreground",
-														)}
-														onClick={() =>
-															setSelectedSessionId(session.sessionId)
-														}
-														title={
-															session.firstMessageSnippet ||
-															`Session from ${new Date(session.createdAt).toLocaleString()}`
-														}
+								{!isLoadingHistory &&
+									sessions.length === 0 &&
+									!historyError && ( // Check error state too
+										<p className="text-sm text-muted-foreground">
+											No saved sessions. Start a chat below.
+										</p>
+									)}
+								{!isLoadingHistory &&
+									sessions.length > 0 &&
+									!historyError && ( // Check error state too
+										<ScrollArea className="h-[100px] pr-3">
+											{" "}
+											{/* Adjust height as needed */}
+											<div className="space-y-1">
+												{sessions.map((session: ChatSessionMetadata) => (
+													<div
+														key={session.sessionId}
+														className="flex items-center justify-between gap-2"
 													>
-														<div className="flex flex-col">
-															<span className="text-xs font-normal text-muted-foreground">
-																{new Date(session.createdAt).toLocaleString()} (
-																{session.messageCount} msgs)
-															</span>
-															<span className="text-sm truncate">
-																{session.firstMessageSnippet || "..."}
-															</span>
-														</div>
-													</Button>
-													<Button
-														variant="ghost"
-														size="icon"
-														className="h-6 w-6 text-muted-foreground hover:text-destructive"
-														onClick={(e) => {
-															e.stopPropagation(); // Prevent triggering session selection
-															handleDeleteSession(session.sessionId);
-														}}
-														title="Delete session"
-													>
-														<Trash2 className="h-4 w-4" />
-													</Button>
-												</div>
-											))}
-										</div>
-									</ScrollArea>
-								)}
+														<Button
+															variant="ghost"
+															size="sm"
+															className={cn(
+																"flex-1 justify-start text-left h-auto py-1 px-2",
+																selectedSessionId === session.sessionId &&
+																	"bg-accent text-accent-foreground",
+															)}
+															onClick={() => {
+																if (!isUpdatingHistory) {
+																	// Prevent switching while updating
+																	setSelectedSessionId(session.sessionId);
+																}
+															}}
+															disabled={isUpdatingHistory} // Disable button while updating
+															title={
+																session.firstMessageSnippet ||
+																`Session from ${new Date(session.createdAt).toLocaleString()}`
+															}
+														>
+															<div className="flex flex-col">
+																<span className="text-xs font-normal text-muted-foreground">
+																	{new Date(session.createdAt).toLocaleString()}{" "}
+																	({session.messageCount} msgs)
+																</span>
+																<span className="text-sm truncate">
+																	{session.firstMessageSnippet || "..."}
+																</span>
+															</div>
+														</Button>
+														<Button
+															variant="ghost"
+															size="icon"
+															className="h-6 w-6 text-muted-foreground hover:text-destructive"
+															onClick={(e) => {
+																e.stopPropagation(); // Prevent triggering session selection
+																if (!isUpdatingHistory) {
+																	// Prevent delete while updating
+																	handleDeleteSession(session.sessionId);
+																}
+															}}
+															disabled={isUpdatingHistory} // Disable button while updating
+															title="Delete session"
+														>
+															<Trash2 className="h-4 w-4" />
+														</Button>
+													</div>
+												))}
+											</div>
+										</ScrollArea>
+									)}
 							</div>
 
 							{/* Selected Session Messages & Actions */}
@@ -470,7 +492,8 @@ export default function ArticleReader() {
 											size="sm"
 											onClick={handleCopyChat}
 											disabled={
-												isLoadingMessages ||
+												isLoadingHistory || // Check overall loading
+												isUpdatingHistory || // Disable if updating
 												selectedSessionMessages.length === 0
 											}
 										>
@@ -480,25 +503,27 @@ export default function ArticleReader() {
 									</div>
 								)}
 								<ScrollArea className="flex-1 mb-4 pr-4">
-									{isLoadingMessages && (
+									{isLoadingHistory &&
+										selectedSessionId && ( // Show loading only if a session is selected
+											<div className="flex items-center justify-center py-4">
+												<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+												<span className="ml-2 text-sm text-muted-foreground">
+													Loading messages...
+												</span>
+											</div>
+										)}
+									{historyError &&
+										!isLoadingHistory && ( // Show history error if not loading
+											<p className="text-sm text-destructive text-center py-4">
+												Error loading history: {historyError}
+											</p>
+										)}
+									{!isLoadingHistory && !selectedSessionId && !historyError && (
 										<p className="text-sm text-muted-foreground text-center py-4">
-											Loading messages...
+											Select a session above to view its history.
 										</p>
 									)}
-									{historyError &&
-										!isLoadingMessages && ( // Show history error if not loading messages
-											<p className="text-sm text-destructive text-center py-4">
-												History Error: {historyError}
-											</p>
-										)}
-									{!isLoadingMessages &&
-										!selectedSessionId &&
-										!historyError && (
-											<p className="text-sm text-muted-foreground text-center py-4">
-												Select a session above to view its history.
-											</p>
-										)}
-									{!isLoadingMessages &&
+									{!isLoadingHistory &&
 										selectedSessionId &&
 										selectedSessionMessages.length === 0 &&
 										!historyError && (
@@ -506,7 +531,7 @@ export default function ArticleReader() {
 												This session is empty.
 											</p>
 										)}
-									{!isLoadingMessages &&
+									{!isLoadingHistory &&
 										selectedSessionId &&
 										selectedSessionMessages.length > 0 &&
 										!historyError && (

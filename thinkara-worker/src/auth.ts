@@ -1,167 +1,100 @@
-// thinkara-worker/src/auth.ts
+import { verifyToken } from "@clerk/backend"; // Use verifyToken directly
+import type { JwtPayload } from "@clerk/types";
+// No need to import from itty-router if extending the standard Request
+import type { ExecutionContext } from "@cloudflare/workers-types";
 
-import { createClerkClient } from "@clerk/backend";
-import type { AuthResult, Env } from "./types";
-import { errorResponse } from "./utils"; // Import errorResponse helper
+// Define the shape of the auth state added to the request
+export interface RequestAuthState {
+	claims: JwtPayload | null; // Store the verified token claims
+	userId: string | null; // Convenience accessor for Clerk's 'sub' claim
+}
 
+// Define the expected environment variables/secrets for authentication
+export interface AuthEnv {
+	CLERK_SECRET_KEY: string;
+	// Add other secrets/variables if needed by Clerk (e.g., JWKS URL, Issuer)
+	// CLERK_JWKS_URL?: string;
+	// CLERK_ISSUER?: string;
+}
+
+// Extend the standard Request type to include our auth property
+// This helps with TypeScript checks in route handlers
+export interface AuthenticatedRequest extends Request {
+	auth?: RequestAuthState;
+}
+
+// Removed unused ClerkClient/getClerkClient code block
 /**
- * Authenticates an incoming request using Clerk backend SDK.
- * Verifies the Authorization Bearer token.
- *
- * @param request - The incoming Request object.
- * @param env - The worker environment variables and bindings.
- * @returns An AuthResult object indicating success (with userId) or error (with Response).
+ * Middleware to authenticate requests using Clerk JWT.
+ * Verifies the Bearer token and attaches auth state to the request.
+ * Returns a Response object for auth failures, otherwise allows execution to continue.
  */
-/**
- * Authenticates an incoming request using Clerk or simplified token.
- */
-export async function authenticateRequestWithClerk(
-	request: Request,
-	env: Env,
-): Promise<AuthResult> {
-	console.log("[WorkerAuth] authenticateRequestWithClerk: Entry");
-	// Check for Authorization header
-	const authHeader = request.headers.get("Authorization");
-	if (!authHeader || !authHeader.startsWith("Bearer ")) {
-		console.warn(
-			"[WorkerAuth] Authentication failed: Missing or invalid Authorization Bearer header.",
+export const authenticateRequest = async (
+	request: AuthenticatedRequest,
+	env: AuthEnv,
+	_ctx: ExecutionContext, // Use _ctx if ctx is not needed to avoid unused var linting
+): Promise<Response | undefined> => {
+	// Replace void with undefined
+	const authorizationHeader = request.headers.get("Authorization");
+
+	if (!authorizationHeader || !authorizationHeader.startsWith("Bearer ")) {
+		return new Response(
+			JSON.stringify({ error: "Missing or invalid Authorization header" }),
+			{
+				status: 401,
+				headers: { "Content-Type": "application/json" },
+			},
 		);
-		return {
-			status: "error",
-			response: errorResponse("Missing Authorization Bearer token", 401),
-		};
 	}
 
-	const token = authHeader.substring(7);
-	console.log(
-		"[WorkerAuth] Extracted token:",
-		token ? `${token.substring(0, 10)}...` : "null/empty",
-	); // Log prefix only
+	const token = authorizationHeader.substring(7); // Remove "Bearer " prefix
 
-	// First try to validate as a simplified token
-	console.log("[WorkerAuth] Attempting simplified token validation...");
 	try {
-		const decodedToken = atob(token);
-		const tokenParts = decodedToken.split(":");
-
-		if (tokenParts.length === 3) {
-			const [email, timestamp, signature] = tokenParts;
-
-			// Verify the token isn't too old (24 hour validity)
-			const tokenAge = Date.now() - Number(timestamp);
-			if (tokenAge > 24 * 60 * 60 * 1000) {
-				console.warn("[WorkerAuth] Simplified token is expired.");
-				return {
-					status: "error",
-					response: errorResponse("Token expired", 401),
-				};
-			}
-
-			// Decode and verify signature
-			try {
-				const decodedSignature = atob(signature);
-				const signatureParts = decodedSignature.split(":");
-
-				if (signatureParts.length === 3) {
-					const [sigEmail, sigTimestamp, secret] = signatureParts;
-
-					// Verify all parts match and secret is correct
-					if (
-						sigEmail === email &&
-						sigTimestamp === timestamp &&
-						secret === "thinkara-secure-key-2025"
-					) {
-						console.log(
-							`[WorkerAuth] Simplified token authentication SUCCESS for: ${email}`,
-						);
-						return { status: "success", userId: email };
-					}
-					console.log(
-						"[WorkerAuth] Simplified token signature mismatch or incorrect secret.",
-					);
-				}
-			} catch (e) {
-				// Simplified token signature decode failed
-				console.log(
-					"[WorkerAuth] Simplified token signature validation failed (decode error), trying Clerk.",
-					e,
-				);
-			}
+		if (!env.CLERK_SECRET_KEY) {
+			console.error("Missing CLERK_SECRET_KEY in authenticateRequest env.");
+			throw new Error("Authentication configuration error.");
 		}
-	} catch (e) {
-		// Simplified token format/decode failed
-		console.log(
-			"[WorkerAuth] Simplified token format invalid or decode error, trying Clerk.",
-			e,
-		);
-	}
-
-	// If simplified token validation fails, try Clerk authentication
-	console.log("[WorkerAuth] Attempting Clerk SDK authentication...");
-	const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
-	try {
-		// Log keys just before use for debugging
-		console.log(
-			`[WorkerAuth] Using Publishable Key: ${env.CLERK_PUBLISHABLE_KEY}`,
-		);
-		console.log(
-			`[WorkerAuth] Using Secret Key: ${env.CLERK_SECRET_KEY ? "Exists" : "MISSING!"}`,
-		);
-		// Use Clerk's robust request authentication
-		const requestState = await clerk.authenticateRequest(request, {
+		// Call verifyToken directly, providing the secret key
+		const claims: JwtPayload = await verifyToken(token, {
 			secretKey: env.CLERK_SECRET_KEY,
-			publishableKey: env.CLERK_PUBLISHABLE_KEY,
-			clockSkewInMs: 300000, // Increase tolerance for clock skew (5 minutes)
+			// issuer: env.CLERK_ISSUER, // Add issuer if needed
+			// other options...
 		});
 
-		if (requestState.status !== "signed-in") {
-			console.warn(
-				`[WorkerAuth] Clerk authentication FAILED: Status=${requestState.status}, Reason=${requestState.reason || "Unknown reason"}`,
-			);
-			return {
-				status: "error",
-				response: errorResponse(
-					`Authentication failed: ${requestState.reason || "Invalid session"}`,
-					401,
-				),
-			};
-		}
-
-		const userId = requestState.toAuth().userId;
-		if (!userId) {
-			console.error(
-				"[WorkerAuth] Clerk authentication succeeded but userId is MISSING in auth state.",
-			);
-			return {
-				status: "error",
-				response: errorResponse(
-					"Authentication succeeded but user ID could not be determined.",
-					500, // Internal server error seems more appropriate
-				),
-			};
-		}
-
-		console.log(
-			`[WorkerAuth] Clerk token verification SUCCESS for user: ${userId}`,
-		);
-		return { status: "success", userId: userId };
-	} catch (clerkError: any) {
-		console.error(
-			"[WorkerAuth] Clerk token verification threw an ERROR:",
-			clerkError,
-		);
-		// Determine specific error message
-		let message = "Invalid or expired session token";
-		if (clerkError.message?.includes("header")) {
-			message = "Invalid Authorization header format or token.";
-		} else if (clerkError.message) {
-			// Use Clerk's error message if available and not header-related
-			message = clerkError.message;
-		}
-
-		return {
-			status: "error",
-			response: errorResponse(message, 401, clerkError.message), // Include original error in details
+		// Attach authentication data to the request object for downstream use
+		// Clerk uses 'sub' (subject) claim for the user ID.
+		// Attach claims and userId to the request object
+		request.auth = {
+			claims: claims,
+			userId: claims.sub,
 		};
+
+		// In itty-router, returning void (or nothing) allows the middleware chain to continue
+	} catch (error: any) {
+		console.error("Clerk token verification failed:", error.message || error);
+		// Provide a generic error message to the client
+		return new Response(
+			JSON.stringify({ error: "Unauthorized: Invalid token" }),
+			{
+				status: 403, // Use 403 Forbidden for valid token format but failed verification
+				headers: { "Content-Type": "application/json" },
+			},
+		);
 	}
-}
+};
+
+/**
+ * Helper function to safely get the user ID from an authenticated request.
+ * Throws an error if the request wasn't properly authenticated (should be caught by caller).
+ */
+export const getUserId = (request: AuthenticatedRequest): string => {
+	const userId = request.auth?.userId;
+	if (!userId) {
+		// This should ideally not happen if authenticateRequest middleware ran successfully
+		console.error("getUserId called on a request without valid auth state.");
+		throw new Error(
+			"Internal server error: User ID not found after authentication.",
+		);
+	}
+	return userId;
+};

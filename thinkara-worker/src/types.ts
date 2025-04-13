@@ -6,6 +6,7 @@
 export interface Env {
 	// Bindings
 	SAVED_ITEMS_KV: KVNamespace;
+	USER_DATA_DB: D1Database; // Added D1 binding
 
 	// Variables
 	GCF_SUMMARIZE_URL: string;

@@ -18,11 +18,11 @@ interface ChatHistoryProps {
 	selectedSessionMessages: HistoryChatMessage[]; // Messages loaded from history
 	createNewSession: (
 		initialMessage: Omit<HistoryChatMessage, "timestamp">,
-	) => Promise<string>; // Returns new session ID
+	) => Promise<string | null>; // Returns new session ID or null on failure
 	addMessageToSession: (
 		sessionId: string,
 		newMessage: Omit<HistoryChatMessage, "timestamp">,
-	) => Promise<void>;
+	) => Promise<boolean>; // Changed to return boolean success indicator
 }
 
 /**
