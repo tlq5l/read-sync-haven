@@ -66,11 +66,11 @@ export function ApiConfigurator({
 
 	return (
 		<Card className="w-full mt-0 pt-0">
-			<CardHeader>
+			<CardHeader className="pb-3">
 				<CardTitle>AI Provider Settings</CardTitle>
 				<CardDescription>Configure your AI provider details.</CardDescription>
 			</CardHeader>
-			<CardContent className="space-y-4">
+			<CardContent className="space-y-4 pt-3">
 				{/* If provider selection is needed: */}
 				{/*
 				<div className="space-y-2">
