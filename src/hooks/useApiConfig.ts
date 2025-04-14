@@ -1,21 +1,21 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export interface ApiConfig {
-  apiKey: string | null;
-  apiEndpoint: string | null;
-  model: string | null;
+	apiKey: string | null;
+	apiEndpoint: string | null;
+	model: string | null;
 }
 
 // Placeholder hook
 export function useApiConfig() {
-  const [apiConfig, setApiConfig] = useState<ApiConfig | null>(null);
-  const availableProviders = ['openai', 'custom']; // Example
+	const [apiConfig, setApiConfig] = useState<ApiConfig | null>(null);
+	const availableProviders = ["openai", "custom"]; // Example
 
-  console.warn("Using placeholder useApiConfig hook!");
+	console.warn("Using placeholder useApiConfig hook!");
 
-  return {
-    apiConfig,
-    setApiConfig,
-    availableProviders,
-  };
+	return {
+		apiConfig,
+		setApiConfig,
+		availableProviders,
+	};
 }

@@ -75,7 +75,7 @@ export const apiClient = async <T = unknown>(
 	delete options.headers; // Remove headers from options to avoid conflict
 
 	try {
-	              console.log("apiClient: Attempting to fetch URL:", url); // Added for debugging
+		console.log("apiClient: Attempting to fetch URL:", url); // Added for debugging
 		const response = await fetch(url, {
 			...options,
 			headers,
