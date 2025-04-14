@@ -3,21 +3,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as auth from "../auth"; // Import the auth module to mock it
 import type { Env } from "../types";
+import type { RequestAuthState } from "../auth"; // Import RequestAuthState from correct path
+import type { JwtPayload } from "@clerk/types"; // Import JwtPayload from correct path
 import { handleChat, handleSummarize } from "./api";
 
 // Spy on global.fetch for worker tests
 // Spy on global.fetch for worker tests
 let fetchSpy: any; // Use 'any' or leave untyped for inference in beforeEach
 
-// Mock the authenticateRequestWithClerk function
+// Mock the authenticateRequest function (middleware simulation)
 vi.mock("../auth", async (importOriginal) => {
 	const actual = await importOriginal<typeof auth>();
 	return {
-		...actual, // Keep other exports if any
-		authenticateRequestWithClerk: vi.fn(), // Mock the specific function
+		...actual, // Keep other exports
+		authenticateRequest: vi.fn().mockResolvedValue(undefined), // Default to success (undefined means continue)
 	};
 });
-const mockedAuth = vi.mocked(auth.authenticateRequestWithClerk);
+const mockedAuth = vi.mocked(auth.authenticateRequest);
 
 describe("Worker API Handlers", () => {
 	// Define constants locally within the describe scope
@@ -26,6 +28,18 @@ describe("Worker API Handlers", () => {
 
 	let mockEnv: Env;
 	const testUserId = "user_api_test_456";
+
+	// Define a mock JWT payload satisfying the interface
+	const mockClaims: JwtPayload = {
+		__raw: "mock_raw_token",
+		iss: "mock_issuer",
+		sub: testUserId, // Ensure sub matches testUserId
+		aud: "mock_audience",
+		exp: Math.floor(Date.now() / 1000) + 3600, // Expires in 1 hour
+		nbf: Math.floor(Date.now() / 1000) - 60, // Not before 1 min ago
+		iat: Math.floor(Date.now() / 1000), // Issued now
+		sid: "mock_session_id",
+	};
 
 	beforeEach(() => {
 		// Reset mocks before each test
@@ -46,6 +60,7 @@ describe("Worker API Handlers", () => {
 			GCLOUD_WORKLOAD_IDENTITY_POOL_ID: "",
 			GCLOUD_WORKLOAD_IDENTITY_PROVIDER_ID: "",
 			GCLOUD_SERVICE_ACCOUNT_EMAIL: "",
+			USER_DATA_DB: {} as D1Database, // Corrected type assertion to D1Database
 		};
 	});
 
@@ -57,7 +72,10 @@ describe("Worker API Handlers", () => {
 	// --- handleSummarize ---
 	describe("handleSummarize", () => {
 		it("should return summary on successful GCF call", async () => {
-			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
+			mockedAuth.mockImplementation(async (req) => {
+				req.auth = { userId: testUserId, claims: mockClaims }; // Use mock claims
+				return undefined; // Success
+			});
 			// Mock the fetch spy's behavior for the GCF call
 			fetchSpy.mockResolvedValueOnce(
 				new Response(JSON.stringify({ summary: MOCK_SUMMARY_LOCAL }), {
@@ -95,10 +113,7 @@ describe("Worker API Handlers", () => {
 				JSON.stringify({ status: "error", message: "Auth failed" }),
 				{ status: 401 },
 			);
-			mockedAuth.mockResolvedValue({
-				status: "error",
-				response: authErrorResponse,
-			});
+			mockedAuth.mockResolvedValue(authErrorResponse); // Simulate middleware returning a Response
 
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
@@ -115,7 +130,10 @@ describe("Worker API Handlers", () => {
 		});
 
 		it("should return 400 if content is missing", async () => {
-			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
+			mockedAuth.mockImplementation(async (req) => {
+				req.auth = { userId: testUserId, claims: mockClaims };
+				return undefined;
+			});
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
 				headers: {
@@ -132,7 +150,10 @@ describe("Worker API Handlers", () => {
 		});
 
 		it("should return 503 if GCF URL is not configured", async () => {
-			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
+			mockedAuth.mockImplementation(async (req) => {
+				req.auth = { userId: testUserId, claims: mockClaims };
+				return undefined;
+			});
 			const envWithoutUrl = { ...mockEnv, GCF_SUMMARIZE_URL: "" }; // Simulate missing URL
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
@@ -152,7 +173,10 @@ describe("Worker API Handlers", () => {
 		});
 
 		it("should return 500 if GCF secret is not configured", async () => {
-			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
+			mockedAuth.mockImplementation(async (req) => {
+				req.auth = { userId: testUserId, claims: mockClaims };
+				return undefined;
+			});
 			const envWithoutSecret = { ...mockEnv, GCF_AUTH_SECRET: "" }; // Simulate missing secret
 			const request = new Request("http://worker/api/summarize", {
 				method: "POST",
@@ -175,7 +199,10 @@ describe("Worker API Handlers", () => {
 		// is difficult without directly mocking fetch to fail.
 		// This test remains largely the same, relying on the direct fetch mock now.
 		it("should return 200 when GCF call succeeds (using direct fetch mock)", async () => {
-			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
+			mockedAuth.mockImplementation(async (req) => {
+				req.auth = { userId: testUserId, claims: mockClaims };
+				return undefined;
+			});
 			// Mock the fetch spy's behavior
 			fetchSpy.mockResolvedValueOnce(
 				new Response(JSON.stringify({ summary: MOCK_SUMMARY_LOCAL }), {
@@ -204,7 +231,10 @@ describe("Worker API Handlers", () => {
 	// --- handleChat ---
 	describe("handleChat", () => {
 		it("should return chat response on successful GCF call", async () => {
-			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
+			mockedAuth.mockImplementation(async (req) => {
+				req.auth = { userId: testUserId, claims: mockClaims };
+				return undefined;
+			});
 			// Mock the fetch spy's behavior for the GCF call
 			fetchSpy.mockResolvedValueOnce(
 				new Response(JSON.stringify({ response: MOCK_CHAT_RESPONSE_LOCAL }), {
@@ -245,10 +275,7 @@ describe("Worker API Handlers", () => {
 				JSON.stringify({ status: "error", message: "Auth failed" }),
 				{ status: 401 },
 			);
-			mockedAuth.mockResolvedValue({
-				status: "error",
-				response: authErrorResponse,
-			});
+			mockedAuth.mockResolvedValue(authErrorResponse);
 
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
@@ -265,7 +292,10 @@ describe("Worker API Handlers", () => {
 		});
 
 		it("should return 400 if content or message is missing", async () => {
-			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
+			mockedAuth.mockImplementation(async (req) => {
+				req.auth = { userId: testUserId, claims: mockClaims };
+				return undefined;
+			});
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
 				headers: {
@@ -284,7 +314,10 @@ describe("Worker API Handlers", () => {
 		});
 
 		it("should return 503 if GCF URL is not configured", async () => {
-			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
+			mockedAuth.mockImplementation(async (req) => {
+				req.auth = { userId: testUserId, claims: mockClaims };
+				return undefined;
+			});
 			const envWithoutUrl = { ...mockEnv, GCF_CHAT_URL: "" };
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
@@ -302,7 +335,10 @@ describe("Worker API Handlers", () => {
 		});
 
 		it("should return 500 if GCF secret is not configured", async () => {
-			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
+			mockedAuth.mockImplementation(async (req) => {
+				req.auth = { userId: testUserId, claims: mockClaims };
+				return undefined;
+			});
 			const envWithoutSecret = { ...mockEnv, GCF_AUTH_SECRET: "" };
 			const request = new Request("http://worker/api/chat", {
 				method: "POST",
@@ -323,7 +359,10 @@ describe("Worker API Handlers", () => {
 
 		// This test remains largely the same, relying on the direct fetch mock now.
 		it("should return 200 when GCF call succeeds (using direct fetch mock)", async () => {
-			mockedAuth.mockResolvedValue({ status: "success", userId: testUserId });
+			mockedAuth.mockImplementation(async (req) => {
+				req.auth = { userId: testUserId, claims: mockClaims };
+				return undefined;
+			});
 			// Mock the fetch spy's behavior
 			fetchSpy.mockResolvedValueOnce(
 				new Response(JSON.stringify({ response: MOCK_CHAT_RESPONSE_LOCAL }), {
