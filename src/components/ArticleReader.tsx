@@ -590,7 +590,7 @@ export default function ArticleReader() {
 						{/* AI Settings Tab */}
 						<TabsContent
 							value="settings"
-							className="space-y-4 flex-1 overflow-y-auto p-1" // Added styling
+							className="flex-1 overflow-y-auto" // Removed space-y-4 and p-1
 						>
 							<ApiConfigurator
 								apiConfig={apiConfig}
