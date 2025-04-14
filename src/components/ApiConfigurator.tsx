@@ -65,7 +65,7 @@ export function ApiConfigurator({
 	// for 'availableProviders' and logic to show/hide fields based on provider.
 
 	return (
-		<Card className="w-full">
+		<Card className="w-full mt-0 pt-0">
 			<CardHeader>
 				<CardTitle>AI Provider Settings</CardTitle>
 				<CardDescription>Configure your AI provider details.</CardDescription>
