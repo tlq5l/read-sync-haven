@@ -8,29 +8,33 @@ import parse from "html-react-parser";
 import { Loader2 } from "lucide-react";
 // Removed unused 'React' type import
 import {
+	type ForwardedRef, // Add ForwardedRef
 	type KeyboardEvent, // Add KeyboardEvent type
 	type MouseEvent,
 	type ReactNode, // Add ReactNode for parsed content state
+	forwardRef, // Add forwardRef
 	useCallback,
 	useEffect,
-	useRef,
+	// Remove unused useRef
 	useState,
 } from "react";
 
 interface ReaderContentDisplayProps {
 	article: Article;
-	// contentRef is removed as it's unused internally
+	// Ref will be passed via forwardRef
 	onTextExtracted: (text: string | null) => void; // Add prop back as it's passed by ArticleReader
 }
 
-export function ReaderContentDisplay({
-	article,
-	onTextExtracted, // Destructure the added prop
-}: ReaderContentDisplayProps) {
+// Wrap component with forwardRef to accept the ref from the parent
+export const ReaderContentDisplay = forwardRef<
+	HTMLDivElement,
+	ReaderContentDisplayProps
+>(({ article, onTextExtracted }, ref: ForwardedRef<HTMLDivElement>) => {
 	const [isLoading, setIsLoading] = useState(true);
 	const [processedHtml, setProcessedHtml] = useState<string | null>(null);
 	const [processingError, setProcessingError] = useState<string | null>(null);
-	const internalScrollRef = useRef<HTMLDivElement>(null); // Ref for the scrollable content area
+	// Use the forwarded ref instead of a local one
+	// const internalScrollRef = useRef<HTMLDivElement>(null); // Ref for the scrollable content area
 	const [parsedContent, setParsedContent] = useState<ReactNode | null>(null); // State for async parsed content
 
 	// Determine article type
@@ -101,25 +105,26 @@ export function ReaderContentDisplay({
 
 	// Effect to extract text content once parsed content is ready and rendered
 	useEffect(() => {
-		// Check if parsedContent exists AND the container ref is available
-		if (parsedContent && internalScrollRef.current) {
-			// Extract text content from the container
+		// Check if parsedContent exists AND the forwarded ref is available
+		// Check if parsedContent exists AND the forwarded ref is available and current
+		if (parsedContent && ref && typeof ref !== "function" && ref.current) {
+			// Extract text content from the container using the forwarded ref
 			// This now runs *after* the parsed content should have been rendered
-			const text = internalScrollRef.current.textContent;
+			const text = ref.current.textContent;
 			console.log(
 				"[ReaderContentDisplay] Extracting text content after parsing:",
 				text ? `${text.substring(0, 100)}...` : "null",
 			);
 			onTextExtracted(text); // Call the prop with potentially complete text
 		} else {
-			// If parsedContent is null or ref isn't ready, ensure null is passed up
+			// If parsedContent is null or ref isn't ready/current, ensure null is passed up
 			console.log(
-				"[ReaderContentDisplay] No parsed content to extract text from, calling onTextExtracted(null)",
+				"[ReaderContentDisplay] No parsed content or ref not ready to extract text from, calling onTextExtracted(null)",
 			);
-			onTextExtracted(null);
+			onTextExtracted(null); // Pass null if ref is not ready or content is null
 		}
 		// Dependency: run when parsedContent changes or the callback changes
-	}, [parsedContent, onTextExtracted]);
+	}, [parsedContent, onTextExtracted, ref]); // Add ref to dependency array
 
 	// Effect to sanitize and parse HTML asynchronously when processedHtml is ready
 	useEffect(() => {
@@ -185,13 +190,14 @@ export function ReaderContentDisplay({
 			// Find the closest anchor tag clicked
 			const anchor = target.closest("a[href^='#']");
 
-			if (anchor && internalScrollRef.current) {
+			// Use forwarded ref
+			if (anchor && ref && typeof ref !== "function" && ref.current) {
 				event.preventDefault(); // Prevent default browser jump
 				const href = anchor.getAttribute("href");
 				if (href) {
 					try {
 						// Query the element within the scrollable container
-						const targetElement = internalScrollRef.current.querySelector(href);
+						const targetElement = ref.current.querySelector(href);
 						if (targetElement) {
 							console.log(`[ReaderContentDisplay] Scrolling to ${href}`);
 							targetElement.scrollIntoView({
@@ -219,7 +225,7 @@ export function ReaderContentDisplay({
 				}
 			}
 		},
-		[],
+		[ref], // Add ref to dependency array
 	);
 
 	// --- End Scroll Handling ---
@@ -273,15 +279,15 @@ export function ReaderContentDisplay({
 
 			{/* Content Area */}
 			{/* Content Area - Add click handler and internal ref */}
+			{/* Assign the forwarded ref to this div */}
 			<div
-				ref={internalScrollRef}
+				ref={ref} // Use the forwarded ref here
 				onClick={handleContentClick}
 				onKeyDown={handleContentKeyDown} // Add keyboard listener
 				className="flex-1 overflow-y-auto px-4 md:px-8 py-6 relative reader-scroll-container focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" // Add focus styles
 				// Removed tabIndex={0} to resolve lint/a11y/noNoninteractiveTabindex
 			>
-				{/* External contentRef is not assigned here directly to avoid TS errors.
-				    Parent component can manage it if needed. internalScrollRef is used for internal logic. */}
+				{/* Ref is now forwarded from parent */}
 				{/* Render the processor component if needed. It handles its own loading/error UI. */}
 				{renderProcessorIfNeeded()}
 
@@ -345,4 +351,4 @@ export function ReaderContentDisplay({
 			</div>
 		</div>
 	);
-}
+});

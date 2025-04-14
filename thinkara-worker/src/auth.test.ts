@@ -1,8 +1,8 @@
 // thinkara-worker/src/auth.test.ts
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionContext } from "@cloudflare/workers-types"; // Import ExecutionContext
-import { authenticateRequest, type AuthenticatedRequest } from "./auth"; // Import AuthenticatedRequest
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { type AuthenticatedRequest, authenticateRequest } from "./auth"; // Import AuthenticatedRequest
 import type { Env } from "./types"; // Removed unused AuthResult
 import { errorResponse } from "./utils"; // Import for comparison
 
@@ -112,7 +112,9 @@ describe("Worker Authentication", () => {
 		});
 
 		// Mock the actual underlying verifyToken call behavior for this case (token expired)
-		const clerkExpiredError = new Error("Token verification failed: token_expired");
+		const clerkExpiredError = new Error(
+			"Token verification failed: token_expired",
+		);
 		mockAuthenticateRequest.mockRejectedValue(clerkExpiredError); // Use mockAuthenticateRequest used by createClerkClient mock
 
 		const result = await authenticateRequest(mockRequest, mockEnv, mockCtx); // Pass mockCtx
@@ -138,7 +140,9 @@ describe("Worker Authentication", () => {
 		});
 
 		// Mock the actual underlying verifyToken call behavior for this case (needs handshake)
-		const clerkHandshakeError = new Error("Token verification failed: needs_handshake");
+		const clerkHandshakeError = new Error(
+			"Token verification failed: needs_handshake",
+		);
 		mockAuthenticateRequest.mockRejectedValue(clerkHandshakeError);
 
 		const result = await authenticateRequest(mockRequest, mockEnv, mockCtx); // Pass mockCtx

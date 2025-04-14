@@ -2,7 +2,7 @@
 import { KeyboardShortcutsTab } from "@/components/keyboard-shortcuts-tab";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input"; // Added Input import
+// Removed Input import as it's no longer used
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -32,9 +32,7 @@ import { Link } from "react-router-dom";
 
 // Define a type for the settings object for clarity
 interface UserSettings {
-	apiKey?: string;
-	endpointUrl?: string;
-	modelName?: string;
+	// Removed apiKey, endpointUrl, modelName as they are moving elsewhere
 	theme?: "light" | "dark" | "system"; // Match useTheme type
 	// Add other settings fields as needed
 }
@@ -48,12 +46,10 @@ export default function SettingsPage() {
 	const [isUpdatingMetadata, setIsUpdatingMetadata] = useState(false);
 	const [activeTab, setActiveTab] = useState("account");
 	// API Provider Settings State
-	const [apiKey, setApiKey] = useState("");
-	const [endpointUrl, setEndpointUrl] = useState("");
-	const [modelName, setModelName] = useState("");
+	// Removed apiKey, endpointUrl, modelName state as they are moving elsewhere
 	// Sync/Loading/Error State for Settings
 	const [isLoadingSettings, setIsLoadingSettings] = useState(false);
-	const [settingsError, setSettingsError] = useState<string | null>(null);
+	// const [settingsError, setSettingsError] = useState<string | null>(null); // Removed unused state
 	const [saveStatus, setSaveStatus] = useState<
 		"idle" | "saving" | "saved" | "error"
 	>("idle");
@@ -61,10 +57,7 @@ export default function SettingsPage() {
 		useState<UserSettings | null>(null); // Store last successfully saved state
 
 	// Test Connection State (Keep separate for now)
-	const [testStatus, setTestStatus] = useState<
-		"idle" | "testing" | "success" | "error"
-	>("idle");
-	const [testResult, setTestResult] = useState<string | null>(null);
+	// Removed testStatus and testResult state as they are related to the removed test connection feature
 
 	// Removed useArticleActions hook call as it's not directly related to settings sync
 
@@ -74,18 +67,16 @@ export default function SettingsPage() {
 		const fetchSettings = async () => {
 			if (!isSignedIn) {
 				// Optionally clear local state if user signs out, or load defaults
-				setApiKey("");
-				setEndpointUrl("");
-				setModelName("");
-				// On sign out, clear API config, but leave theme as is for now.
-				setSettingsError(null);
+				// On sign out, clear API config state (which is now removed)
+				// Theme state is handled by useTheme context
+				// setSettingsError(null); // Removed state
 				setIsLoadingSettings(false);
 				setLastSavedSettings(null);
 				return;
 			}
 
 			setIsLoadingSettings(true);
-			setSettingsError(null);
+			// setSettingsError(null); // Removed state
 			console.log("Attempting to fetch user settings...");
 
 			try {
@@ -100,9 +91,7 @@ export default function SettingsPage() {
 				console.log("Fetched settings:", fetchedSettings);
 
 				// Update local state with fetched data
-				setApiKey(fetchedSettings.apiKey || "");
-				setEndpointUrl(fetchedSettings.endpointUrl || "");
-				setModelName(fetchedSettings.modelName || "");
+				// Removed setting apiKey, endpointUrl, modelName from fetchedSettings
 				// Update theme context if a theme was fetched
 				if (fetchedSettings.theme) {
 					setTheme(fetchedSettings.theme); // Update theme context
@@ -114,17 +103,24 @@ export default function SettingsPage() {
 				if (error instanceof ApiError && error.status === 404) {
 					// User might not have settings saved yet, treat as empty/default
 					console.log("No settings found for user (404), using defaults.");
-					setApiKey("");
-					setEndpointUrl("");
-					setModelName("");
+					// Removed setting default apiKey, endpointUrl, modelName on 404
 					setLastSavedSettings({}); // Indicate fetch occurred but no data
 				} else if (error instanceof ApiError) {
-					setSettingsError(
+					// setSettingsError( // Removed state
+					// 	`Failed to load settings: ${error.status} ${error.message}${error.body ? ` - ${JSON.stringify(error.body)}` : ""}`,
+					// );
+					console.error(
+						// Log the error instead
 						`Failed to load settings: ${error.status} ${error.message}${error.body ? ` - ${JSON.stringify(error.body)}` : ""}`,
 					);
 				} else {
-					setSettingsError(
+					// setSettingsError( // Removed state
+					// 	"Failed to load settings due to an unexpected error.",
+					// );
+					console.error(
+						// Log the error instead
 						"Failed to load settings due to an unexpected error.",
+						error, // Include the original error object
 					);
 				}
 				setSaveStatus("idle"); // Ensure save status is reset on error
@@ -149,7 +145,7 @@ export default function SettingsPage() {
 			}
 
 			setSaveStatus("saving");
-			setSettingsError(null); // Clear previous errors on new save attempt
+			// setSettingsError(null); // Removed state
 			console.log("Attempting to save settings:", settingsToSave);
 
 			try {
@@ -192,12 +188,18 @@ export default function SettingsPage() {
 							/* ignore stringify error */
 						}
 					}
-					setSettingsError(errorDesc); // Set specific error message
+					// setSettingsError(errorDesc); // Removed state
+					console.error("Settings save error:", errorDesc); // Log instead
 				} else if (error instanceof Error) {
 					errorDesc += ` Error: ${error.message}`;
-					setSettingsError(errorDesc);
+					// setSettingsError(errorDesc); // Removed state
+					console.error("Settings save error:", errorDesc, error); // Log instead
 				} else {
-					setSettingsError("An unknown error occurred while saving settings.");
+					// setSettingsError("An unknown error occurred while saving settings."); // Removed state
+					console.error(
+						"An unknown error occurred while saving settings.",
+						error,
+					); // Log instead
 				}
 				toast({
 					title: "Save Failed",
@@ -216,16 +218,7 @@ export default function SettingsPage() {
 		[isSignedIn, toast, saveStatus, getToken], // Add getToken to dependency array
 	);
 
-	const handleSaveApiConfigSettings = () => {
-		const settings: UserSettings = {
-			...(lastSavedSettings || {}), // Start with last known settings (including theme)
-			apiKey: apiKey,
-			endpointUrl: endpointUrl,
-			modelName: modelName,
-		};
-		saveSettingsToBackend(settings);
-	};
-
+	// Removed handleSaveApiConfigSettings function
 	// Handler for theme change
 	const handleThemeChange = (newTheme: "light" | "dark") => {
 		setTheme(newTheme); // Update context immediately for responsiveness
@@ -241,72 +234,7 @@ export default function SettingsPage() {
 	// --- End Logic for Custom API Settings (refactored to use backend) ---
 
 	// --- Logic for Test Connection ---
-	const handleTestConnection = async () => {
-		setTestStatus("testing");
-		setTestResult(null); // Clear previous result
-
-		// Use current state instead of localStorage for testing
-		// Note: This tests the connection using the *currently entered* values,
-		// which might differ from the *last saved* values if changes are pending.
-		// This seems reasonable behaviour for a test button.
-		if (!apiKey || !endpointUrl) {
-			setTestStatus("error");
-			setTestResult(
-				"Error: API Key and/or Endpoint URL not configured. Please configure and save them in the 'Configuration' tab first.",
-			);
-			return;
-		}
-
-		// Ensure the endpoint doesn't end with a slash, and append /v1/models
-		const baseUrl = endpointUrl.endsWith("/")
-			? endpointUrl.slice(0, -1)
-			: endpointUrl;
-		const testUrl = `${baseUrl}/v1/models`;
-
-		try {
-			const response = await fetch(testUrl, {
-				method: "GET",
-				headers: {
-					Authorization: `Bearer ${apiKey}`,
-					"Content-Type": "application/json",
-				},
-			});
-
-			if (response.ok) {
-				const data = await response.json();
-				const modelCount = data?.data?.length || 0; // Adjust based on actual API response structure
-				setTestStatus("success");
-				setTestResult(
-					`Connection successful! Received ${modelCount} model(s).`, // Example: Display model count
-				);
-			} else {
-				let errorMsg = `Connection failed: ${response.status} ${response.statusText}`;
-				try {
-					// Attempt to parse error details from the response body
-					const errorData = await response.json();
-					if (errorData?.error?.message) {
-						errorMsg += ` - ${errorData.error.message}`;
-					} else {
-						// Try to stringify if it's not the expected format
-						errorMsg += ` - ${JSON.stringify(errorData)}`;
-					}
-				} catch (parseError) {
-					// If parsing fails, just use the status text
-					console.warn("Could not parse error response body:", parseError);
-				}
-				setTestStatus("error");
-				setTestResult(errorMsg);
-			}
-		} catch (error) {
-			console.error("Test connection fetch error:", error);
-			setTestStatus("error");
-			let networkErrorMsg = "Network error: Could not reach the endpoint.";
-			if (error instanceof Error) {
-				networkErrorMsg += ` (${error.message})`;
-			}
-			setTestResult(networkErrorMsg);
-		}
-	};
+	// Removed handleTestConnection function
 	// --- End Logic for Test Connection ---
 
 	const exportData = async () => {
@@ -606,154 +534,7 @@ export default function SettingsPage() {
 								</CardContent>
 							</Card>
 
-							{/* Nested Tabs for AI Provider Settings */}
-							<Tabs defaultValue="configuration" className="space-y-4">
-								<TabsList className="grid w-full grid-cols-2">
-									<TabsTrigger value="configuration">Configuration</TabsTrigger>
-									<TabsTrigger value="test-connection">
-										Test Connection
-									</TabsTrigger>
-								</TabsList>
-								<TabsContent value="configuration">
-									<Card>
-										<CardHeader>
-											<CardTitle>AI Provider Configuration</CardTitle>{" "}
-											{/* Slightly adjust title */}
-										</CardHeader>
-										<CardContent className="space-y-4">
-											{isLoadingSettings && (
-												<p className="text-sm text-muted-foreground">
-													Loading settings...
-												</p>
-											)}
-											{settingsError && (
-												<p className="text-sm text-red-600">{settingsError}</p>
-											)}
-											{!isSignedIn && (
-												<p className="text-sm text-yellow-600">
-													Sign in to load and save your settings.
-												</p>
-											)}
-											<div className="space-y-2">
-												<Label htmlFor="apiKey">API Key</Label>
-												<Input
-													id="apiKey"
-													type="password"
-													placeholder={
-														isSignedIn
-															? "Enter your API Key"
-															: "Sign in to load"
-													}
-													value={apiKey}
-													onChange={(e) => setApiKey(e.target.value)}
-													disabled={!isSignedIn || isLoadingSettings}
-												/>
-												<p className="text-sm text-muted-foreground">
-													Your custom OpenAI-compatible API key (stored
-													securely).
-												</p>
-											</div>
-											<div className="space-y-2">
-												<Label htmlFor="endpointUrl">Endpoint URL</Label>
-												<Input
-													id="endpointUrl"
-													type="url"
-													placeholder={
-														isSignedIn
-															? "https://api.example.com/v1"
-															: "Sign in to load"
-													}
-													value={endpointUrl}
-													onChange={(e) => setEndpointUrl(e.target.value)}
-													disabled={!isSignedIn || isLoadingSettings}
-												/>
-												<p className="text-sm text-muted-foreground">
-													The base URL for the OpenAI-compatible API endpoint.
-												</p>
-											</div>
-											<div className="space-y-2">
-												<Label htmlFor="modelName">Model Name</Label>
-												<Input
-													id="modelName"
-													type="text"
-													placeholder={
-														isSignedIn
-															? "Enter model name (e.g., gpt-4o)"
-															: "Sign in to load"
-													}
-													value={modelName}
-													onChange={(e) => setModelName(e.target.value)}
-													disabled={!isSignedIn || isLoadingSettings}
-												/>
-												<p className="text-sm text-muted-foreground">
-													Specify the exact model to use with the custom
-													provider.
-												</p>
-											</div>
-											<Button
-												onClick={handleSaveApiConfigSettings} // Use the renamed handler
-												disabled={
-													!isSignedIn ||
-													isLoadingSettings ||
-													saveStatus === "saving"
-												}
-											>
-												{saveStatus === "saved"
-													? "Saved!"
-													: saveStatus === "saving"
-														? "Saving..."
-														: saveStatus === "error"
-															? "Save Failed" // Indicate error state
-															: "Save Settings"}
-											</Button>
-										</CardContent>
-									</Card>
-								</TabsContent>
-								<TabsContent value="test-connection">
-									<Card>
-										<CardHeader>
-											<CardTitle>Test Connection</CardTitle>
-										</CardHeader>
-										<CardContent className="space-y-4">
-											<p className="text-sm text-muted-foreground">
-												Verify your saved API Key and Endpoint URL by making a
-												test call to the `/v1/models` endpoint.
-											</p>
-											<Button
-												onClick={handleTestConnection}
-												disabled={testStatus === "testing"}
-											>
-												{testStatus === "testing"
-													? "Testing..."
-													: testStatus === "idle"
-														? "Test Connection"
-														: "Test Again"}
-											</Button>
-											<div>
-												<p className="text-sm font-medium">Result:</p>
-												{testResult && (
-													<p
-														className={`text-sm mt-1 ${
-															testStatus === "success"
-																? "text-green-600"
-																: testStatus === "error"
-																	? "text-red-600"
-																	: "text-muted-foreground"
-														}`}
-													>
-														{testResult}
-													</p>
-												)}
-												{testStatus === "idle" && !testResult && (
-													<p className="text-sm text-muted-foreground mt-1">
-														Click the button to test your connection settings.
-													</p>
-												)}
-											</div>
-										</CardContent>
-									</Card>
-								</TabsContent>
-							</Tabs>
+							{/* Removed Nested Tabs for AI Provider Settings */}
 						</div>
 					</ScrollArea>
 				</TabsContent>

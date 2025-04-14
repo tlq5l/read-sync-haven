@@ -6,6 +6,7 @@ if (!API_BASE_URL) {
 	console.error("VITE_API_BASE_URL is not defined in environment variables.");
 	// Optionally throw an error or provide a default, but logging is safer for now
 }
+console.log("apiClient: Initial API_BASE_URL:", API_BASE_URL); // Added for debugging
 
 type ApiClientOptions = Omit<RequestInit, "headers"> & {
 	headers?: Record<string, string>;
@@ -74,6 +75,7 @@ export const apiClient = async <T = unknown>(
 	delete options.headers; // Remove headers from options to avoid conflict
 
 	try {
+	              console.log("apiClient: Attempting to fetch URL:", url); // Added for debugging
 		const response = await fetch(url, {
 			...options,
 			headers,

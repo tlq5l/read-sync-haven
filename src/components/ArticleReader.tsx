@@ -1,3 +1,4 @@
+import { ApiConfigurator } from "@/components/ApiConfigurator";
 import { ReaderContentDisplay } from "@/components/ReaderContentDisplay";
 import { ReaderToolbar } from "@/components/ReaderToolbar";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useArticles } from "@/context/ArticleContext";
+import { useApiConfig } from "@/hooks/useApiConfig";
 import { useArticleData } from "@/hooks/useArticleData";
 import { useChat } from "@/hooks/useChat";
 // Import necessary types from useChatHistory
@@ -68,6 +70,7 @@ export default function ArticleReader() {
 		isUpdating: isUpdatingHistory, // New state for background updates
 		error: historyError,
 	} = useChatHistory(id || null);
+	const { apiConfig, setApiConfig, availableProviders } = useApiConfig();
 
 	// --- Integrate Chat and History ---
 	// Prepare props for useChat hook
@@ -172,7 +175,9 @@ export default function ArticleReader() {
 	useEffect(() => {
 		if (!article || !contentRef.current || article.type !== "article") return;
 		const debouncedUpdateProgress = debounce((progress: number) => {
-			if (article._id) {
+			if (article?._id) {
+				// Use optional chaining as suggested by lint
+				// Check article exists before accessing _id
 				// Ensure _id exists
 				updateReadingProgress(article._id, progress);
 			}
@@ -194,7 +199,7 @@ export default function ArticleReader() {
 			ref.removeEventListener("scroll", trackProgress);
 			debouncedUpdateProgress.cancel();
 		};
-	}, [article, updateReadingProgress]);
+	}, [article, updateReadingProgress]); // Removed contentRef from dependencies as it's a ref
 
 	// REMOVED: Effect to save AI responses manually (lines 142-185 in original)
 	// This logic needs to be integrated into useChat when addMessageToSession is called.
@@ -250,9 +255,18 @@ export default function ArticleReader() {
 				onToggleFullscreen={toggleFullscreen}
 				onToggleSidebar={toggleSidebar}
 			/>
+			{/* API Configurator Section */}
+			<div className="p-2 border-b border-border">
+				<ApiConfigurator
+					apiConfig={apiConfig}
+					setApiConfig={setApiConfig}
+					availableProviders={availableProviders}
+				/>
+			</div>
 
 			{/* Content Display Area */}
 			<ReaderContentDisplay
+				ref={contentRef} // Pass ref here for scroll tracking
 				article={article}
 				onTextExtracted={handleTextExtracted}
 			/>
