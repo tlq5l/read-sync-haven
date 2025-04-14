@@ -30,17 +30,19 @@ export function parseUserItemKey(
 
 /**
  * Standard CORS headers for API responses.
- * These are applied automatically by `jsonResponse` and `errorResponse`.
- * The `OPTIONS` preflight requests are handled in `index.ts`.
+ * Allows requests specifically from the frontend origin during development.
+ * These are applied automatically by `jsonResponse` and `errorResponse`
+ * and used by the preflight handler in `index.ts`.
  */
 export const corsHeaders = {
-	"Access-Control-Allow-Origin": "*", // Adjust in production if needed
+	"Access-Control-Allow-Origin": "http://localhost:8080", // Explicitly allow the frontend origin
 	"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-	"Access-Control-Allow-Headers": "Content-Type, Authorization",
+	"Access-Control-Allow-Headers": "Content-Type, Authorization", // Add other headers if needed by frontend
+	"Access-Control-Allow-Credentials": "true", // Allow credentials (cookies, auth headers)
 };
 
 /**
- * Creates a standard JSON response object.
+ * Creates a standard JSON response object with CORS headers.
  * @param body - The response body object.
  * @param status - The HTTP status code (default: 200).
  * @param additionalHeaders - Optional additional headers.
@@ -51,18 +53,20 @@ export function jsonResponse(
 	status = 200,
 	additionalHeaders: Record<string, string> = {},
 ): Response {
+	// Apply CORS headers directly here, consistent with original design.
+	// The global fetch handler will ensure they are applied even if this isn't called.
 	return new Response(JSON.stringify(body), {
 		status: status,
 		headers: {
 			"Content-Type": "application/json",
-			...corsHeaders,
+			...corsHeaders, // Apply refined CORS headers
 			...additionalHeaders,
 		},
 	});
 }
 
 /**
- * Creates a standard error response object.
+ * Creates a standard error response object with CORS headers.
  * @param message - The error message.
  * @param status - The HTTP status code (default: 500).
  * @param details - Optional additional error details.
@@ -78,5 +82,6 @@ export function errorResponse(
 		message: message,
 		...(details && { details: details }), // Include details if provided
 	};
+	// Use jsonResponse to ensure consistent header application (including CORS)
 	return jsonResponse(body, status);
 }

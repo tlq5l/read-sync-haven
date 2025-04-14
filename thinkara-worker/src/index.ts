@@ -10,7 +10,8 @@ import {
 } from "./auth";
 import { handleChat, handleSummarize } from "./handlers/api"; // Assuming these handle their own internal logic/auth for now
 import type { Env } from "./types";
-import { corsHeaders, errorResponse, jsonResponse } from "./utils";
+// Use original response helpers and refined CORS headers
+import { corsHeaders, errorResponse, jsonResponse } from "./utils"; // Corrected import
 
 // Combine Env and AuthEnv for convenience in handlers
 type AppEnv = Env & AuthEnv;
@@ -59,8 +60,11 @@ const router = Router<AuthenticatedRequest, [AppEnv, ExecutionContext]>(); // Us
 
 // --- Middleware ---
 
-// 1. CORS Preflight Handler
-router.options("*", () => new Response(null, { headers: corsHeaders }));
+// 1. CORS Preflight Handler - Respond with 204 No Content and correct CORS headers
+router.options("*", () => {
+	// Use the refined corsHeaders from utils.ts
+	return new Response(null, { status: 204, headers: corsHeaders });
+});
 
 // 2. Global Request Logger (Example)
 router.all("*", (request: IRequest, env: AppEnv, ctx: ExecutionContext) => {
@@ -75,10 +79,11 @@ router.all("*", (request: IRequest, env: AppEnv, ctx: ExecutionContext) => {
 
 // Root Endpoint
 router.get("/", () => {
+	// Use original response helper
 	return jsonResponse({
 		status: "ok",
 		message: "Thinkara Sync API is running",
-		version: "2.0.0", // Updated version for router refactor + new features
+		version: "2.0.0",
 		endpoints: [
 			"/api/webhooks/clerk",
 			"/api/summarize",
@@ -97,6 +102,7 @@ router.post(
 		const secret = env.CLERK_WEBHOOK_SECRET;
 		if (!secret) {
 			console.error("CLERK_WEBHOOK_SECRET is not set in environment.");
+			// Use original error helper
 			return errorResponse("Webhook secret configuration error", 500);
 		}
 
@@ -107,6 +113,7 @@ router.post(
 
 		if (!svix_id || !svix_timestamp || !svix_signature) {
 			console.warn("Missing svix headers for webhook verification.");
+			// Use original error helper
 			return errorResponse("Missing required webhook headers", 400);
 		}
 
@@ -126,11 +133,13 @@ router.post(
 		} catch (err: unknown) {
 			if (err instanceof WebhookVerificationError) {
 				console.error("Svix webhook verification failed:", err.message);
+				// Use original error helper
 				return errorResponse("Webhook signature verification failed", 400);
 			}
 			console.error("Error during webhook verification process:", err);
 			const message =
 				err instanceof Error ? err.message : "Unknown verification error";
+			// Use original error helper
 			return errorResponse(`Webhook verification error: ${message}`, 500);
 		}
 
@@ -171,7 +180,7 @@ router.post(
 		} else {
 			console.log(`Ignoring webhook event type: ${eventType}`);
 		}
-
+		// Use original response helper
 		return jsonResponse({ status: "success", message: "Webhook received" });
 	},
 );
@@ -185,6 +194,7 @@ router.post("/api/chat", handleChat);
 const checkDb = (env: AppEnv) => {
 	if (!env.USER_DATA_DB) {
 		console.error("USER_DATA_DB binding is not available");
+		// itty-router's error() helper automatically creates a Response
 		throw error(503, "Database service unavailable");
 	}
 };
@@ -201,24 +211,22 @@ router.get(
 			const stmt = env.USER_DATA_DB.prepare(
 				"SELECT settingsData FROM user_settings WHERE clerkUserId = ?",
 			).bind(userId);
-			// D1 stmt.first<T>() returns T | null
 			const result = await stmt.first<UserSettingsRow>();
 
 			if (result) {
-				// Check if a row was found
 				try {
-					// result is now correctly typed as UserSettingsRow
 					const settings: UserSettings = JSON.parse(result.settingsData);
+					// Use itty-router's json() helper for simple cases
 					return json({ status: "success", data: settings });
 				} catch (parseError) {
 					console.error(
 						`Failed to parse settings JSON for user ${userId}:`,
 						parseError,
 					);
+					// Use itty-router's error() helper
 					return error(500, "Failed to parse stored settings");
 				}
 			}
-			// Return empty object if no settings found yet
 			return json({ status: "success", data: {} });
 		} catch (dbError) {
 			console.error(
@@ -239,7 +247,6 @@ router.post(
 		const userId = getUserId(request);
 		let settingsData: UserSettings;
 
-		// Try parsing the JSON body first
 		try {
 			settingsData = (await request.json()) as UserSettings;
 			if (typeof settingsData !== "object" || settingsData === null) {
@@ -250,7 +257,6 @@ router.post(
 			return error(400, "Invalid JSON request body");
 		}
 
-		// If parsing succeeded, try saving to the database
 		try {
 			const settingsJson = JSON.stringify(settingsData);
 			const stmt = env.USER_DATA_DB.prepare(
@@ -258,7 +264,6 @@ router.post(
                  ON CONFLICT(clerkUserId) DO UPDATE SET settingsData = excluded.settingsData, updatedAt = CURRENT_TIMESTAMP`,
 			).bind(userId, settingsJson);
 
-			// D1 stmt.run() returns D1Result
 			const info: D1Result = await stmt.run();
 
 			if (!info.success) {
@@ -292,19 +297,15 @@ router.get(
 		const articleUrl = searchParams.get("url");
 
 		try {
-			let stmt: D1PreparedStatement; // Add type annotation
+			let stmt: D1PreparedStatement;
 			if (articleUrl) {
-				// Fetch data for a specific article URL
 				stmt = env.USER_DATA_DB.prepare(
 					"SELECT articleUrl, articleData FROM user_articles WHERE clerkUserId = ? AND articleUrl = ?",
 				).bind(userId, articleUrl);
-				// D1 stmt.first<T>() returns T | null
 				const result = await stmt.first<UserArticleRow>();
 
 				if (result) {
-					// Check if row exists
 					try {
-						// result is now UserArticleRow
 						const articleData: UserArticleData = JSON.parse(result.articleData);
 						return json({ status: "success", data: articleData });
 					} catch (parseError) {
@@ -315,23 +316,18 @@ router.get(
 						return error(500, "Failed to parse stored article data");
 					}
 				} else {
-					// Return null if specific article not found
 					return json({ status: "success", data: null });
 				}
 			} else {
-				// Fetch all article data for the user
 				stmt = env.USER_DATA_DB.prepare(
 					"SELECT articleUrl, articleData FROM user_articles WHERE clerkUserId = ?",
 				).bind(userId);
-				// D1 stmt.all<T>() returns D1Result<T>
 				const results = await stmt.all<UserArticleRow>();
 
-				// Check results.results directly
 				if (results.results) {
 					const articles = results.results
 						.map((row: UserArticleRow) => {
 							try {
-								// row is UserArticleRow here
 								const data: UserArticleData = JSON.parse(row.articleData);
 								return { url: row.articleUrl, data: data };
 							} catch (parseError) {
@@ -339,17 +335,15 @@ router.get(
 									`Failed to parse article JSON for user ${userId}, url ${row.articleUrl}:`,
 									parseError,
 								);
-								// Skip this article or return an error marker? Skipping for now.
 								return null;
 							}
 						})
 						.filter(
 							(item): item is { url: string; data: UserArticleData } =>
 								item !== null,
-						); // Filter out nulls and type guard
+						);
 					return json({ status: "success", data: articles });
 				}
-				// Return empty array if no articles found
 				return json({ status: "success", data: [] });
 			}
 		} catch (dbError) {
@@ -371,11 +365,9 @@ router.post(
 		const userId = getUserId(request);
 		let body: PostArticleRequestBody;
 
-		// Try parsing the JSON body first
 		try {
 			body = (await request.json()) as PostArticleRequestBody;
 
-			// Validate required fields after parsing
 			if (
 				typeof body !== "object" ||
 				body === null ||
@@ -393,9 +385,7 @@ router.post(
 			return error(400, "Invalid JSON request body");
 		}
 
-		// If parsing succeeded, try saving to the database
 		try {
-			// body is now correctly typed as PostArticleRequestBody
 			const { articleUrl, articleData } = body;
 			const articleDataJson = JSON.stringify(articleData);
 			const stmt = env.USER_DATA_DB.prepare(
@@ -403,7 +393,6 @@ router.post(
                  ON CONFLICT(clerkUserId, articleUrl) DO UPDATE SET articleData = excluded.articleData, updatedAt = CURRENT_TIMESTAMP`,
 			).bind(userId, articleUrl, articleDataJson);
 
-			// D1 stmt.run() returns D1Result
 			const info: D1Result = await stmt.run();
 
 			if (!info.success) {
@@ -418,7 +407,7 @@ router.post(
 			return json({ status: "success", message: "Article data updated" });
 		} catch (dbError) {
 			console.error(
-				`Database error saving article data for user ${userId}, url ${body.articleUrl}:`, // Use body.articleUrl here
+				`Database error saving article data for user ${userId}, url ${body.articleUrl}:`,
 				dbError,
 			);
 			return error(500, "Database error saving article data");
@@ -427,6 +416,7 @@ router.post(
 );
 
 // --- Catch-All for 404 ---
+// Use itty-router's error helper for consistency
 router.all("*", () => error(404, "Endpoint not found"));
 
 // --- Exported Fetch Handler ---
@@ -442,53 +432,107 @@ export default {
 				console.error(
 					"CRITICAL ERROR: CLERK_SECRET_KEY is not configured in the environment.",
 				);
+				// Use original error helper here. CORS headers will be applied by the catch block.
+				// Need to explicitly return the result of errorResponse
 				return errorResponse("Authentication system configuration error.", 500);
 			}
-			// USER_DATA_DB check happens within authenticated routes
+			// USER_DATA_DB check happens within authenticated routes that need it
 
+			// Handle requests and apply CORS headers globally to the final response
 			return await router
 				.handle(request, env, ctx)
 				.then((response: Response) => {
-					// Add CORS headers to successful responses
-					// Note: itty-router error responses might not go through here
-					if (response.status < 400) {
-						const newHeaders = new Headers(response.headers);
-						// Replace forEach with for...of
-						for (const [key, value] of Object.entries(corsHeaders)) {
-							newHeaders.set(key, value);
-						}
-						return new Response(response.body, {
-							...response,
-							headers: newHeaders,
-						});
+					// Clone the response to modify headers
+					const newHeaders = new Headers(response.headers);
+					// Apply CORS headers from utils.ts to ALL responses
+					for (const [key, value] of Object.entries(corsHeaders)) {
+						newHeaders.set(key, value);
 					}
-					return response;
+					// Return new response with original body/status but updated headers
+					return new Response(response.body, {
+						status: response.status,
+						statusText: response.statusText,
+						headers: newHeaders,
+					});
 				})
-				.catch((err: unknown) => {
-					// Add type annotation to err
-					// Catch errors thrown by handlers or middleware
-					console.error("Unhandled error caught in fetch:", err);
-					// Safely check if err is an object with a status property
-					// itty-router errors often have a .status property
-					const statusCode =
-						typeof err === "object" &&
-						err !== null &&
-						typeof (err as any).status === "number"
-							? (err as any).status
-							: 500;
-					const message =
-						err instanceof Error ? err.message : "Internal Server Error";
-					return errorResponse(message, statusCode); // Use our standard error response
+				// Make the catch callback async to allow await
+				.catch(async (err: unknown) => {
+					// Catch errors thrown by handlers or middleware (including itty-router's error())
+					console.error("Unhandled error caught by router handler:", err);
+
+					// Default error details
+					let statusCode = 500;
+					let message = "Internal Server Error";
+					let errorResp: Response; // Declare here
+
+					// Check if it's an itty-router error response (which is a Response object)
+					if (err instanceof Response) {
+						// Use the response directly, as itty-router's error() creates it
+						errorResp = err;
+						statusCode = err.status; // Update status code based on the response
+						try {
+							// Try to parse the error body if it's JSON to extract message
+							const errorBody = await err.clone().json(); // Clone before reading body
+							if (
+								typeof errorBody === "object" &&
+								errorBody !== null &&
+								"error" in errorBody && // itty-router uses 'error' key
+								typeof errorBody.error === "string"
+							) {
+								message = errorBody.error; // Use message from body if available
+							}
+							// If parsing succeeds but no 'error' key, message remains default
+						} catch {
+							// If body isn't JSON or parsing fails, message remains default
+						}
+						// Re-create the response body using the potentially extracted message
+						// This ensures the body matches the intended error structure
+						errorResp = errorResponse(message, statusCode);
+
+					} else if (err instanceof Error) {
+						// Handle standard JS Errors
+						message = err.message;
+						// Check if itty-router attached a status code
+						if (typeof (err as any).status === "number") {
+							statusCode = (err as any).status;
+						}
+						// Create a response using the original error helper
+						errorResp = errorResponse(message, statusCode);
+					} else {
+						// Fallback for non-Error, non-Response throws
+						errorResp = errorResponse(message, statusCode);
+					}
+
+					// Apply CORS headers to the final error response MANUALLY
+					const finalHeaders = new Headers(errorResp.headers);
+					for (const [key, value] of Object.entries(corsHeaders)) {
+						finalHeaders.set(key, value);
+					}
+
+					return new Response(errorResp.body, {
+						status: errorResp.status, // Use updated statusCode
+						statusText: errorResp.statusText,
+						headers: finalHeaders,
+					});
 				});
 		} catch (globalError) {
 			// Catch unexpected errors outside the router handling
 			console.error("Critical error in fetch handler:", globalError);
-			return errorResponse(
+			const message =
 				globalError instanceof Error
 					? globalError.message
-					: "Unknown critical error",
-				500,
-			);
+					: "Unknown critical error";
+			// Use original helper, apply CORS headers manually
+			const errorResp = errorResponse(message, 500);
+			const finalHeaders = new Headers(errorResp.headers);
+			for (const [key, value] of Object.entries(corsHeaders)) {
+				finalHeaders.set(key, value);
+			}
+			return new Response(errorResp.body, {
+				status: errorResp.status,
+				statusText: errorResp.statusText,
+				headers: finalHeaders,
+			});
 		}
 	},
 };

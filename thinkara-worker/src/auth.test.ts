@@ -1,26 +1,25 @@
 // thinkara-worker/src/auth.test.ts
 
 import type { ExecutionContext } from "@cloudflare/workers-types"; // Import ExecutionContext
+import type { JwtPayload } from "@clerk/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type AuthenticatedRequest, authenticateRequest } from "./auth"; // Import AuthenticatedRequest
-import type { Env } from "./types"; // Removed unused AuthResult
-import { errorResponse } from "./utils"; // Import for comparison
+// Import the function to test using standard import
+import { type AuthenticatedRequest, authenticateRequest } from "./auth";
+import type { Env } from "./types";
+import { errorResponse } from "./utils";
+// No longer importing from testSetup
 
-// Mock the Clerk backend client
-const mockAuthenticateRequest = vi.fn();
-vi.mock("@clerk/backend", () => ({
-	createClerkClient: vi.fn(() => ({
-		authenticateRequest: mockAuthenticateRequest,
-	})),
-}));
+// Declare the mock function locally for this test suite
+const mockVerifyToken = vi.fn();
 
 describe("Worker Authentication", () => {
 	let mockEnv: Env;
 	let mockRequest: AuthenticatedRequest; // Use AuthenticatedRequest type
 	let mockCtx: ExecutionContext; // Define mock context
+
 	beforeEach(() => {
-		// Reset mocks before each test
-		mockAuthenticateRequest.mockReset();
+		// Reset the local mock before each test
+		mockVerifyToken.mockReset();
 
 		// Mock ExecutionContext
 		mockCtx = {
@@ -31,10 +30,11 @@ describe("Worker Authentication", () => {
 		// Mock environment variables
 		mockEnv = {
 			CLERK_SECRET_KEY: "test_secret_key",
+			// Keep other env vars as needed by tests or other modules
 			CLERK_PUBLISHABLE_KEY: "test_pub_key",
 			CLERK_WEBHOOK_SECRET: "test_webhook_secret",
 			SAVED_ITEMS_KV: {} as KVNamespace,
-			USER_DATA_DB: {} as D1Database, // Added mock D1Database
+			USER_DATA_DB: {} as D1Database,
 			GCF_SUMMARIZE_URL: "http://example.com/summarize",
 			GCF_CHAT_URL: "http://example.com/chat",
 			GEMINI_API_KEY: "",
@@ -47,32 +47,59 @@ describe("Worker Authentication", () => {
 	});
 
 	afterEach(() => {
-		vi.restoreAllMocks();
+		// Vitest automatically handles restoring original implementations when mocks are declared with vi.fn() locally
+		// No need for vi.clearAllMocks() or vi.restoreAllMocks() here for the local mockVerifyToken
 	});
 
 	it("should return success with userId for a valid token", async () => {
 		const testUserId = "user_test_123";
-		mockAuthenticateRequest.mockResolvedValue({
-			status: "signed-in",
-			toAuth: () => ({ userId: testUserId }),
-		});
+		// Add missing required JwtPayload fields with placeholder values
+		const mockClaims: JwtPayload = {
+			__raw: "mock_raw_token", // Required placeholder
+			sid: "mock_session_id", // Required placeholder
+			sub: testUserId, // 'sub' holds the user ID
+			azp: "test_azp",
+			iss: "https://clerk.example.com",
+			nbf: Math.floor(Date.now() / 1000) - 60, // Not Before: 1 min ago
+			exp: Math.floor(Date.now() / 1000) + 3600, // Expires in 1 hour
+			iat: Math.floor(Date.now() / 1000),
+		};
+		// Configure the local mock
+		mockVerifyToken.mockResolvedValue(mockClaims);
 
 		mockRequest = new Request("http://example.com/items", {
 			headers: { Authorization: "Bearer valid_token" },
 		});
 
-		const result = await authenticateRequest(mockRequest, mockEnv, mockCtx); // Pass mockCtx
+		// Pass the local mock function as the last argument
+		const result = await authenticateRequest(
+			mockRequest,
+			mockEnv,
+			mockCtx,
+			mockVerifyToken,
+		);
 
 		// On success, middleware returns undefined and attaches auth state
 		expect(result).toBeUndefined();
 		expect(mockRequest.auth?.userId).toBe(testUserId);
-		expect(mockAuthenticateRequest).toHaveBeenCalledTimes(1);
+		expect(mockRequest.auth?.claims).toEqual(mockClaims);
+		expect(mockVerifyToken).toHaveBeenCalledTimes(1);
+		// Verify arguments passed to verifyToken
+		expect(mockVerifyToken).toHaveBeenCalledWith("valid_token", {
+			secretKey: mockEnv.CLERK_SECRET_KEY,
+		});
 	});
 
 	it("should return error response for missing Authorization header", async () => {
 		mockRequest = new Request("http://example.com/items"); // No Auth header
 
-		const result = await authenticateRequest(mockRequest, mockEnv, mockCtx); // Pass mockCtx
+		// Pass the local mock (though it won't be called)
+		const result = await authenticateRequest(
+			mockRequest,
+			mockEnv,
+			mockCtx,
+			mockVerifyToken,
+		);
 
 		// On error, middleware returns a Response
 		expect(result).toBeInstanceOf(Response);
@@ -81,7 +108,7 @@ describe("Worker Authentication", () => {
 			const body = (await result.json()) as { error?: string }; // Check error property
 			expect(body.error).toBe("Missing or invalid Authorization header"); // Match actual error
 		}
-		expect(mockAuthenticateRequest).not.toHaveBeenCalled(); // Clerk fn should not be called
+		expect(mockVerifyToken).not.toHaveBeenCalled(); // verifyToken should not be called
 	});
 
 	it("should return error response for non-Bearer token", async () => {
@@ -89,7 +116,13 @@ describe("Worker Authentication", () => {
 			headers: { Authorization: "Basic some_credentials" },
 		});
 
-		const result = await authenticateRequest(mockRequest, mockEnv, mockCtx); // Pass mockCtx
+		// Pass the local mock
+		const result = await authenticateRequest(
+			mockRequest,
+			mockEnv,
+			mockCtx,
+			mockVerifyToken,
+		);
 
 		// On error, middleware returns a Response
 		expect(result).toBeInstanceOf(Response);
@@ -98,26 +131,28 @@ describe("Worker Authentication", () => {
 			const body = (await result.json()) as { error?: string }; // Check error property
 			expect(body.error).toBe("Missing or invalid Authorization header"); // Match actual error
 		}
-		expect(mockAuthenticateRequest).not.toHaveBeenCalled(); // Clerk fn should not be called
+		expect(mockVerifyToken).not.toHaveBeenCalled(); // verifyToken should not be called
 	});
 
-	it("should return error response when Clerk authentication fails (signed-out)", async () => {
-		mockAuthenticateRequest.mockResolvedValue({
-			status: "signed-out",
-			reason: "token_expired",
-		});
+	it("should return 403 error response when Clerk token verification fails (e.g., expired)", async () => {
+		// Mock verifyToken to reject with an error simulating expiration
+		const clerkExpiredError = new Error(
+			"Token verification failed: token_expired",
+		);
+		// Configure the local mock
+		mockVerifyToken.mockRejectedValue(clerkExpiredError);
 
 		mockRequest = new Request("http://example.com/items", {
 			headers: { Authorization: "Bearer expired_token" },
 		});
 
-		// Mock the actual underlying verifyToken call behavior for this case (token expired)
-		const clerkExpiredError = new Error(
-			"Token verification failed: token_expired",
+		// Pass the local mock
+		const result = await authenticateRequest(
+			mockRequest,
+			mockEnv,
+			mockCtx,
+			mockVerifyToken,
 		);
-		mockAuthenticateRequest.mockRejectedValue(clerkExpiredError); // Use mockAuthenticateRequest used by createClerkClient mock
-
-		const result = await authenticateRequest(mockRequest, mockEnv, mockCtx); // Pass mockCtx
 
 		// On error, middleware returns a Response
 		expect(result).toBeInstanceOf(Response);
@@ -126,94 +161,96 @@ describe("Worker Authentication", () => {
 			const body = (await result.json()) as { error?: string };
 			expect(body.error).toBe("Unauthorized: Invalid token");
 		}
-		// expect(mockAuthenticateRequest).toHaveBeenCalledTimes(1); // This mock doesn't track verifyToken calls
+		expect(mockVerifyToken).toHaveBeenCalledTimes(1);
+		expect(mockVerifyToken).toHaveBeenCalledWith("expired_token", {
+			secretKey: mockEnv.CLERK_SECRET_KEY,
+		});
 	});
 
-	it("should return error response when Clerk authentication fails (handshake)", async () => {
-		mockAuthenticateRequest.mockResolvedValue({
-			status: "handshake",
-			reason: "needs_handshake",
-		});
+	// Combine other failure cases like 'handshake' into a generic verification failure test
+	it("should return 403 error response for other Clerk token verification failures", async () => {
+		const clerkVerificationError = new Error(
+			"Token verification failed: invalid_signature", // Example reason
+		);
+		// Configure the local mock
+		mockVerifyToken.mockRejectedValue(clerkVerificationError);
 
 		mockRequest = new Request("http://example.com/items", {
-			headers: { Authorization: "Bearer handshake_token" },
+			headers: { Authorization: "Bearer invalid_token" },
 		});
 
-		// Mock the actual underlying verifyToken call behavior for this case (needs handshake)
-		const clerkHandshakeError = new Error(
-			"Token verification failed: needs_handshake",
+		// Pass the local mock
+		const result = await authenticateRequest(
+			mockRequest,
+			mockEnv,
+			mockCtx,
+			mockVerifyToken,
 		);
-		mockAuthenticateRequest.mockRejectedValue(clerkHandshakeError);
 
-		const result = await authenticateRequest(mockRequest, mockEnv, mockCtx); // Pass mockCtx
-
-		// On error, middleware returns a Response
 		expect(result).toBeInstanceOf(Response);
 		if (result instanceof Response) {
-			expect(result.status).toBe(403); // Auth failure is 403
+			expect(result.status).toBe(403);
 			const body = (await result.json()) as { error?: string };
 			expect(body.error).toBe("Unauthorized: Invalid token");
 		}
-		// expect(mockAuthenticateRequest).toHaveBeenCalledTimes(1);
+		expect(mockVerifyToken).toHaveBeenCalledTimes(1);
 	});
 
-	it("should return error response when Clerk authentication succeeds but userId is missing", async () => {
-		mockAuthenticateRequest.mockResolvedValue({
-			status: "signed-in",
-			toAuth: () => ({ userId: null }), // Simulate missing userId
-		});
+	it("should succeed but have null userId when verifyToken returns claims without 'sub'", async () => {
+		// Add missing required JwtPayload fields, omit 'sub' property
+		const mockClaimsNoSub = {
+			__raw: "mock_raw_token_no_sub",
+			sid: "mock_session_id_no_sub",
+			azp: "test_azp",
+			iss: "https://clerk.example.com",
+			nbf: Math.floor(Date.now() / 1000) - 60,
+			exp: Math.floor(Date.now() / 1000) + 3600,
+			iat: Math.floor(Date.now() / 1000),
+			// 'sub' property is intentionally omitted here
+		};
+        // Cast to JwtPayload to satisfy the type checker for the mock setup,
+        // even though 'sub' is technically missing from the object itself.
+		// Configure the local mock
+		mockVerifyToken.mockResolvedValue(mockClaimsNoSub as JwtPayload);
 
 		mockRequest = new Request("http://example.com/items", {
 			headers: { Authorization: "Bearer valid_token_no_userid" },
 		});
 
-		// Mock the actual underlying verifyToken to return claims without 'sub'
-		mockAuthenticateRequest.mockResolvedValue({ azp: "test_azp" }); // Using the mockAuthenticateRequest for verifyToken mock
-
-		const result = await authenticateRequest(mockRequest, mockEnv, mockCtx); // Pass mockCtx
+		// Pass the local mock
+		const result = await authenticateRequest(
+			mockRequest,
+			mockEnv,
+			mockCtx,
+			mockVerifyToken,
+		);
 
 		// Even if claims lack 'sub', the middleware should attach what it has and return undefined
 		expect(result).toBeUndefined();
-		expect(mockRequest.auth?.userId).toBeUndefined(); // userId should be undefined
-		expect(mockRequest.auth?.claims).toEqual({ azp: "test_azp" }); // Claims should be attached
-		// expect(mockAuthenticateRequest).toHaveBeenCalledTimes(1);
+		// Check for null now due to ?? null in authenticateRequest
+		expect(mockRequest.auth?.userId).toBeNull();
+		// Assert against the object without 'sub'
+		expect(mockRequest.auth?.claims).toEqual(mockClaimsNoSub);
+		expect(mockVerifyToken).toHaveBeenCalledTimes(1);
 	});
 
-	it("should return error response when Clerk SDK throws an error", async () => {
-		// Mock the actual underlying verifyToken to throw (SDK internal error)
-		const clerkSdkError = new Error("Clerk SDK internal error"); // Declare unique error name
-		mockAuthenticateRequest.mockRejectedValue(clerkSdkError); // Use unique error name in mock setup
+	it("should return 403 error response when Clerk SDK throws an unexpected error", async () => {
+		// Mock verifyToken to throw an unexpected SDK error
+		const clerkSdkError = new Error("Clerk SDK internal error");
+		// Configure the local mock
+		mockVerifyToken.mockRejectedValue(clerkSdkError);
 
 		mockRequest = new Request("http://example.com/items", {
 			headers: { Authorization: "Bearer some_token" },
 		});
 
-		// Removed redundant mock setup block
-
-		const result = await authenticateRequest(mockRequest, mockEnv, mockCtx); // Pass mockCtx
-
-		// On error, middleware returns a Response
-		expect(result).toBeInstanceOf(Response);
-		if (result instanceof Response) {
-			expect(result.status).toBe(403); // Auth failure is 403
-			const body = (await result.json()) as { error?: string };
-			expect(body.error).toBe("Unauthorized: Invalid token"); // Generic message
-		}
-		// expect(mockAuthenticateRequest).toHaveBeenCalledTimes(1);
-	});
-
-	it("should return specific error for header-related Clerk SDK errors", async () => {
-		// Mock the actual underlying verifyToken to throw (simulate header structure issue)
-		const clerkHeaderError = new Error("Invalid header structure detected"); // Declare unique error name
-		mockAuthenticateRequest.mockRejectedValue(clerkHeaderError); // Use unique error name in mock setup
-
-		mockRequest = new Request("http://example.com/items", {
-			headers: { Authorization: "Bearer some_token" }, // Assume token is fine, but SDK has header issue
-		});
-
-		// Removed redundant mock setup block
-
-		const result = await authenticateRequest(mockRequest, mockEnv, mockCtx); // Pass mockCtx
+		// Pass the local mock
+		const result = await authenticateRequest(
+			mockRequest,
+			mockEnv,
+			mockCtx,
+			mockVerifyToken,
+		);
 
 		// On error, middleware returns a Response
 		expect(result).toBeInstanceOf(Response);
@@ -222,6 +259,8 @@ describe("Worker Authentication", () => {
 			const body = (await result.json()) as { error?: string };
 			expect(body.error).toBe("Unauthorized: Invalid token"); // Generic message
 		}
-		// expect(mockAuthenticateRequest).toHaveBeenCalledTimes(1);
+		expect(mockVerifyToken).toHaveBeenCalledTimes(1);
 	});
+
+	// Removed redundant header-related error test, covered by generic failure cases
 });

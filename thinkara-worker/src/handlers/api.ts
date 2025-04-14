@@ -1,6 +1,6 @@
 // thinkara-worker/src/handlers/api.ts
 
-import { authenticateRequestWithClerk } from "../auth"; // Import auth function
+import { authenticateRequest, AuthenticatedRequest } from "../auth"; // Import corrected auth function and type
 import type { Env } from "../types";
 import { errorResponse, jsonResponse } from "../utils";
 
@@ -8,7 +8,7 @@ import { errorResponse, jsonResponse } from "../utils";
  * Handles POST /api/summarize requests.
  */
 export async function handleSummarize(
-	request: Request,
+	request: AuthenticatedRequest, // Use AuthenticatedRequest type
 	env: Env,
 ): Promise<Response> {
 	console.log("Processing /api/summarize request...");
@@ -17,9 +17,12 @@ export async function handleSummarize(
 		JSON.stringify(Object.keys(env)),
 	); // Log keys to check presence
 	try {
-		// Authentication is required
-		const authResult = await authenticateRequestWithClerk(request, env);
-		if (authResult.status === "error") return authResult.response;
+		// Authentication is required - authenticateRequest returns Response on failure, undefined on success
+		const authFailureResponse = await authenticateRequest(request, env, {} as any); // Pass dummy context
+		if (authFailureResponse instanceof Response) {
+			return authFailureResponse; // Return failure response directly
+		}
+		// If undefined, auth succeeded, proceed. User ID is in request.auth.userId
 
 		const gcfUrl = env.GCF_SUMMARIZE_URL;
 		if (!gcfUrl)
@@ -89,15 +92,18 @@ export async function handleSummarize(
  * Handles POST /api/chat requests.
  */
 export async function handleChat(
-	request: Request,
+	request: AuthenticatedRequest, // Use AuthenticatedRequest type
 	env: Env,
 ): Promise<Response> {
 	console.log("Processing /api/chat request...");
 	console.log("[handleChat] Received env:", JSON.stringify(Object.keys(env))); // Log keys to check presence
 	try {
-		// Authentication is required
-		const authResult = await authenticateRequestWithClerk(request, env);
-		if (authResult.status === "error") return authResult.response;
+		// Authentication is required - authenticateRequest returns Response on failure, undefined on success
+		const authFailureResponse = await authenticateRequest(request, env, {} as any); // Pass dummy context
+		if (authFailureResponse instanceof Response) {
+			return authFailureResponse; // Return failure response directly
+		}
+		// If undefined, auth succeeded, proceed. User ID is in request.auth.userId
 
 		const gcfChatUrl = env.GCF_CHAT_URL;
 		if (!gcfChatUrl)

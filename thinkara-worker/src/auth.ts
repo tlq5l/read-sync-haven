@@ -1,4 +1,4 @@
-import { verifyToken } from "@clerk/backend"; // Use verifyToken directly
+import { verifyToken as clerkVerifyToken } from "@clerk/backend"; // Use verifyToken directly, rename import
 import type { JwtPayload } from "@clerk/types";
 // No need to import from itty-router if extending the standard Request
 import type { ExecutionContext } from "@cloudflare/workers-types";
@@ -23,16 +23,21 @@ export interface AuthenticatedRequest extends Request {
 	auth?: RequestAuthState;
 }
 
-// Removed unused ClerkClient/getClerkClient code block
+// Define the signature for the verifyToken function for easier mocking/injection
+type VerifyTokenFn = typeof clerkVerifyToken;
+
 /**
  * Middleware to authenticate requests using Clerk JWT.
  * Verifies the Bearer token and attaches auth state to the request.
  * Returns a Response object for auth failures, otherwise allows execution to continue.
+ * Accepts an optional verifyTokenFn for testing purposes.
  */
 export const authenticateRequest = async (
 	request: AuthenticatedRequest,
 	env: AuthEnv,
 	_ctx: ExecutionContext, // Use _ctx if ctx is not needed to avoid unused var linting
+	// Optional parameter for dependency injection during testing
+	verifyTokenFn: VerifyTokenFn = clerkVerifyToken,
 ): Promise<Response | undefined> => {
 	// Replace void with undefined
 	const authorizationHeader = request.headers.get("Authorization");
@@ -54,8 +59,8 @@ export const authenticateRequest = async (
 			console.error("Missing CLERK_SECRET_KEY in authenticateRequest env.");
 			throw new Error("Authentication configuration error.");
 		}
-		// Call verifyToken directly, providing the secret key
-		const claims: JwtPayload = await verifyToken(token, {
+		// Use the provided (or default) verifyToken function
+		const claims: JwtPayload = await verifyTokenFn(token, {
 			secretKey: env.CLERK_SECRET_KEY,
 			// issuer: env.CLERK_ISSUER, // Add issuer if needed
 			// other options...
@@ -66,10 +71,10 @@ export const authenticateRequest = async (
 		// Attach claims and userId to the request object
 		request.auth = {
 			claims: claims,
-			userId: claims.sub,
+			userId: claims.sub ?? null, // Handle potentially missing sub claim gracefully
 		};
 
-		// In itty-router, returning void (or nothing) allows the middleware chain to continue
+		// In itty-router, returning void/undefined allows the middleware chain to continue
 	} catch (error: any) {
 		console.error("Clerk token verification failed:", error.message || error);
 		// Provide a generic error message to the client
@@ -81,6 +86,8 @@ export const authenticateRequest = async (
 			},
 		);
 	}
+	// Return undefined explicitly if successful
+	return undefined;
 };
 
 /**
