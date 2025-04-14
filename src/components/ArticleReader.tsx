@@ -70,7 +70,7 @@ export default function ArticleReader() {
 		isUpdating: isUpdatingHistory, // New state for background updates
 		error: historyError,
 	} = useChatHistory(id || null);
-	const { apiConfig, setApiConfig, availableProviders } = useApiConfig();
+	const { apiConfig, setApiConfig /*, availableProviders */ } = useApiConfig(); // availableProviders is unused
 
 	// --- Integrate Chat and History ---
 	// Prepare props for useChat hook
@@ -595,7 +595,7 @@ export default function ArticleReader() {
 							<ApiConfigurator
 								apiConfig={apiConfig}
 								setApiConfig={setApiConfig}
-								availableProviders={availableProviders}
+								// availableProviders={availableProviders} // Prop removed from ApiConfigurator
 							/>
 						</TabsContent>
 					</Tabs>
