@@ -255,14 +255,7 @@ export default function ArticleReader() {
 				onToggleFullscreen={toggleFullscreen}
 				onToggleSidebar={toggleSidebar}
 			/>
-			{/* API Configurator Section */}
-			<div className="p-2 border-b border-border">
-				<ApiConfigurator
-					apiConfig={apiConfig}
-					setApiConfig={setApiConfig}
-					availableProviders={availableProviders}
-				/>
-			</div>
+			{/* API Configurator Section Removed - Moved to Sidebar */}
 
 			{/* Content Display Area */}
 			<ReaderContentDisplay
@@ -290,10 +283,14 @@ export default function ArticleReader() {
 					>
 						{" "}
 						{/* Added flex-1 flex flex-col */}
-						<TabsList className="grid w-full grid-cols-3">
+						<TabsList className="grid w-full grid-cols-4">
+							{" "}
+							{/* Updated to 4 columns */}
 							<TabsTrigger value="summary">Summary</TabsTrigger>
 							<TabsTrigger value="chat">Chat</TabsTrigger>
 							<TabsTrigger value="history">History</TabsTrigger>
+							<TabsTrigger value="settings">AI Settings</TabsTrigger>{" "}
+							{/* Added Settings Tab */}
 						</TabsList>
 						{/* Summary Tab */}
 						<TabsContent
@@ -589,6 +586,17 @@ export default function ArticleReader() {
 									</p>
 								)}
 							</div>
+						</TabsContent>
+						{/* AI Settings Tab */}
+						<TabsContent
+							value="settings"
+							className="mt-4 space-y-4 flex-1 overflow-y-auto p-1" // Added styling
+						>
+							<ApiConfigurator
+								apiConfig={apiConfig}
+								setApiConfig={setApiConfig}
+								availableProviders={availableProviders}
+							/>
 						</TabsContent>
 					</Tabs>
 				</SheetContent>
