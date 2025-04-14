@@ -59,7 +59,6 @@ export function useSummarize() {
 						stream: true, // <<< Enable streaming
 						// Add other parameters like max_tokens if needed
 					});
-					console.log("Custom API Payload:", requestBody); // Log the payload
 
 					response = await fetch(apiUrl, {
 						method: "POST",
