@@ -39,6 +39,11 @@ import {
 // import React, { useState } from "react"; // Removed unused React/useState
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+/**
+ * Renders a collapsible sidebar navigation panel with animated transitions and authentication-aware controls.
+ *
+ * The sidebar provides navigation links for Home, Library, Settings, and authentication actions. It adapts its layout and content based on the collapsed state and user authentication status, and synchronizes its open/close animation with the rest of the application.
+ */
 export default function Sidebar() {
 	// const [collapsed, setCollapsed] = useState(false); // Replaced with context state
 	const { isSidebarCollapsed: collapsed, toggleSidebar } = useKeyboard(); // Use context state and toggle

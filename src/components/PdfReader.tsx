@@ -35,9 +35,10 @@ interface PdfProcessorProps {
 }
 
 /**
- * Processes a PDF file from base64 data, extracts text content,
- * formats it as simple HTML, and calls back with the result.
- * This component does not render the PDF content itself visually.
+ * Processes a base64-encoded PDF file, extracts its text content, formats it into simple HTML paragraphs, and invokes a callback with the result.
+ *
+ * @remark
+ * If the PDF is password-protected or invalid, the callback is invoked with `null` and an error message is displayed. The component does not render the PDF content itself.
  */
 export default function PdfProcessor({
 	fileData,

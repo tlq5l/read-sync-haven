@@ -26,6 +26,18 @@ interface ApiConfiguratorProps {
 	// availableProviders: string[]; // Currently unused
 }
 
+/**
+ * Renders a form for configuring AI provider API settings and allows users to save changes.
+ *
+ * The form includes fields for API key, endpoint, and model, with local state synchronized to the provided configuration. When the user saves, the updated configuration is passed to the parent via the provided setter.
+ *
+ * @param apiConfig - The current API configuration, or null if not set.
+ * @param setApiConfig - Callback to update the API configuration.
+ *
+ * @returns A React component displaying the configuration form.
+ *
+ * @remark Provider selection is not currently implemented; the form assumes a single provider setup.
+ */
 export function ApiConfigurator({
 	apiConfig,
 	setApiConfig,

@@ -21,6 +21,11 @@ import {
 import { useEffect, useRef, useState } from "react"; // Removed unused useMemo import
 import { Link } from "react-router-dom";
 
+/**
+ * Displays the inbox view with a virtualized, filterable list of articles and handles loading, error, and empty states.
+ *
+ * Renders a top bar, manages search and filter state, and conditionally displays loading indicators, error messages, empty states, or a virtualized grid of inbox articles. Integrates animation synchronization and debounced search input.
+ */
 export default function InboxPage() {
 	const {
 		articles, // Raw articles for deriving filter options

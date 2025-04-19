@@ -26,8 +26,20 @@ interface ChatHistoryProps {
 }
 
 /**
- * Custom hook to manage chat interactions related to article content.
- * Integrates with useChatHistory for persistence.
+ * React hook for managing chat interactions tied to article content, integrating with persistent chat history and supporting both streaming and non-streaming AI responses.
+ *
+ * Synchronizes the active chat UI with historical messages, handles user message submission, manages chat sessions, communicates with backend APIs, updates UI optimistically, and maintains scroll position. Supports custom OpenAI-compatible endpoints and fallback proxy, with robust error handling and incremental UI updates for streaming responses.
+ *
+ * @param fullTextContent - The article content to provide context for the chat, or null if unavailable.
+ * @param historyProps - Chat history management functions and state, including session and message persistence.
+ * @param onChatSettled - Optional callback invoked after each chat interaction settles.
+ * @returns An object containing the active chat history, input state, error state, chat status, submit handler, and scroll area ref.
+ *
+ * @throws {Error} If article content is missing, the user message is empty, the article ID is missing, authentication fails, or the backend returns an error.
+ *
+ * @remark
+ * - If a custom API key and endpoint are configured in localStorage, the hook uses a streaming OpenAI-compatible API; otherwise, it falls back to a non-streaming proxy.
+ * - Errors during message persistence are logged and reflected in the UI but do not interrupt the chat flow.
  */
 export function useChat(
 	fullTextContent: string | null,

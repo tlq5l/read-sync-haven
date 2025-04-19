@@ -25,7 +25,14 @@ const sortArticlesBySavedAt = (articles: Article[]): Article[] => {
 	return [...articles].sort((a, b) => (b.savedAt ?? 0) - (a.savedAt ?? 0));
 };
 
-// --- Main Hook - Refactored for Local Dexie Storage ---
+/**
+ * React hook for synchronizing and reactively querying articles from a local Dexie (IndexedDB) database.
+ *
+ * Provides mapped and sorted articles, loading and error states, manual refresh and retry functions, and a sync status indicator. Automatically updates articles in response to database changes.
+ *
+ * @param isDbInitialized - Indicates whether the Dexie database is ready for queries.
+ * @returns An object containing the current articles, loading and error states, refresh and retry functions, and a sync status string.
+ */
 export function useArticleSync(
 	isDbInitialized: boolean, // Keep dependency on DB initialization
 	// Remove hidingArticleIds - optimistic updates handled differently or in ArticleContext

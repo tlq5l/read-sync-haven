@@ -22,7 +22,13 @@ interface ApiResponse {
 	[key: string]: any; // For any other properties
 }
 
-// Function to get or prompt for user ID
+/**
+ * Retrieves the stored user ID (email) from local Chrome storage, or prompts the user to set it if missing.
+ *
+ * If the user ID is not found, displays a notification prompting the user to complete setup and opens the options page when the notification button is clicked.
+ *
+ * @returns The user ID string if available, otherwise `null`.
+ */
 async function getUserId(): Promise<string | null> {
 	// Try to get stored user ID
 	const result = await chrome.storage.local.get(["userId"]);
@@ -53,7 +59,13 @@ async function getUserId(): Promise<string | null> {
 	return null;
 }
 
-// Function to get or generate authentication token
+/**
+ * Retrieves a valid authentication token for API requests, generating and storing a new one if necessary.
+ *
+ * If a valid token exists in local storage and has not expired, it is returned. Otherwise, a new token is generated using the user's email, the current timestamp, and a shared secret, then stored with a 24-hour expiry.
+ *
+ * @returns The authentication token as a string, or `null` if the user ID is not set.
+ */
 async function getAuthToken(): Promise<string | null> {
 	// First check if we have a valid stored token
 	const storedToken = await chrome.storage.local.get([

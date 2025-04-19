@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Custom hook to get the previous value of a prop or state.
- * @param value The value to track
- * @returns The previous value
+ * Returns the previous value of a prop or state across renders.
+ *
+ * @param value - The current value to track.
+ * @returns The value from the previous render, or `undefined` on the initial render.
  */
 export function usePrevious<T>(value: T): T | undefined {
 	const ref = useRef<T>();

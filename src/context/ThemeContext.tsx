@@ -20,6 +20,15 @@ const initialState: ThemeProviderState = {
 
 const ThemeContext = createContext<ThemeProviderState>(initialState);
 
+/**
+ * Provides theme context to child components, managing dark, light, and system themes with persistence in localStorage.
+ *
+ * Wraps its children with a context that supplies the current theme and a setter function. The theme is initialized from localStorage if available and valid, or falls back to the provided default. Updates to the theme are reflected in the document's root element and persisted for future sessions.
+ *
+ * @param children - React nodes to receive theme context.
+ * @param defaultTheme - Theme to use if no valid value is found in localStorage. Defaults to "system".
+ * @param storageKey - Key used for storing the theme in localStorage. Defaults to "thinkara-ui-theme".
+ */
 export function ThemeProvider({
 	children,
 	defaultTheme = "system",

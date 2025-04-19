@@ -12,6 +12,18 @@ interface FileUploadProps {
 	maxSize?: number; // in bytes
 }
 
+/**
+ * React component for uploading files via drag-and-drop or file browser selection.
+ *
+ * Renders a styled upload area that allows users to select a file by dragging it onto the drop zone or by clicking to browse. Validates the selected file against accepted extensions and maximum size, displays errors if validation fails, and shows the selected file with an option to remove it.
+ *
+ * @param onFileSelect - Callback invoked with the selected file if it passes validation.
+ * @param isUploading - Optional flag to disable input and removal actions during upload.
+ * @param accept - Comma-separated list of accepted file extensions (default: ".epub").
+ * @param maxSize - Maximum allowed file size in bytes (default: 150MB).
+ *
+ * @returns The file upload UI component.
+ */
 export default function FileUpload({
 	onFileSelect,
 	isUploading = false,

@@ -2,10 +2,13 @@ import type { Article } from "@/services/db/types"; // Updated path
 import type { ArticleFilters, SortCriteria } from "@/types/articles";
 
 /**
- * Filters an array of articles based on the provided criteria.
- * @param articles - The array of articles to filter.
- * @param filters - The filtering criteria.
- * @returns A new array containing only the articles that match the filters.
+ * Returns a new array of articles that match all specified filter criteria.
+ *
+ * Filters include search query (matching title, excerpt, or site name), site names, types, tags (at least one must match), and category.
+ *
+ * @param articles - The articles to filter.
+ * @param filters - Criteria specifying which articles to include.
+ * @returns Articles that satisfy all provided filters.
  */
 export function filterArticles(
 	articles: Article[],

@@ -22,15 +22,14 @@ const inferCategoryFromType = (type: Article["type"]): ArticleCategory => {
 };
 
 /**
- * Saves a new article or updates an existing one.
- * Assumes necessary fields like siteName and estimatedReadTime are pre-calculated.
- * Handles conflicts by fetching the latest revision and retrying.
+ * Saves a new article or updates an existing one in the database, handling versioning and conflict resolution.
  *
- * @param article - The article data to save. Must include all required fields.
- *                  If updating, provide `_id` and the latest `_rev`.
- *                  If creating, `_id` can be omitted (will be generated).
+ * If the article does not have an `_id`, a new one is generated. Essential fields (`title`, `url`, `content`) must be present or an error is thrown. On update, the version is incremented and any `deletedAt` flag is cleared. If a conflict occurs, the function compares version numbers and applies the newer version, retrying the save as needed.
+ *
+ * @param article - The article data to save. If updating, must include `_id` and latest `_rev`.
  * @returns The saved or updated article document with its latest revision.
- * @throws Error if saving fails after retries.
+ *
+ * @throws {Error} If essential fields are missing, or if saving fails after conflict resolution and retries.
  */
 export async function saveArticle(
 	article: Omit<Article, "_id" | "_rev"> & { _id?: string; _rev?: string },
@@ -180,15 +179,14 @@ export async function saveArticle(
 }
 
 /**
- * Saves multiple articles in bulk. Handles both creating new articles and updating existing ones.
- * Fetches existing documents first to handle conflicts and merge data.
- * Checks for existing articles with the same URL to prevent duplicates.
+ * Saves multiple articles to the database in a single bulk operation, handling both new articles and updates to existing ones.
  *
- * @param articlesToSave - An array of article objects to save.
- * @returns A promise resolving to an array of results, one for each input article.
- *          Success results contain { ok: true, id: string, rev: string }.
- *          Error results contain { error: true, id: string, message: string, name?: string, status?: number }.
- * @throws Error if the bulk operation itself fails unexpectedly.
+ * For each article, validates essential fields and prepares the document with default values. Existing articles are merged using version comparison: if the incoming version is newer or equal, incoming changes are applied; otherwise, the local version is kept. Soft-deleted articles are restored on save.
+ *
+ * @param articlesToSave - Array of articles to save or update.
+ * @returns An array of results for each article, containing either a success response or an error object.
+ *
+ * @throws Error if the underlying bulk database operation fails.
  */
 export async function bulkSaveArticles(
 	articlesToSave: (Omit<Article, "_id" | "_rev"> & {
@@ -333,9 +331,7 @@ export async function bulkSaveArticles(
 
 			// Log errors from the response
 			const errors = response.filter(
-				(
-					res: PouchDB.Core.Response | PouchDB.Core.Error,
-				): res is PouchDB.Core.Error => "error" in res && !!res.error,
+				(res): res is PouchDB.Core.Error => "error" in res && !!res.error,
 			);
 			if (errors.length > 0) {
 				console.error(
@@ -381,13 +377,14 @@ export async function getArticle(id: string): Promise<Article | null> {
 }
 
 /**
- * Updates specific fields of an existing article.
- * Requires the article's _id and latest _rev.
- * Fetches the current document first to ensure updates are applied correctly.
+ * Updates an existing article with the specified fields and increments its version.
  *
- * @param articleUpdate - An object containing the _id, _rev, and fields to update.
- * @returns The fully updated article document with the new revision.
- * @throws Error if the update fails (e.g., conflict, document not found).
+ * Merges the provided updates onto the current article, infers the category if needed, clears any soft deletion, and saves the changes as a new revision.
+ *
+ * @param articleUpdate - The partial article fields to update, including the required `_id` and `_rev`.
+ * @returns The updated article document with the new revision.
+ *
+ * @throws {Error} If the update fails due to a conflict, missing document, or other database error.
  */
 export async function updateArticle(
 	articleUpdate: Partial<Article> & { _id: string; _rev: string },
@@ -449,11 +446,12 @@ export async function updateArticle(
 }
 
 /**
- * Soft deletes an article locally and queues the delete operation for cloud sync.
+ * Marks an article as deleted by setting its `deletedAt` timestamp and queues the deletion for cloud synchronization.
  *
- * @param id - The _id of the article to soft delete.
- * @returns True if soft deletion and queuing were successful, false otherwise.
- * @throws Error if fetching the article or saving the soft delete fails.
+ * @param id - The unique identifier of the article to soft delete.
+ * @returns True if the article was found, soft deleted, and the delete operation was queued; false if the article does not exist.
+ *
+ * @throws {Error} If an error occurs while fetching or updating the article, or while queuing the delete operation.
  */
 export async function deleteArticle(id: string): Promise<boolean> {
 	console.log(`Attempting to soft delete article ${id} locally...`);
@@ -505,19 +503,12 @@ export async function deleteArticle(id: string): Promise<boolean> {
 }
 
 /**
- * Retrieves all articles, optionally filtered and sorted.
- * Prefers using `allDocs` for reliability and filters/sorts in memory.
+ * Retrieves all articles from the database with optional filtering, sorting, and pagination.
  *
- * @param options - Optional filtering and sorting parameters.
- * @param options.limit - Max number of articles to return.
- * @param options.skip - Number of articles to skip (for pagination).
- * @param options.isRead - Filter by read status.
- * @param options.favorite - Filter by favorite status.
- * @param options.tag - Filter by a specific tag ID.
- * @param options.sortBy - Field to sort by ('savedAt', 'title', 'readAt'). Defaults to 'savedAt'.
- * @param options.sortDirection - Sort direction ('asc' or 'desc'). Defaults to 'desc'.
- * @param options.userIds - Filter by one or more user IDs. If provided, only articles matching these IDs are returned.
- * @returns A promise resolving to an array of Article documents. Returns empty array on error.
+ * Applies in-memory filters for user IDs, read status, favorite status, tags, and soft-deleted articles. Supports sorting by `savedAt`, `title`, `readAt`, or `version`, and paginates results based on provided options.
+ *
+ * @param options - Filtering, sorting, and pagination options.
+ * @returns A promise that resolves to an array of articles matching the specified criteria, or an empty array if an error occurs.
  */
 export async function getAllArticles(
 	// Corrected signature: Parameter is non-optional but has a default value
@@ -546,14 +537,8 @@ export async function getAllArticles(
 			// Since include_docs: true guarantees _rev for existing docs, we can filter and cast.
 			// We filter out rows where the doc is missing (e.g., deleted docs).
 			let articles: Article[] = allDocsResponse.rows
-				.filter(
-					(row: PouchDB.Core.AllDocsResponse<Article>["rows"][number]) =>
-						!!row.doc,
-				) // Ensure the document exists for the row
-				.map(
-					(row: PouchDB.Core.AllDocsResponse<Article>["rows"][number]) =>
-						row.doc as Article,
-				); // Map to the doc and cast to Article
+				.filter((row) => !!row.doc) // Ensure the document exists for the row
+				.map((row) => row.doc as Article); // Map to the doc and cast to Article
 
 			console.log(
 				`Retrieved ${articles.length} total articles. Applying filters...`,

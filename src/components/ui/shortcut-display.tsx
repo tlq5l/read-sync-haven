@@ -15,6 +15,18 @@ interface ShortcutItemProps {
 	onChange?: (updatedShortcut: Shortcut) => void; // Added prop
 }
 
+/**
+ * Displays a single shortcut action with its associated keys and allows editing of shortcut keys.
+ *
+ * When editing is enabled, users can add new shortcut keys by capturing keyboard input or remove existing keys (except the last one). Changes are propagated via the {@link onChange} callback.
+ *
+ * @param shortcut - The shortcut action and its keys to display and edit.
+ * @param isEditing - Enables editing controls for adding or removing shortcut keys.
+ * @param onChange - Callback invoked with the updated shortcut when keys are added or removed.
+ *
+ * @remark
+ * Only one shortcut key can be removed at a time, and the last remaining key cannot be deleted.
+ */
 export function ShortcutItem({
 	shortcut,
 	isEditing = false,
@@ -174,6 +186,17 @@ interface ShortcutCategoryProps {
 	onShortcutChange?: (updatedShortcut: Shortcut) => void; // Added prop
 }
 
+/**
+ * Displays a category of keyboard shortcuts with optional editing capabilities.
+ *
+ * Renders the category title, description, and a list of shortcut items. If editing is enabled, allows shortcut keys within the category to be modified via provided handlers.
+ *
+ * @param title - The title of the shortcut category.
+ * @param description - A brief description of the category.
+ * @param shortcuts - The list of shortcuts belonging to this category.
+ * @param isEditing - If true, enables editing controls for the shortcuts.
+ * @param onShortcutChange - Callback invoked when a shortcut in the category is updated.
+ */
 export function ShortcutCategory({
 	title,
 	description,
@@ -208,6 +231,14 @@ interface ShortcutDisplayProps {
 	onShortcutChange?: (updatedShortcut: Shortcut) => void; // Added prop
 }
 
+/**
+ * Displays a grouped list of keyboard shortcuts by category, with optional editing capabilities.
+ *
+ * @param shortcuts - The array of shortcut definitions to display and manage.
+ * @param className - Optional additional CSS classes for the container.
+ * @param isEditing - If true, enables editing mode for adding or removing shortcut keys.
+ * @param onShortcutChange - Optional callback invoked when a shortcut is updated.
+ */
 export function ShortcutDisplay({
 	shortcuts,
 	className,

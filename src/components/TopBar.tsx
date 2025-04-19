@@ -12,7 +12,11 @@ import type { ArticleSortField } from "@/types/articles";
 import { ArrowDownUp, WifiOff } from "lucide-react"; // Added WifiOff icon
 import { Link, useLocation } from "react-router-dom";
 
-// Removed unused getSortLabel function
+/**
+ * Renders the top navigation bar with navigation links, sync status, and sorting controls.
+ *
+ * The bar includes navigation buttons for "Inbox," "Later," and "Archive," a center indicator for offline status, and controls for sorting articles by various fields and directions.
+ */
 
 export default function TopBar() {
 	const {

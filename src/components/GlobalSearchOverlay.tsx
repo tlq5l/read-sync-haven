@@ -12,7 +12,15 @@ interface GlobalSearchOverlayProps {
 	onClose: () => void;
 }
 
-// Simple fuzzy matching helper function (copied from SearchPage)
+/**
+ * Determines whether the query matches the text using simple fuzzy matching.
+ *
+ * Returns `true` if the query is a substring of the text (case-insensitive), or if all characters of the query appear in order within the text for queries longer than two characters. Returns `false` if the query is empty or contains only whitespace.
+ *
+ * @param text - The text to search within.
+ * @param query - The search query to match.
+ * @returns Whether the query matches the text according to fuzzy matching rules.
+ */
 function fuzzyMatch(text: string, query: string): boolean {
 	if (!query.trim()) return false;
 	const lowerText = text.toLowerCase();
@@ -28,6 +36,14 @@ function fuzzyMatch(text: string, query: string): boolean {
 	return queryIndex === lowerQuery.length;
 }
 
+/**
+ * Displays a full-screen modal overlay for searching articles with fuzzy matching.
+ *
+ * Shows a search input and dynamically filters articles by title, excerpt, content, author, or site name as the user types. Results are limited to 10 and displayed in a scrollable list. The overlay closes when clicking outside, pressing Escape, or selecting a result.
+ *
+ * @param isOpen - Whether the overlay is visible.
+ * @param onClose - Callback to close the overlay.
+ */
 export default function GlobalSearchOverlay({
 	isOpen,
 	onClose,

@@ -8,6 +8,11 @@ import { Outlet } from "react-router-dom";
 import OfflineIndicator from "./OfflineIndicator";
 import Sidebar from "./Sidebar";
 
+/**
+ * Renders the main application layout with sidebar navigation, animated route transitions, and an offline status indicator.
+ *
+ * The layout triggers page transition animations after each route change and displays nested routes via {@link Outlet}.
+ */
 export default function Layout() {
 	// Removed useOffline hook call
 	const { animateAll } = useAnimation();

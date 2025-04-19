@@ -16,9 +16,14 @@ const mapDexieToArticleLocal = (
 };
 
 /**
- * Custom hook to fetch and manage article data.
- * @param id The ID of the article to fetch.
- * @returns An object containing the article data, loading state, and error state.
+ * React hook for fetching and managing a single article's data from the Dexie.js database.
+ *
+ * Returns the current article, loading status, error message (if any), and a setter for locally updating the article state.
+ *
+ * @param id - The ID of the article to fetch, or undefined to skip fetching.
+ * @returns An object with `article`, `loading`, `error`, and `setArticle` for local state updates.
+ *
+ * @remark If no article is found for the given ID, `article` will be null and `error` will be set.
  */
 export function useArticleData(id: string | undefined) {
 	const [article, setArticle] = useState<Article | null>(null);
