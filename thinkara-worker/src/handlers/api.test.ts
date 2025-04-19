@@ -1,10 +1,10 @@
 // thinkara-worker/src/handlers/api.test.ts
 
+import type { JwtPayload } from "@clerk/types"; // Import JwtPayload from correct path
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as auth from "../auth"; // Import the auth module to mock it
-import type { Env } from "../types";
 import type { RequestAuthState } from "../auth"; // Import RequestAuthState from correct path
-import type { JwtPayload } from "@clerk/types"; // Import JwtPayload from correct path
+import type { Env } from "../types";
 import { handleChat, handleSummarize } from "./api";
 
 // Spy on global.fetch for worker tests

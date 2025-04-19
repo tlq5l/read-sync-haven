@@ -1,11 +1,23 @@
 // thinkara-worker/src/index.test.ts
 
-import type { ExecutionContext, KVNamespace, Request as CfRequest } from "@cloudflare/workers-types";
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import type {
+	Request as CfRequest,
+	ExecutionContext,
+	KVNamespace,
+} from "@cloudflare/workers-types";
+import {
+	type MockInstance,
+	afterEach,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 // Import the *actual* auth module
 import * as auth from "./auth";
 // Import necessary types for the spy signature (excluding VerifyTokenFn)
-import type { AuthenticatedRequest, AuthEnv } from "./auth";
+import type { AuthEnv, AuthenticatedRequest } from "./auth";
 import worker from "./index";
 import type { Env, WorkerArticle } from "./types";
 import { createUserItemKey } from "./utils";
@@ -13,23 +25,30 @@ import { createUserItemKey } from "./utils";
 
 // Type for the authenticateRequest function signature (omitting VerifyTokenFn)
 type AuthenticateRequestFn = (
-    request: AuthenticatedRequest,
-    env: AuthEnv,
-    _ctx: ExecutionContext
+	request: AuthenticatedRequest,
+	env: AuthEnv,
+	_ctx: ExecutionContext,
 ) => Promise<Response | undefined>;
-
 
 // Mock KV Namespace for tests
 class MockKVNamespace {
 	private store = new Map<string, string>();
-	async get(key: string) { return this.store.get(key) || null; }
-	async put(key: string, value: string) { this.store.set(key, value); }
-	async delete(key: string) { this.store.delete(key); }
+	async get(key: string) {
+		return this.store.get(key) || null;
+	}
+	async put(key: string, value: string) {
+		this.store.set(key, value);
+	}
+	async delete(key: string) {
+		this.store.delete(key);
+	}
 	async list(options?: { prefix?: string }) {
 		const keys = [];
 		const prefix = options?.prefix || "";
 		for (const key of this.store.keys()) {
-			if (key.startsWith(prefix)) { keys.push({ name: key }); }
+			if (key.startsWith(prefix)) {
+				keys.push({ name: key });
+			}
 		}
 		return { keys, list_complete: true, cursor: undefined };
 	}
@@ -42,18 +61,30 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 	let authSpy: MockInstance<AuthenticateRequestFn>;
 
 	const testUserId = "user_integration_789";
-	const testAuthContext = { userId: testUserId, claims: { /* Add claims if needed */ } };
+	const testAuthContext = {
+		userId: testUserId,
+		claims: {
+			/* Add claims if needed */
+		},
+	};
 	const testArticleId = "article_integ_1";
 	const testArticle: WorkerArticle = {
-		_id: testArticleId, userId: testUserId, url: "http://integration.test/1",
-		title: "Integration Test Article", type: "article", savedAt: Date.now(),
-		isRead: false, favorite: false, siteName: "Integration",
-		estimatedReadTime: 2, content: "<h1>Integration Test Content</h1><p>More text.</p>",
+		_id: testArticleId,
+		userId: testUserId,
+		url: "http://integration.test/1",
+		title: "Integration Test Article",
+		type: "article",
+		savedAt: Date.now(),
+		isRead: false,
+		favorite: false,
+		siteName: "Integration",
+		estimatedReadTime: 2,
+		content: "<h1>Integration Test Content</h1><p>More text.</p>",
 	};
 
 	// Helper using vi.spyOn().mockImplementationOnce()
 	const mockSuccessfulAuth = () => {
-        // Implementation must match the (simplified) AuthenticateRequestFn signature
+		// Implementation must match the (simplified) AuthenticateRequestFn signature
 		authSpy.mockImplementationOnce(async (request /*, env, _ctx */) => {
 			Object.assign(request, { auth: testAuthContext });
 			return undefined;
@@ -62,19 +93,27 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 
 	// Helper using vi.spyOn().mockResolvedValueOnce()
 	const mockFailedAuth = (status = 401) => {
-		const authErrorResponse = new Response(JSON.stringify({ message: "Auth Failed" }), { status });
+		const authErrorResponse = new Response(
+			JSON.stringify({ message: "Auth Failed" }),
+			{ status },
+		);
 		authSpy.mockResolvedValueOnce(authErrorResponse);
 		return authErrorResponse;
 	};
 
 	beforeEach(async () => {
-        // Spy on the actual authenticateRequest before each test
-        authSpy = vi.spyOn(auth, 'authenticateRequest') as MockInstance<AuthenticateRequestFn>;
+		// Spy on the actual authenticateRequest before each test
+		authSpy = vi.spyOn(
+			auth,
+			"authenticateRequest",
+		) as MockInstance<AuthenticateRequestFn>;
 
 		const mockKV = new MockKVNamespace();
 
 		ctx = {
-			waitUntil: vi.fn(async (promise) => { await promise; }),
+			waitUntil: vi.fn(async (promise) => {
+				await promise;
+			}),
 			passThroughOnException: vi.fn(),
 		} as unknown as ExecutionContext;
 
@@ -93,7 +132,7 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 			GCLOUD_WORKLOAD_IDENTITY_PROVIDER_ID: "test-provider",
 			GCLOUD_SERVICE_ACCOUNT_EMAIL: "test@example.com",
 		};
-        mockKV['store'].clear();
+		mockKV.store.clear();
 	});
 
 	afterEach(() => {
@@ -105,7 +144,7 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 		const req = new Request("http://worker/");
 		const res = await worker.fetch(req, env, ctx);
 		expect(res.status).toBe(200);
-		const body = await res.json() as { status?: string; message?: string };
+		const body = (await res.json()) as { status?: string; message?: string };
 		expect(body.status).toBe("ok");
 	});
 
@@ -138,7 +177,10 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 			});
 			const postRes = await worker.fetch(postReq, env, ctx);
 			expect(postRes.status).toBe(201);
-			const postBody = await postRes.json() as { status?: string; item?: WorkerArticle };
+			const postBody = (await postRes.json()) as {
+				status?: string;
+				item?: WorkerArticle;
+			};
 			expect(postBody.status).toBe("success");
 			expect(postBody.item).toEqual(testArticle);
 			expect(authSpy).toHaveBeenCalledTimes(1);
@@ -152,7 +194,7 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 			const getReq = new Request("http://worker/items");
 			const getRes = await worker.fetch(getReq, env, ctx);
 			expect(getRes.status).toBe(200);
-			const getBody = await getRes.json() as WorkerArticle[];
+			const getBody = (await getRes.json()) as WorkerArticle[];
 			expect(getBody).toHaveLength(1);
 			expect(getBody[0]).toEqual(testArticle);
 			expect(authSpy).toHaveBeenCalledTimes(2);
@@ -195,8 +237,12 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 			mockSuccessfulAuth();
 			const key = createUserItemKey(testUserId, testArticleId);
 			await env.SAVED_ITEMS_KV.put(key, JSON.stringify(testArticle));
-			expect(await env.SAVED_ITEMS_KV.get(key)).toBe(JSON.stringify(testArticle));
-			const req = new Request(`http://worker/items/${testArticleId}`, { method: "DELETE" });
+			expect(await env.SAVED_ITEMS_KV.get(key)).toBe(
+				JSON.stringify(testArticle),
+			);
+			const req = new Request(`http://worker/items/${testArticleId}`, {
+				method: "DELETE",
+			});
 			const res = await worker.fetch(req, env, ctx);
 			expect(res.status).toBe(200);
 			expect(authSpy).toHaveBeenCalledTimes(1);
@@ -212,33 +258,42 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 		it("POST /api/summarize should call GCF and return summary", async () => {
 			mockSuccessfulAuth();
 			const req = new Request("http://worker/api/summarize", {
-				method: "POST", headers: { "Content-Type": "application/json" },
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(summarizeContent),
 			});
 			const res = await worker.fetch(req, env, ctx);
 			expect(res.status).toBe(200);
 			const body = await res.json();
-			expect(body).toEqual({ status: "success", summary: "Fake GCF Summary (.test)" });
+			expect(body).toEqual({
+				status: "success",
+				summary: "Fake GCF Summary (.test)",
+			});
 			expect(authSpy).toHaveBeenCalledTimes(1);
 		});
 
 		it("POST /api/chat should call GCF and return response", async () => {
 			mockSuccessfulAuth();
 			const req = new Request("http://worker/api/chat", {
-				method: "POST", headers: { "Content-Type": "application/json" },
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(chatContent),
 			});
 			const res = await worker.fetch(req, env, ctx);
 			expect(res.status).toBe(200);
 			const body = await res.json();
-			expect(body).toEqual({ status: "success", response: "Fake GCF Chat Response (.test)" });
+			expect(body).toEqual({
+				status: "success",
+				response: "Fake GCF Chat Response (.test)",
+			});
 			expect(authSpy).toHaveBeenCalledTimes(1);
 		});
 
 		it("POST /api/summarize should return 401 if auth fails", async () => {
 			const authErrorResponse = mockFailedAuth(401);
 			const req = new Request("http://worker/api/summarize", {
-				method: "POST", headers: { "Content-Type": "application/json" },
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(summarizeContent),
 			});
 			const res = await worker.fetch(req, env, ctx);
@@ -249,7 +304,8 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 		it("POST /api/chat should return 401 if auth fails", async () => {
 			const authErrorResponse = mockFailedAuth(401);
 			const req = new Request("http://worker/api/chat", {
-				method: "POST", headers: { "Content-Type": "application/json" },
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(chatContent),
 			});
 			const res = await worker.fetch(req, env, ctx);
@@ -261,7 +317,8 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 			mockSuccessfulAuth();
 			// TODO: Ensure MSW handler for error exists
 			const req = new Request("http://worker/api/summarize", {
-				method: "POST", headers: { "Content-Type": "application/json" },
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(summarizeContent),
 			});
 			const res = await worker.fetch(req, env, ctx);
@@ -273,7 +330,8 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 			mockSuccessfulAuth();
 			// TODO: Ensure MSW handler for error exists
 			const req = new Request("http://worker/api/chat", {
-				method: "POST", headers: { "Content-Type": "application/json" },
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(chatContent),
 			});
 			const res = await worker.fetch(req, env, ctx);
@@ -287,12 +345,12 @@ describe("Worker Integration Tests", { timeout: 10000 }, () => {
 		const req = new Request("http://worker/unknown/route");
 		const res = await worker.fetch(req, env, ctx);
 		expect(res.status).toBe(404);
-		const body = await res.json() as { message?: string };
+		const body = (await res.json()) as { message?: string };
 		expect(body.message).toBe("Endpoint not found");
 		// Auth spy should *not* have been called for a 404 route
 		// Need to check if authSpy exists because beforeEach might not run if describe block is skipped
 		if (authSpy) {
-            expect(authSpy).not.toHaveBeenCalled();
-        }
+			expect(authSpy).not.toHaveBeenCalled();
+		}
 	});
 });

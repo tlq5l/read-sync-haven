@@ -351,6 +351,9 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 						if (existing && !existing.readAt) {
 							changes.readAt = Date.now();
 						}
+					} else {
+						// Reset readAt when marking as unread
+						changes.readAt = undefined;
 					}
 					statusUpdateMessage = updates.isRead
 						? "marked as read"

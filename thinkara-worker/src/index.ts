@@ -488,7 +488,6 @@ export default {
 						// Re-create the response body using the potentially extracted message
 						// This ensures the body matches the intended error structure
 						errorResp = errorResponse(message, statusCode);
-
 					} else if (err instanceof Error) {
 						// Handle standard JS Errors
 						message = err.message;
