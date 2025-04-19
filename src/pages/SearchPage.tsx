@@ -35,6 +35,11 @@ function fuzzyMatch(text: string, query: string): boolean {
 	return queryIndex === lowerQuery.length;
 }
 
+/**
+ * Displays a searchable interface for articles with fuzzy matching and progressive filtering.
+ *
+ * Provides real-time search results as the user types, prioritizing exact matches in article titles, excerpts, authors, and site names, then expanding to content and fuzzy matches if needed. Includes user feedback for loading, empty input, and no results.
+ */
 export default function SearchPage() {
 	const [searchTerm, setSearchTerm] = useState("");
 	const { articles } = useArticles();

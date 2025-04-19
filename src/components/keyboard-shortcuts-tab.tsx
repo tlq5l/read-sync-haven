@@ -5,7 +5,11 @@ import { ShortcutDisplay } from "@/components/ui/shortcut-display";
 import { useKeyboard } from "@/context/KeyboardContext"; // Assuming context provides update function later
 import type { Shortcut } from "@/lib/keyboard-shortcuts"; // Import Shortcut type
 import { Keyboard, Pencil, Save, X } from "lucide-react"; // Added icons
-import { useEffect, useState } from "react"; // Added useState, useEffect
+import { useEffect, useState } from "react"; /**
+ * Displays and manages keyboard shortcuts, allowing users to view and edit shortcut assignments.
+ *
+ * Provides an interface for editing keyboard shortcuts with local state management and synchronizes changes with the application context. Editing can be canceled or saved, and changes are reflected in the shortcut display.
+ */
 
 export function KeyboardShortcutsTab() {
 	const { shortcuts: initialShortcuts, updateShortcuts } = useKeyboard(); // Get updateShortcuts

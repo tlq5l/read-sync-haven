@@ -35,6 +35,17 @@ const KeyboardContext = createContext<KeyboardContextType | undefined>(
 	undefined,
 );
 
+/**
+ * Provides keyboard shortcut management and UI overlay state to its children.
+ *
+ * This provider manages registration, persistence, and validation of keyboard shortcuts, as well as state for dialogs, overlays, theme toggling, and sidebar collapse. It integrates with navigation, toast notifications, and article refresh functionality, exposing all relevant state and actions via context.
+ *
+ * @param children - The React node(s) that will have access to the keyboard context.
+ *
+ * @returns A context provider that supplies keyboard shortcut and UI overlay state to its descendants.
+ *
+ * @remark Shortcuts are persisted in localStorage and validated globally to prevent duplicate key assignments.
+ */
 export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 	const navigate = useNavigate();
 	const { theme, setTheme } = useTheme();
@@ -230,31 +241,13 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 	// Set up global keyboard event listener
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
-			// Don't trigger shortcuts when the target is an input, textarea, select, or contenteditable element
+			// Don't trigger shortcuts when in input elements
 			if (
-				event.target instanceof HTMLElement &&
-				(event.target instanceof HTMLInputElement ||
-					event.target instanceof HTMLTextAreaElement ||
-					event.target instanceof HTMLSelectElement ||
-					event.target.isContentEditable)
+				event.target instanceof HTMLInputElement ||
+				event.target instanceof HTMLTextAreaElement ||
+				event.target instanceof HTMLSelectElement
 			) {
-				// Exception: Allow Esc key for closing overlays/dialogs even in inputs
-				if (event.key === "Escape") {
-					// Check if a dialog/overlay is open and handle Esc
-					if (isShortcutsDialogOpen) {
-						event.preventDefault();
-						closeShortcutsDialog();
-						return;
-					}
-					if (isSearchOverlayOpen) {
-						event.preventDefault();
-						closeSearchOverlay();
-						return;
-					}
-				} else {
-					// Otherwise, ignore event if target is editable
-					return;
-				}
+				return;
 			}
 
 			// Check if the event matches any shortcuts
@@ -268,32 +261,32 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 		};
 
 		window.addEventListener("keydown", handleKeyDown);
+
 		return () => {
 			window.removeEventListener("keydown", handleKeyDown);
 		};
-	}, [shortcuts, isShortcutsDialogOpen, isSearchOverlayOpen]); // Add dialog/overlay states as dependencies
+	}, [shortcuts]);
 
 	const openShortcutsDialog = () => setIsShortcutsDialogOpen(true);
 	const closeShortcutsDialog = () => setIsShortcutsDialogOpen(false);
 	const openSearchOverlay = () => setIsSearchOverlayOpen(true);
 	const closeSearchOverlay = () => setIsSearchOverlayOpen(false);
 
-	// Include sidebar state and toggle in context value
-	const value = {
-		shortcuts,
-		isShortcutsDialogOpen,
-		openShortcutsDialog,
-		closeShortcutsDialog,
-		isSearchOverlayOpen,
-		openSearchOverlay,
-		closeSearchOverlay,
-		updateShortcuts,
-		isSidebarCollapsed,
-		toggleSidebar,
-	};
-
 	return (
-		<KeyboardContext.Provider value={value}>
+		<KeyboardContext.Provider
+			value={{
+				shortcuts,
+				isShortcutsDialogOpen,
+				openShortcutsDialog,
+				closeShortcutsDialog,
+				isSearchOverlayOpen,
+				openSearchOverlay,
+				closeSearchOverlay,
+				updateShortcuts,
+				isSidebarCollapsed, // Provide sidebar state
+				toggleSidebar, // Provide sidebar toggle function
+			}}
+		>
 			{children}
 		</KeyboardContext.Provider>
 	);

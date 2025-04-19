@@ -1,10 +1,13 @@
 import { Readability } from "@mozilla/readability";
 
 /**
- * Processes an HTML string using Readability to extract the main article content.
- * @param htmlContent The raw HTML content string.
- * @param documentUrl A dummy URL for Readability's base URI resolution (can be arbitrary).
- * @returns The cleaned HTML content of the article, or null if parsing fails.
+ * Extracts the main article content from an HTML string using the Mozilla Readability library.
+ *
+ * Attempts to parse and clean the provided HTML to return only the readable article content. If parsing fails or no article content is found, returns the original HTML string. Returns `null` only if the HTML cannot be parsed into a valid document.
+ *
+ * @param htmlContent - The raw HTML content to process.
+ * @param documentUrl - Optional base URL for resolving relative links; defaults to a dummy URL.
+ * @returns The cleaned article HTML if extraction succeeds, the original HTML if extraction fails, or `null` if the HTML cannot be parsed.
  */
 export function processHtmlWithReadability(
 	htmlContent: string,

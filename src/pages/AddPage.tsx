@@ -9,6 +9,13 @@ import { ArrowLeft, BookOpen, FileText, Globe } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+/**
+ * Renders the Add Content page, allowing users to add articles to their library by entering a web URL, uploading an EPUB file, or uploading a PDF file.
+ *
+ * @returns The Add Content page component.
+ *
+ * @remark After a successful file upload, users are redirected to the library inbox page. File uploads are limited to 150MB and are stored locally in the browser.
+ */
 export default function AddPage() {
 	const [isUploading, setIsUploading] = useState(false);
 	const [uploadType, setUploadType] = useState<"epub" | "pdf">("epub");

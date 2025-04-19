@@ -4,7 +4,15 @@ import { db } from "@/services/db/dexie"; // Import dexie db
 // Removed cloudSync import
 import type { Article } from "@/services/db/types"; // Update type import path
 import { useAuth } from "@clerk/clerk-react"; // Keep useAuth for userId/isSignedIn check
-import { useCallback } from "react"; // Removed unused useMemo
+import { useCallback } from "react"; /**
+ * Provides a hook for updating the reading progress of an article in the local IndexedDB.
+ *
+ * The returned `updateReadingProgress` function updates the reading progress for a specific article belonging to the current signed-in user. If the progress reaches 90% or more and the article is not already marked as read, it marks the article as read and records the timestamp.
+ *
+ * @returns An object containing the `updateReadingProgress` function.
+ *
+ * @remark The update is performed only if the user is signed in and owns the article. Progress updates are skipped if the change is less than 1% unless the new progress is exactly 100%.
+ */
 
 export function useReadingProgress() {
 	const { userId, isSignedIn } = useAuth(); // Removed getToken

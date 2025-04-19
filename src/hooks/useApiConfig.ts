@@ -6,7 +6,13 @@ export interface ApiConfig {
 	model: string | null;
 }
 
-// Placeholder hook
+/**
+ * React hook for managing API configuration state and available provider options.
+ *
+ * @returns An object containing the current {@link ApiConfig} state, a setter to update it, and a list of available provider names.
+ *
+ * @remark This is a placeholder implementation and may not provide full functionality.
+ */
 export function useApiConfig() {
 	const [apiConfig, setApiConfig] = useState<ApiConfig | null>(null);
 	const availableProviders = ["openai", "custom"]; // Example

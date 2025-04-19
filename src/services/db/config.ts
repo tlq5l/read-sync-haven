@@ -74,10 +74,10 @@ function createDbInstance<T extends object>(
 		const db = new PouchDB<T>(name, options); // Use original options
 		// Perform an immediate info() call to test the connection
 		db.info()
-			.then((info: PouchDB.Core.DatabaseInfo) =>
+			.then((info) =>
 				console.log(`Successfully connected to ${name}. Info:`, info),
 			)
-			.catch((err: any) => {
+			.catch((err) => {
 				console.error(`Initial connection test failed for ${name}:`, err);
 				// Fallback logic is handled below if needed
 			});
@@ -125,8 +125,12 @@ if (import.meta.vitest) {
 let indexesCreated = false; // Track index creation status
 
 /**
- * Creates necessary indexes for optimal query performance.
- * Handles potential errors during index creation gracefully.
+ * Creates all required indexes on the database instances to optimize query performance.
+ *
+ * Index creation is performed only once per session. If an index already exists, the function skips its creation without error. Any errors encountered during index creation are logged, but do not interrupt the process.
+ *
+ * @remark
+ * Indexes are created for articles, highlights, tags, and operations queue databases on fields relevant to their typical queries.
  */
 async function createDbIndexes(): Promise<void> {
 	if (indexesCreated) {
@@ -204,10 +208,13 @@ let isInitializing = false;
 let initializationPromise: Promise<boolean> | null = null;
 
 /**
- * Initializes the database connections and creates necessary indexes.
- * Handles retries and fallbacks to memory adapter if IndexedDB fails.
- * Ensures initialization runs only once.
- * @returns {Promise<boolean>} True if initialization (including index creation attempt) was successful, false otherwise.
+ * Initializes all PouchDB database connections, creates required indexes, and runs data migrations.
+ *
+ * Attempts to connect to the primary IndexedDB databases, falling back to in-memory adapters if necessary. Ensures initialization is performed only once, with retries on failure. Index creation and data migrations are executed after successful connection.
+ *
+ * @returns A promise that resolves to true if initialization (including index creation attempt) succeeded, or false if all connection attempts failed.
+ *
+ * @remark If index creation or data migration fails but database connections succeed, initialization still returns true but logs the errors.
  */
 export async function initializeDatabase(): Promise<boolean> {
 	if (initializationPromise) {

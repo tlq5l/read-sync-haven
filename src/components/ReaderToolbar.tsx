@@ -19,6 +19,11 @@ interface ReaderToolbarProps {
 	onToggleSidebar: (open: boolean) => void; // Function to change sidebar state
 }
 
+/**
+ * Renders a toolbar with controls for navigation, favoriting, fullscreen mode, and sidebar toggling.
+ *
+ * The toolbar displays a back button, a favorite toggle, a fullscreen toggle, and a sidebar trigger. All state and event handling are managed via props.
+ */
 export function ReaderToolbar({
 	isFavorite,
 	isFullscreen,

@@ -36,7 +36,13 @@ import {
 	useState,
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner"; // Import toast for feedback
+import { toast } from "sonner"; /**
+ * Displays an article with integrated AI features, including summarization, chat, chat history, and API configuration.
+ *
+ * Provides a reading interface with controls for favoriting, fullscreen mode, and sidebar access. The sidebar offers tabs for AI-generated summaries, interactive chat about the article, chat session history management (including copying and deleting sessions), and AI API configuration. Reading progress is tracked and updated based on scroll position.
+ *
+ * @remark Shows loading skeletons while fetching article data and displays error messages with navigation options if loading fails.
+ */
 
 export default function ArticleReader() {
 	const { id } = useParams<{ id: string }>();

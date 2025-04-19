@@ -1,5 +1,10 @@
 import { SignIn } from "@clerk/clerk-react";
 
+/**
+ * Renders the sign-in page for Thinkara with a centered authentication form.
+ *
+ * Displays a styled sign-in interface using the Clerk authentication component, including a heading and custom appearance.
+ */
 export default function SignInPage() {
 	return (
 		<div className="flex items-center justify-center min-h-screen bg-background">

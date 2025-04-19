@@ -11,7 +11,17 @@ interface SynchronizedAnimationOptions {
 }
 
 /**
- * Hook for creating synchronized animations between components
+ * React hook for synchronizing CSS-based animations of an individual element within an animation group.
+ *
+ * Registers the element with a shared animation context, applies transition styles, and manages animation state based on transition events.
+ *
+ * @param groupId - Identifier for the animation group. Defaults to "default".
+ * @param elementId - Optional unique identifier for the element. If not provided, a random ID is generated.
+ * @param duration - Duration of the transition in milliseconds. If not specified, uses the group's default timing.
+ * @param delay - Delay before the transition starts, in milliseconds. Defaults to 0.
+ * @param easing - CSS timing function for the transition. If not specified, uses the group's default easing.
+ * @param disabled - If true, disables animation and registration for this element.
+ * @returns An object containing a `ref` callback to assign to the element, a boolean `isAnimating` indicating animation state, and the unique `elementId`.
  */
 export function useSynchronizedAnimation({
 	groupId = "default",

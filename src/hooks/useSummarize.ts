@@ -3,9 +3,18 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 /**
- * Custom hook to handle article summarization via API calls.
- * Manages loading state, error handling, and the resulting summary.
- * Supports streaming for custom OpenAI-compatible endpoints.
+ * React hook for summarizing article content using either a streaming custom OpenAI-compatible API or a non-streaming Cloudflare Worker proxy.
+ *
+ * Manages loading state, summary result, and error messages. Automatically selects the streaming custom API if configured in localStorage, otherwise falls back to the worker proxy. Handles incremental summary updates for streaming responses and complete summaries for non-streaming responses.
+ *
+ * @returns An object containing:
+ * - `summarize`: Function to trigger summarization with the article content.
+ * - `isSummarizing`: Boolean indicating if summarization is in progress.
+ * - `summary`: The current summary text, updated incrementally if streaming, or `null` if not started.
+ * - `summaryError`: Error message if summarization fails, or `null` if no error.
+ *
+ * @remark
+ * If no article content is provided, the hook sets an error and does not attempt summarization. Errors from the API or network are captured and exposed via `summaryError`.
  */
 export function useSummarize() {
 	const { getToken } = useAuth();

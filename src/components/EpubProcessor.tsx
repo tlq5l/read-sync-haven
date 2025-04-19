@@ -32,7 +32,12 @@ interface ExtendedBook extends Book {
 }
 // --- End Interfaces ---
 
-// --- Helper Functions ---
+/**
+ * Returns the MIME type for a given filename based on its image file extension.
+ *
+ * @param filename - The name of the file whose MIME type is to be determined.
+ * @returns The corresponding MIME type string if recognized, or `null` if the extension is not a known image type.
+ */
 function getMimeType(filename: string): string | null {
 	const extension = filename.split(".").pop()?.toLowerCase();
 	switch (extension) {
@@ -52,7 +57,14 @@ function getMimeType(filename: string): string | null {
 	}
 }
 
-// Helper function to safely decode URI components
+/**
+ * Decodes a URI component, returning the original string if decoding fails.
+ *
+ * @param uriComponent - The URI component to decode.
+ * @returns The decoded string, or the original input if decoding throws an error.
+ *
+ * @remark Logs a warning to the console if decoding fails.
+ */
 function decodeURIComponentSafely(uriComponent: string): string {
 	try {
 		return decodeURIComponent(uriComponent);
@@ -72,6 +84,13 @@ interface EpubProcessorProps {
 	fileName?: string;
 	onContentProcessed: (processedHtml: string | null) => void;
 }
+/**
+ * React component that processes a base64-encoded EPUB file, extracts and parses its content, embeds images as base64 data URIs, and returns the combined HTML via a callback.
+ *
+ * The component uses both `epubjs` and `JSZip` to handle EPUB structure and raw file access, ensuring robust extraction and embedding of resources. It manages loading and error states, providing user feedback during processing and on failure. The processed HTML is delivered through the `onContentProcessed` callback.
+ *
+ * @remark The component does not render any content itself except for loading and error states; its primary purpose is to process the EPUB and report results via the callback.
+ */
 export default function EpubProcessor({
 	fileData,
 	fileName,

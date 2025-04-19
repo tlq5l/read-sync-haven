@@ -225,7 +225,13 @@ export const shortcutGroups: ShortcutGroup[] = [
 	},
 ];
 
-// Helper function to check if a keyboard event matches a shortcut key
+/**
+ * Determines whether a keyboard event matches any of the provided shortcut key combinations.
+ *
+ * @param event - The keyboard event to check.
+ * @param shortcutKeys - An array of shortcut key definitions to match against.
+ * @returns `true` if the event matches any shortcut key combination; otherwise, `false`.
+ */
 export function matchesShortcut(
 	event: KeyboardEvent,
 	shortcutKeys: ShortcutKey[], // Changed to accept array
@@ -257,7 +263,14 @@ export function matchesShortcut(
 	return false; // No match found in the array
 }
 
-// Helper function to format shortcut for display
+/**
+ * Formats an array of shortcut key combinations into a human-readable string.
+ *
+ * Each key combination is represented with its modifiers (e.g., "Ctrl", "Alt") and main key, joined by " + ". Multiple combinations are separated by " or ".
+ *
+ * @param shortcutKeys - An array of shortcut key combinations to format.
+ * @returns A formatted string representing the shortcut keys.
+ */
 export function formatShortcut(shortcutKeys: ShortcutKey[]): string {
 	// Helper function to format a single key
 	const formatSingleKey = (shortcutKey: ShortcutKey): string => {

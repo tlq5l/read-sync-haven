@@ -68,7 +68,17 @@ const mapDexieToArticle = (dexieArticle: DexieArticle): Article => {
 	};
 };
 
-// Helper function to process EPUB files (Modified to return Dexie compatible structure)
+/**
+ * Processes an EPUB file and returns a Dexie-compatible article object.
+ *
+ * Validates the EPUB structure, extracts metadata, encodes the file as base64, and estimates reading time. The resulting object is ready for storage in the Dexie database.
+ *
+ * @param file - The EPUB file to process.
+ * @param userId - The ID of the user importing the file.
+ * @returns A {@link DexieArticle} object populated with metadata and file data.
+ *
+ * @throws {Error} If the file is not a valid EPUB or required files are missing.
+ */
 async function processEpubFile(
 	file: File,
 	userId: string,
@@ -112,7 +122,17 @@ async function processEpubFile(
 	};
 }
 
-// Helper function to process PDF files using pdfParser service
+/**
+ * Processes a PDF file and extracts its text content to create a Dexie-compatible article object.
+ *
+ * Validates the file type, parses the PDF using the {@link parsePdf} service, and throws errors for password-protected or invalid files. The resulting article includes extracted text as content, file metadata, and a default excerpt.
+ *
+ * @param file - The PDF file to process.
+ * @param userId - The ID of the user importing the file.
+ * @returns A {@link DexieArticle} object populated with the extracted PDF content and metadata.
+ *
+ * @throws {Error} If the file is not a PDF, is password protected, cannot be parsed, or an unknown parsing error occurs.
+ */
 async function processPdfFile(
 	file: File,
 	userId: string,
@@ -179,9 +199,12 @@ async function processPdfFile(
 }
 
 /**
- * Hook providing functions to perform actions on articles using Dexie.
+ * React hook providing functions to add, update, and remove articles in a local Dexie (IndexedDB) database.
  *
- * @param refreshArticles - A callback function to trigger a refresh of the article list after an action.
+ * Exposes actions for adding articles by URL or file (EPUB/PDF), updating article status and reading progress, removing articles, and a placeholder for duplicate removal. All actions require the user to be signed in and trigger UI updates via the provided {@link refreshArticles} callback where applicable.
+ *
+ * @param refreshArticles - Callback to refresh the article list after changes.
+ * @returns An object with methods for managing articles: `addArticleByUrl`, `addArticleByFile`, `updateArticleStatus`, `updateReadingProgress`, `removeArticle`, and `removeDuplicateLocalArticles`.
  */
 export function useArticleActions(refreshArticles: () => Promise<void>) {
 	const { toast } = useToast();
@@ -351,9 +374,6 @@ export function useArticleActions(refreshArticles: () => Promise<void>) {
 						if (existing && !existing.readAt) {
 							changes.readAt = Date.now();
 						}
-					} else {
-						// Reset readAt when marking as unread
-						changes.readAt = undefined;
 					}
 					statusUpdateMessage = updates.isRead
 						? "marked as read"

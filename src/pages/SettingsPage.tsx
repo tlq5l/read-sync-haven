@@ -37,6 +37,11 @@ interface UserSettings {
 	// Add other settings fields as needed
 }
 
+/**
+ * Displays the user settings page with account management, appearance customization, data export, duplicate cleanup, and keyboard shortcuts in a tabbed interface.
+ *
+ * Integrates with Clerk for authentication and user profile, saves and loads user settings from a backend API, and manages local data using Dexie. Provides UI feedback for all operations and disables controls appropriately based on authentication and loading state.
+ */
 export default function SettingsPage() {
 	const { toast } = useToast();
 	const { isSignedIn, getToken } = useAuth(); // Get authentication status and getToken function

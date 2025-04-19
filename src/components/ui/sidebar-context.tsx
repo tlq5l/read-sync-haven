@@ -25,7 +25,13 @@ export const SidebarContext = React.createContext<SidebarContextType | null>(
 	null,
 );
 
-// Hook to use the context
+/**
+ * Provides access to the sidebar context state and actions.
+ *
+ * @returns The current sidebar context value.
+ *
+ * @throws {Error} If called outside of a {@link SidebarProvider}.
+ */
 export function useSidebar() {
 	const context = React.useContext(SidebarContext);
 	if (!context) {

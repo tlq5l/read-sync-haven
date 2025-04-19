@@ -1,7 +1,11 @@
 import { cn } from "@/lib/utils";
 import { WifiOff } from "lucide-react";
 // Removed useOffline import
-import { useEffect, useState } from "react"; // Add hooks for basic online check
+import { useEffect, useState } from "react"; /**
+ * Displays a notification when the browser is offline.
+ *
+ * Renders a fixed offline indicator in the bottom-right corner of the screen when the user loses internet connectivity. The indicator is hidden when the browser is online.
+ */
 
 export default function OfflineIndicator() {
 	// Replace useOffline with navigator.onLine and event listeners

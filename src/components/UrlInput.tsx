@@ -10,6 +10,13 @@ interface UrlInputProps {
 	onSuccess?: () => void;
 }
 
+/**
+ * Renders a form for users to input and save a URL as an article.
+ *
+ * After successful submission, the input is cleared and either the optional {@link onSuccess} callback is called or the user is redirected to the library page.
+ *
+ * @param onSuccess - Optional callback invoked after a successful URL submission.
+ */
 export default function UrlInput({ onSuccess }: UrlInputProps) {
 	const [url, setUrl] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);

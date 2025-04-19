@@ -17,7 +17,12 @@ import cors from "cors";
 const secretClient = new SecretManagerServiceClient();
 const projectNumber = "98706481155"; // Your Google Cloud Project Number
 
-// Helper function to access secrets
+/**
+ * Retrieves the latest version of a secret from Google Secret Manager.
+ *
+ * @param secretName - The name of the secret to retrieve.
+ * @returns The secret payload as a string, or null if the payload is empty or an error occurs.
+ */
 async function accessSecretVersion(secretName: string): Promise<string | null> {
 	// console.log(`Attempting to access secret: ${secretName}`); // LOG: Secret access start
 	try {
