@@ -76,6 +76,58 @@ if (typeof window !== "undefined") {
 		}
 	}
 
+	// Anti-recursion protection for Date methods
+	// This prevents infinite recursion between setTime and _set methods
+	// which can be caused by fingerprinting protection extensions
+	try {
+		const originalDatePrototype = Date.prototype;
+		const originalSetTime = originalDatePrototype.setTime;
+
+		// Detect if setTime is already wrapped or modified
+		if (originalSetTime && typeof originalSetTime === "function") {
+			// Use a recursion counter to break infinite loops
+			const recursionGuard = new WeakMap<Function, Map<Date, number>>();
+
+			// Override setTime with a version that has recursion protection
+			Object.defineProperty(Date.prototype, "setTime", {
+				value: function setTimeWithGuard(time: number): number {
+					// Initialize recursion tracking if needed
+					if (!recursionGuard.has(originalSetTime)) {
+						recursionGuard.set(originalSetTime, new Map<Date, number>());
+					}
+
+					const guardsForThis = recursionGuard.get(originalSetTime)!;
+					const currentCount = guardsForThis.get(this) || 0;
+
+					// If we detect too many recursive calls, break the chain
+					if (currentCount > 10) {
+						guardsForThis.delete(this);
+						return 0; // Return a default value to break recursion
+					}
+
+					// Track this call
+					guardsForThis.set(this, currentCount + 1);
+
+					try {
+						// Call the original method
+						return originalSetTime.call(this, time);
+					} finally {
+						// Clean up our tracking
+						if (currentCount <= 1) {
+							guardsForThis.delete(this);
+						} else {
+							guardsForThis.set(this, currentCount - 1);
+						}
+					}
+				},
+				configurable: true,
+				writable: true,
+			});
+		}
+	} catch (e) {
+		console.warn("Failed to apply Date recursion protection:", e);
+	}
+
 	// Ensure global is defined (needed for PouchDB)
 	if (
 		typeof (window as Window & typeof globalThis & { global?: unknown })
