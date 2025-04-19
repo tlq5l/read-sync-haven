@@ -35,10 +35,14 @@ export function parseUserItemKey(
  * and used by the preflight handler in `index.ts`.
  */
 export const corsHeaders = {
-	"Access-Control-Allow-Origin": "http://localhost:8080", // Explicitly allow the frontend origin
+	"Access-Control-Allow-Origin":
+		process.env.NODE_ENV === "development"
+			? "*"
+			: "https://your-production-domain.com", // Use wildcard in development, restrict in production
 	"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-	"Access-Control-Allow-Headers": "Content-Type, Authorization", // Add other headers if needed by frontend
+	"Access-Control-Allow-Headers": "Content-Type, Authorization, *", // Explicitly define allowed headers
 	"Access-Control-Allow-Credentials": "true", // Allow credentials (cookies, auth headers)
+	"Access-Control-Max-Age": "86400", // 24 hours
 };
 
 /**
