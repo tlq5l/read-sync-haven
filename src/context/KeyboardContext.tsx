@@ -134,7 +134,8 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 						refreshAction()
 							.then(() => {
 								dismiss(); // Dismiss the 'Syncing...' toast
-								toast({ // Show success toast
+								toast({
+									// Show success toast
 									title: "Sync Complete",
 									description: "Articles refreshed successfully.",
 									duration: 3000,
