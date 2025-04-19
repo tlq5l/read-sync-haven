@@ -333,7 +333,9 @@ export async function bulkSaveArticles(
 
 			// Log errors from the response
 			const errors = response.filter(
-				(res): res is PouchDB.Core.Error => "error" in res && !!res.error,
+				(
+					res: PouchDB.Core.Response | PouchDB.Core.Error,
+				): res is PouchDB.Core.Error => "error" in res && !!res.error,
 			);
 			if (errors.length > 0) {
 				console.error(
@@ -544,8 +546,14 @@ export async function getAllArticles(
 			// Since include_docs: true guarantees _rev for existing docs, we can filter and cast.
 			// We filter out rows where the doc is missing (e.g., deleted docs).
 			let articles: Article[] = allDocsResponse.rows
-				.filter((row) => !!row.doc) // Ensure the document exists for the row
-				.map((row) => row.doc as Article); // Map to the doc and cast to Article
+				.filter(
+					(row: PouchDB.Core.AllDocsResponse<Article>["rows"][number]) =>
+						!!row.doc,
+				) // Ensure the document exists for the row
+				.map(
+					(row: PouchDB.Core.AllDocsResponse<Article>["rows"][number]) =>
+						row.doc as Article,
+				); // Map to the doc and cast to Article
 
 			console.log(
 				`Retrieved ${articles.length} total articles. Applying filters...`,

@@ -74,10 +74,10 @@ function createDbInstance<T extends object>(
 		const db = new PouchDB<T>(name, options); // Use original options
 		// Perform an immediate info() call to test the connection
 		db.info()
-			.then((info) =>
+			.then((info: PouchDB.Core.DatabaseInfo) =>
 				console.log(`Successfully connected to ${name}. Info:`, info),
 			)
-			.catch((err) => {
+			.catch((err: any) => {
 				console.error(`Initial connection test failed for ${name}:`, err);
 				// Fallback logic is handled below if needed
 			});

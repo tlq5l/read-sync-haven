@@ -125,6 +125,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	// 1.5. Fetch initial data from backend after auth and DB init
 	useEffect(() => {
 		let isMounted = true;
+		const controller = new AbortController(); // Create an AbortController
+
 		const fetchInitialData = async () => {
 			if (isLoaded && isSignedIn && isDbInitialized && !hasFetchedInitialData) {
 				console.log(
@@ -149,9 +151,15 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 						headers: {
 							Authorization: `Bearer ${token}`,
 						},
+						signal: controller.signal, // Pass the signal to the fetch request
 					});
 
 					if (!response.ok) {
+						// Check if the error is due to abort before throwing
+						if (controller.signal.aborted) {
+							console.log("ArticleContext: Initial fetch aborted.");
+							return;
+						}
 						throw new Error(
 							`Failed to fetch initial data: ${response.status} ${response.statusText}`,
 						);
@@ -179,6 +187,11 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 						setHasFetchedInitialData(true); // Mark initial fetch as complete
 					}
 				} catch (error) {
+					// Check if the error is due to abort before logging
+					if (controller.signal.aborted) {
+						console.log("ArticleContext: Initial fetch aborted (in catch).");
+						return;
+					}
 					console.error(
 						"ArticleContext: Error fetching initial data from backend:",
 						error,
@@ -193,8 +206,10 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 
 		fetchInitialData();
 
+		// Cleanup function to abort the fetch if the component unmounts
 		return () => {
 			isMounted = false;
+			controller.abort(); // Abort the fetch on cleanup
 		};
 	}, [isLoaded, isSignedIn, isDbInitialized, hasFetchedInitialData, getToken]); // Dependencies for the effect
 

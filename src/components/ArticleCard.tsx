@@ -88,12 +88,14 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 		}
 	};
 
-	const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+	const handleKeyDown = async (e: React.KeyboardEvent<HTMLDivElement>) => {
 		if (e.key === "Delete") {
 			e.preventDefault();
 			e.stopPropagation();
 			// Call optimistic remove directly, similar to handleDelete but for keyboard event
-			optimisticRemoveArticle(article._id).catch((error: any) => {
+			try {
+				await optimisticRemoveArticle(article._id);
+			} catch (error: any) {
 				// Revert function call
 				// Reverted handler
 				console.error("Error deleting article via keyboard:", error);
@@ -102,7 +104,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 					description: "Could not delete article",
 					variant: "destructive",
 				});
-			});
+			}
 		}
 	};
 	return (
@@ -113,206 +115,113 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 			className="flex flex-col h-[200px] overflow-hidden transition-all gpu-accelerated duration-200 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" // Add focus styles, FIXED height, and flex
 			// Style removed to prevent flickering with virtualization
 		>
-			<Link to={`/read/${article._id}`} data-testid="article-card">
-				<CardContent className="p-0 flex-grow flex flex-col">
-					{" "}
-					{/* Keep CardContent growing */}
-					{/* Allow content to grow */}
-					<div className="p-4 flex flex-col flex-grow">
-						{" "}
-						{/* Make inner div grow, remove justify-between */}
-						{article.isRead ? (
-							<div className="flex justify-between items-start mb-2">
-								<span
-									className="text-xs text-muted-foreground"
-									data-testid="read-status"
-								>
-									Read
-								</span>
-								<div className="flex items-center gap-1">
-									{/* Move to Later Button */}
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-8 w-8"
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											updateArticleStatus(article._id, { status: "later" });
-										}}
-										aria-label="Read Later"
-									>
-										<Clock size={16} />
-									</Button>
-									{/* Archive Button */}
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-8 w-8"
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											updateArticleStatus(article._id, { status: "archived" });
-										}}
-										aria-label="Archive"
-									>
-										<Archive size={16} />
-									</Button>
-									{/* Move to Inbox Button (Replaces Favorite) */}
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-8 w-8"
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											updateArticleStatus(article._id, { status: "inbox" });
-										}}
-										aria-label="Move to Inbox"
-									>
-										<Inbox size={16} />
-									</Button>
-									<DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-										<DropdownMenuTrigger asChild>
-											<Button
-												variant="ghost"
-												size="icon"
-												className="h-8 w-8"
-												onClick={(e) => {
-													e.preventDefault();
-													e.stopPropagation();
-												}}
-											>
-												<MoreHorizontal size={16} />
-											</Button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent
-											align="end"
-											className="gpu-accelerated"
-										>
-											{/* Items removed, now direct buttons */}
-											<DropdownMenuItem
-												className="text-destructive focus:text-destructive"
-												onClick={handleDelete}
-											>
-												<Trash2 className="mr-2 h-4 w-4" />
-												<span>Delete</span>
-											</DropdownMenuItem>
-										</DropdownMenuContent>
-									</DropdownMenu>
-								</div>
-							</div>
-						) : (
-							<div className="flex justify-between items-start mb-2">
-								<span
-									className="text-xs font-medium text-thinkara-500"
-									data-testid="unread-status"
-								>
-									Unread
-								</span>
-								<div className="flex items-center gap-1">
-									{/* Move to Later Button */}
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-8 w-8"
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											updateArticleStatus(article._id, { status: "later" });
-										}}
-										aria-label="Read Later"
-									>
-										<Clock size={16} />
-									</Button>
-									{/* Archive Button */}
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-8 w-8"
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											updateArticleStatus(article._id, { status: "archived" });
-										}}
-										aria-label="Archive"
-									>
-										<Archive size={16} />
-									</Button>
-									{/* Move to Inbox Button (Replaces Favorite) */}
-									<Button
-										variant="ghost"
-										size="icon"
-										className="h-8 w-8"
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											updateArticleStatus(article._id, { status: "inbox" });
-										}}
-										aria-label="Move to Inbox"
-									>
-										<Inbox size={16} />
-									</Button>
-									<DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-										<DropdownMenuTrigger asChild>
-											<Button
-												variant="ghost"
-												size="icon"
-												className="h-8 w-8"
-												onClick={(e) => {
-													e.preventDefault();
-													e.stopPropagation();
-												}}
-											>
-												<MoreHorizontal size={16} />
-											</Button>
-										</DropdownMenuTrigger>
-										<DropdownMenuContent
-											align="end"
-											className="gpu-accelerated"
-										>
-											{/* Items removed, now direct buttons */}
-											<DropdownMenuItem
-												className="text-destructive focus:text-destructive"
-												onClick={handleDelete}
-											>
-												<Trash2 className="mr-2 h-4 w-4" />
-												<span>Delete</span>
-											</DropdownMenuItem>
-										</DropdownMenuContent>
-									</DropdownMenu>
-								</div>
-							</div>
-						)}
-						{/* Wrap title and excerpt and make this section grow */}
-						<div className="flex-grow mb-3">
-							<h3 className="text-lg font-medium line-clamp-2 mb-2">
-								{article.title || "Untitled"}
-							</h3>
-							<p className="text-sm text-muted-foreground line-clamp-2">
-								{article.excerpt || "No excerpt available"}
-							</p>
-						</div>
-						{/* Keep bottom metadata section */}
-						<div className="flex items-center justify-between text-xs text-muted-foreground mt-auto">
-							{" "}
-							{/* Use mt-auto to push to bottom */}
-							<span>
-								{article.type === "pdf" && !article.siteName
-									? "PDF Document"
-									: article.type === "epub" && !article.siteName
-										? "EPUB Document"
-										: article.siteName || "Unknown source"}
-							</span>
-							<div className="flex items-center gap-3">
-								<span>{article.estimatedReadTime || "?"} min read</span>
-								<span>{getFormattedDate()}</span>
-							</div>
-						</div>
-						{/* Spacer div removed, rely on justify-between */}
-					</div>
-				</CardContent>
+			{/* Link only wraps the main content area */}
+			<Link
+				to={`/read/${article._id}`}
+				data-testid="article-card-link"
+				className="flex-grow block p-4 overflow-hidden" // Adjusted padding and overflow
+			>
+				{/* Content that should navigate */}
+				<h3
+					className="font-semibold text-lg truncate mb-1"
+					data-testid="article-title"
+				>
+					{article.title || "Untitled Article"}
+				</h3>
+				<p
+					className="text-sm text-muted-foreground line-clamp-2 mb-2"
+					data-testid="article-excerpt"
+				>
+					{article.excerpt || "No excerpt available."}
+				</p>
+				<div className="mt-auto text-xs text-muted-foreground">
+					<span>{article.siteName || "Unknown Source"}</span>
+					<span className="mx-1">·</span>
+					<span>{getFormattedDate()}</span>
+				</div>
 			</Link>
+
+			{/* Action buttons are outside the Link */}
+			<CardContent className="p-2 flex justify-between items-center border-t mt-auto">
+				{/* Status Indicator (Unread/Read) */}
+				<span
+					className={`text-xs font-medium ${article.isRead ? "text-muted-foreground" : "text-thinkara-500"}`}
+					data-testid={article.isRead ? "read-status" : "unread-status"}
+				>
+					{article.isRead ? "Read" : "Unread"}
+				</span>
+
+				{/* Action Buttons Group */}
+				<div className="flex items-center gap-1">
+					{/* Move to Later Button */}
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8"
+						onClick={(e) => {
+							e.preventDefault(); // Keep stopping propagation if needed
+							e.stopPropagation();
+							updateArticleStatus(article._id, { status: "later" });
+						}}
+						aria-label="Read Later"
+					>
+						<Clock size={16} />
+					</Button>
+					{/* Archive Button */}
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8"
+						onClick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							updateArticleStatus(article._id, { status: "archived" });
+						}}
+						aria-label="Archive"
+					>
+						<Archive size={16} />
+					</Button>
+					{/* Move to Inbox Button */}
+					<Button
+						variant="ghost"
+						size="icon"
+						className="h-8 w-8"
+						onClick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							updateArticleStatus(article._id, { status: "inbox" });
+						}}
+						aria-label="Move to Inbox"
+					>
+						<Inbox size={16} />
+					</Button>
+					{/* Dropdown Menu for Delete */}
+					<DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+						<DropdownMenuTrigger asChild>
+							<Button
+								variant="ghost"
+								size="icon"
+								className="h-8 w-8"
+								onClick={(e) => {
+									e.preventDefault();
+									e.stopPropagation();
+								}}
+							>
+								<MoreHorizontal size={16} />
+							</Button>
+						</DropdownMenuTrigger>
+						<DropdownMenuContent align="end" className="gpu-accelerated">
+							<DropdownMenuItem
+								className="text-destructive focus:text-destructive"
+								onClick={handleDelete} // Keep using the existing handleDelete for click
+							>
+								<Trash2 className="mr-2 h-4 w-4" />
+								<span>Delete</span>
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
+			</CardContent>
 		</Card>
 	);
 };

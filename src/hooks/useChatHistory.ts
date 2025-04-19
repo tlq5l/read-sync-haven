@@ -65,76 +65,88 @@ export function useChatHistory(articleId: string | null) {
 	const [error, setError] = useState<string | null>(null);
 
 	// --- Fetch Article Data (including sessions) ---
-	const fetchArticleData = useCallback(async () => {
-		if (!isSignedIn || !articleId) {
-			setArticleSessions([]);
-			setIsLoadingData(false);
-			setSelectedSessionIdState(null);
-			setSelectedSessionMessages([]);
-			setError(null);
-			return;
-		}
-
-		setIsLoadingData(true);
-		setError(null);
-		console.log(`Fetching article data for articleId: ${articleId}`);
-
-		try {
-			// Adjust endpoint if needed, e.g., /api/user/articles/${articleId}
-			// Assuming the endpoint returns data structured like SingleArticleData
-			if (!getToken) {
-				throw new Error("getToken function is not available from useAuth.");
-			}
-			// Pass getToken to apiClient
-			const data = await apiClient<SingleArticleData>(
-				`/api/user/articles?articleId=${encodeURIComponent(articleId)}`,
-				getToken, // Pass getToken here
-			); // Assuming query param filtering
-
-			const fetchedSessions = data?.sessions || [];
-			// Sort sessions by creation time, newest first
-			fetchedSessions.sort((a, b) => b.createdAt - a.createdAt);
-
-			console.log(`Fetched ${fetchedSessions.length} sessions.`);
-			setArticleSessions(fetchedSessions);
-
-			// Update selected session if it still exists
-			if (
-				selectedSessionId &&
-				!fetchedSessions.some((s) => s.sessionId === selectedSessionId)
-			) {
-				setSelectedSessionIdState(null); // Deselect if it disappeared
-				setSelectedSessionMessages([]);
-			} else if (selectedSessionId) {
-				// If selected session still exists, update its messages
-				const currentSelected = fetchedSessions.find(
-					(s) => s.sessionId === selectedSessionId,
-				);
-				setSelectedSessionMessages(currentSelected?.messages || []);
-			}
-		} catch (error) {
-			console.error("Failed to fetch article data:", error);
-			if (error instanceof ApiError && error.status === 404) {
-				console.log("No data found for article (404), using empty list.");
+	const fetchArticleData = useCallback(
+		async (signal?: AbortSignal) => {
+			if (!isSignedIn || !articleId) {
 				setArticleSessions([]);
-			} else if (error instanceof ApiError) {
-				setError(
-					`Failed to load data: ${error.status} ${error.message}${error.body ? ` - ${JSON.stringify(error.body)}` : ""}`,
-				);
-			} else {
-				setError("Failed to load data due to an unexpected error.");
+				setIsLoadingData(false);
+				setSelectedSessionIdState(null);
+				setSelectedSessionMessages([]);
+				setError(null);
+				return;
 			}
-			setArticleSessions([]); // Clear data on error
-			setSelectedSessionIdState(null);
-			setSelectedSessionMessages([]);
-		} finally {
-			setIsLoadingData(false);
-		}
-	}, [isSignedIn, articleId, selectedSessionId, getToken]); // Add getToken dependency
+
+			setIsLoadingData(true);
+			setError(null);
+			console.log(`Fetching article data for articleId: ${articleId}`);
+
+			try {
+				// Adjust endpoint if needed, e.g., /api/user/articles/${articleId}
+				// Assuming the endpoint returns data structured like SingleArticleData
+				if (!getToken) {
+					throw new Error("getToken function is not available from useAuth.");
+				}
+				// Pass getToken to apiClient and the signal
+				const data = await apiClient<SingleArticleData>(
+					`/api/user/articles?articleId=${encodeURIComponent(articleId)}`,
+					getToken, // Pass getToken here
+					{ signal }, // Pass the signal
+				); // Assuming query param filtering
+
+				const fetchedSessions = data?.sessions || [];
+				// Sort sessions by creation time, newest first
+				fetchedSessions.sort((a, b) => b.createdAt - a.createdAt);
+
+				console.log(`Fetched ${fetchedSessions.length} sessions.`);
+				setArticleSessions(fetchedSessions);
+
+				// Update selected session if it still exists
+				if (
+					selectedSessionId &&
+					!fetchedSessions.some((s) => s.sessionId === selectedSessionId)
+				) {
+					setSelectedSessionIdState(null); // Deselect if it disappeared
+					setSelectedSessionMessages([]);
+				} else if (selectedSessionId) {
+					// If selected session still exists, update its messages
+					const currentSelected = fetchedSessions.find(
+						(s) => s.sessionId === selectedSessionId,
+					);
+					setSelectedSessionMessages(currentSelected?.messages || []);
+				}
+			} catch (error) {
+				if (signal?.aborted) {
+					console.log("Fetch article data aborted.");
+					return;
+				}
+				console.error("Failed to fetch article data:", error);
+				if (error instanceof ApiError && error.status === 404) {
+					console.log("No data found for article (404), using empty list.");
+					setArticleSessions([]);
+				} else if (error instanceof ApiError) {
+					setError(
+						`Failed to load data: ${error.status} ${error.message}${error.body ? ` - ${JSON.stringify(error.body)}` : ""}`,
+					);
+				} else {
+					setError("Failed to load data due to an unexpected error.");
+				}
+				setArticleSessions([]); // Clear data on error
+				setSelectedSessionIdState(null);
+				setSelectedSessionMessages([]);
+			} finally {
+				if (!signal?.aborted) {
+					setIsLoadingData(false);
+				}
+			}
+		},
+		[isSignedIn, articleId, selectedSessionId, getToken],
+	); // Add getToken dependency
 
 	// Effect to fetch data when auth/articleId changes
 	useEffect(() => {
-		fetchArticleData();
+		const controller = new AbortController();
+		fetchArticleData(controller.signal);
+		return () => controller.abort();
 	}, [fetchArticleData]);
 
 	// Derive metadata whenever articleSessions change
@@ -185,7 +197,7 @@ export function useChatHistory(articleId: string | null) {
 
 	// --- Update Backend Data ---
 	const updateBackendData = useCallback(
-		async (updatedSessions: ChatSession[]) => {
+		async (updatedSessions: ChatSession[], signal?: AbortSignal) => {
 			if (!isSignedIn || !articleId) {
 				setError("Not signed in or no article selected.");
 				return false; // Indicate failure
@@ -207,13 +219,14 @@ export function useChatHistory(articleId: string | null) {
 					throw new Error("getToken function is not available from useAuth.");
 				}
 				// Assuming POST /api/user/articles updates the specific article's data
-				// Pass getToken to apiClient
+				// Pass getToken to apiClient and the signal
 				await apiClient(
 					"/api/user/articles", // Use double quotes instead of template literal
 					getToken, // Pass getToken here
 					{
 						method: "POST",
 						body: JSON.stringify(payload),
+						signal, // Pass the signal
 					},
 				);
 				console.log("Backend update successful.");
@@ -227,9 +240,15 @@ export function useChatHistory(articleId: string | null) {
 					);
 					setSelectedSessionMessages(currentSelected?.messages || []);
 				}
-				setIsUpdatingData(false);
+				if (!signal?.aborted) {
+					setIsUpdatingData(false);
+				}
 				return true; // Indicate success
 			} catch (error) {
+				if (signal?.aborted) {
+					console.log("Update backend data aborted.");
+					return false;
+				}
 				console.error("Failed to update backend data:", error);
 				if (error instanceof ApiError) {
 					setError(
@@ -238,7 +257,9 @@ export function useChatHistory(articleId: string | null) {
 				} else {
 					setError("Failed to save data due to an unexpected error.");
 				}
-				setIsUpdatingData(false);
+				if (!signal?.aborted) {
+					setIsUpdatingData(false);
+				}
 				// Optionally: trigger a re-fetch to revert local state to last known good state?
 				// fetchArticleData();
 				return false; // Indicate failure

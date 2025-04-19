@@ -230,13 +230,31 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 	// Set up global keyboard event listener
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
-			// Don't trigger shortcuts when in input elements
+			// Don't trigger shortcuts when the target is an input, textarea, select, or contenteditable element
 			if (
-				event.target instanceof HTMLInputElement ||
-				event.target instanceof HTMLTextAreaElement ||
-				event.target instanceof HTMLSelectElement
+				event.target instanceof HTMLElement &&
+				(event.target instanceof HTMLInputElement ||
+					event.target instanceof HTMLTextAreaElement ||
+					event.target instanceof HTMLSelectElement ||
+					event.target.isContentEditable)
 			) {
-				return;
+				// Exception: Allow Esc key for closing overlays/dialogs even in inputs
+				if (event.key === "Escape") {
+					// Check if a dialog/overlay is open and handle Esc
+					if (isShortcutsDialogOpen) {
+						event.preventDefault();
+						closeShortcutsDialog();
+						return;
+					}
+					if (isSearchOverlayOpen) {
+						event.preventDefault();
+						closeSearchOverlay();
+						return;
+					}
+				} else {
+					// Otherwise, ignore event if target is editable
+					return;
+				}
 			}
 
 			// Check if the event matches any shortcuts
@@ -250,32 +268,32 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 		};
 
 		window.addEventListener("keydown", handleKeyDown);
-
 		return () => {
 			window.removeEventListener("keydown", handleKeyDown);
 		};
-	}, [shortcuts]);
+	}, [shortcuts, isShortcutsDialogOpen, isSearchOverlayOpen]); // Add dialog/overlay states as dependencies
 
 	const openShortcutsDialog = () => setIsShortcutsDialogOpen(true);
 	const closeShortcutsDialog = () => setIsShortcutsDialogOpen(false);
 	const openSearchOverlay = () => setIsSearchOverlayOpen(true);
 	const closeSearchOverlay = () => setIsSearchOverlayOpen(false);
 
+	// Include sidebar state and toggle in context value
+	const value = {
+		shortcuts,
+		isShortcutsDialogOpen,
+		openShortcutsDialog,
+		closeShortcutsDialog,
+		isSearchOverlayOpen,
+		openSearchOverlay,
+		closeSearchOverlay,
+		updateShortcuts,
+		isSidebarCollapsed,
+		toggleSidebar,
+	};
+
 	return (
-		<KeyboardContext.Provider
-			value={{
-				shortcuts,
-				isShortcutsDialogOpen,
-				openShortcutsDialog,
-				closeShortcutsDialog,
-				isSearchOverlayOpen,
-				openSearchOverlay,
-				closeSearchOverlay,
-				updateShortcuts,
-				isSidebarCollapsed, // Provide sidebar state
-				toggleSidebar, // Provide sidebar toggle function
-			}}
-		>
+		<KeyboardContext.Provider value={value}>
 			{children}
 		</KeyboardContext.Provider>
 	);

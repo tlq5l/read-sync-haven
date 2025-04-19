@@ -19,8 +19,14 @@ export async function removeDuplicateArticles(): Promise<number> {
 			});
 
 			const articles: Article[] = allDocsResponse.rows
-				.filter((row) => !!row.doc && row.id.startsWith("article_")) // Ensure doc exists and is an article
-				.map((row) => row.doc as Article);
+				.filter(
+					(row: PouchDB.Core.AllDocsResponse<Article>["rows"][number]) =>
+						!!row.doc && row.id.startsWith("article_"),
+				) // Ensure doc exists and is an article
+				.map(
+					(row: PouchDB.Core.AllDocsResponse<Article>["rows"][number]) =>
+						row.doc as Article,
+				);
 
 			console.log(
 				`Fetched ${articles.length} articles to check for duplicates.`,
@@ -82,7 +88,9 @@ export async function removeDuplicateArticles(): Promise<number> {
 
 				// Check response for errors
 				const errors = bulkResponse.filter(
-					(res): res is PouchDB.Core.Error => "error" in res && !!res.error,
+					(
+						res: PouchDB.Core.Response | PouchDB.Core.Error,
+					): res is PouchDB.Core.Error => "error" in res && !!res.error,
 				);
 				if (errors.length > 0) {
 					console.error("Errors occurred during bulk deletion:", errors);
