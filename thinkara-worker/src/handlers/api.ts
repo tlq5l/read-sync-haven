@@ -1,6 +1,6 @@
 // thinkara-worker/src/handlers/api.ts
 
-import { authenticateRequest, AuthenticatedRequest } from "../auth"; // Import corrected auth function and type
+import { type AuthenticatedRequest, authenticateRequest } from "../auth"; // Import corrected auth function and type
 import type { Env } from "../types";
 import { errorResponse, jsonResponse } from "../utils";
 
@@ -18,7 +18,11 @@ export async function handleSummarize(
 	); // Log keys to check presence
 	try {
 		// Authentication is required - authenticateRequest returns Response on failure, undefined on success
-		const authFailureResponse = await authenticateRequest(request, env, {} as any); // Pass dummy context
+		const authFailureResponse = await authenticateRequest(
+			request,
+			env,
+			{} as any,
+		); // Pass dummy context
 		if (authFailureResponse instanceof Response) {
 			return authFailureResponse; // Return failure response directly
 		}
@@ -99,7 +103,11 @@ export async function handleChat(
 	console.log("[handleChat] Received env:", JSON.stringify(Object.keys(env))); // Log keys to check presence
 	try {
 		// Authentication is required - authenticateRequest returns Response on failure, undefined on success
-		const authFailureResponse = await authenticateRequest(request, env, {} as any); // Pass dummy context
+		const authFailureResponse = await authenticateRequest(
+			request,
+			env,
+			{} as any,
+		); // Pass dummy context
 		if (authFailureResponse instanceof Response) {
 			return authFailureResponse; // Return failure response directly
 		}

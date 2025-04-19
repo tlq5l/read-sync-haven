@@ -12,8 +12,8 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" })); // Error on unh
 // Reset any request handlers that we may add during the tests,
 // so they don't affect other tests.
 afterEach(() => {
-    server.resetHandlers();
-    // No longer need to reset Clerk mock here, it will be managed per-test suite if needed
+	server.resetHandlers();
+	// No longer need to reset Clerk mock here, it will be managed per-test suite if needed
 });
 
 // Clean up after the tests are finished.

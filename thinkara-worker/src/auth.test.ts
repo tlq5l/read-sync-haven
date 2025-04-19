@@ -1,7 +1,7 @@
 // thinkara-worker/src/auth.test.ts
 
-import type { ExecutionContext } from "@cloudflare/workers-types"; // Import ExecutionContext
 import type { JwtPayload } from "@clerk/types";
+import type { ExecutionContext } from "@cloudflare/workers-types"; // Import ExecutionContext
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Import the function to test using standard import
 import { type AuthenticatedRequest, authenticateRequest } from "./auth";
@@ -208,8 +208,8 @@ describe("Worker Authentication", () => {
 			iat: Math.floor(Date.now() / 1000),
 			// 'sub' property is intentionally omitted here
 		};
-        // Cast to JwtPayload to satisfy the type checker for the mock setup,
-        // even though 'sub' is technically missing from the object itself.
+		// Cast to JwtPayload to satisfy the type checker for the mock setup,
+		// even though 'sub' is technically missing from the object itself.
 		// Configure the local mock
 		mockVerifyToken.mockResolvedValue(mockClaimsNoSub as JwtPayload);
 
