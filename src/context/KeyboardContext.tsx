@@ -45,7 +45,24 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 	const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Added sidebar state
 	const USER_SHORTCUTS_KEY = "userKeyboardShortcuts";
 
-	const articlesContext = useArticles(); // Get articles context
+	// Get articles context with fallback for when provider isn't available
+	const articlesContext = (() => {
+		try {
+			return useArticles();
+		} catch {
+			// Allow KeyboardProvider to work in isolation (e.g., in Storybook)
+			// Return a compatible structure with a no-op refresh function
+			return {
+				refreshArticles: () => {
+					console.warn(
+						"KeyboardProvider: ArticleContext not found, sync action unavailable.",
+					);
+					return Promise.resolve([]); // Return empty array to match signature
+				},
+				// Add other properties from ArticleContextType with default/null values if needed by getActionById
+			};
+		}
+	})();
 
 	// Function to toggle sidebar state
 	const toggleSidebar = useCallback(() => {
@@ -108,16 +125,31 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 				// Add cases for the new shortcuts
 				case "sync-articles":
 					return () => {
-						toast({ title: "Syncing...", description: "Refreshing articles." });
-						refreshAction().catch((err) => {
-							// Use the potentially wrapped refreshAction
-							console.error("Error during manual sync:", err);
-							toast({
-								title: "Sync Failed",
-								description: "Could not refresh articles.",
-								variant: "destructive",
-							});
+						// Show initial toast and get dismiss function
+						const { dismiss } = toast({
+							title: "Syncing...",
+							description: "Refreshing articles.",
+							duration: 5000, // Keep it visible for a bit
 						});
+						refreshAction()
+							.then(() => {
+								dismiss(); // Dismiss the 'Syncing...' toast
+								toast({ // Show success toast
+									title: "Sync Complete",
+									description: "Articles refreshed successfully.",
+									duration: 3000,
+								});
+							})
+							.catch((err) => {
+								// Use the potentially wrapped refreshAction
+								dismiss(); // Dismiss the 'Syncing...' toast on error too
+								console.error("Error during manual sync:", err);
+								toast({
+									title: "Sync Failed",
+									description: "Could not refresh articles.",
+									variant: "destructive",
+								});
+							});
 					};
 				case "toggle-sidebar":
 					return toggleSidebar; // Return the memoized toggle function
@@ -240,15 +272,15 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 			) {
 				// Exception: Allow Esc key for closing overlays/dialogs even in inputs
 				if (event.key === "Escape") {
-					// Check if a dialog/overlay is open and handle Esc
-					if (isShortcutsDialogOpen) {
-						event.preventDefault();
-						closeShortcutsDialog();
-						return;
-					}
+					// Check highest priority overlay first (Search Overlay)
 					if (isSearchOverlayOpen) {
 						event.preventDefault();
 						closeSearchOverlay();
+						return;
+					} // Then check shortcuts dialog
+					if (isShortcutsDialogOpen) {
+						event.preventDefault();
+						closeShortcutsDialog();
 						return;
 					}
 				} else {

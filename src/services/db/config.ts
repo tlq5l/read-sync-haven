@@ -86,7 +86,6 @@ function createDbInstance<T extends object>(
 		console.error(`FATAL: Failed to create PouchDB instance ${name}:`, err);
 		// Fallback to memory adapter immediately if constructor fails
 		// This fallback is for non-test environments
-		console.error(`FATAL: Failed to create PouchDB instance ${name}:`, err);
 		console.warn(`Falling back to memory adapter for ${name}.`);
 		try {
 			return new PouchDB<T>(name, { ...options, adapter: "memory" });
@@ -167,7 +166,6 @@ async function createDbIndexes(): Promise<void> {
 	};
 
 	// Article Indexes
-	indexPromises.push(createIndex(articlesDb, ["_id"], "primary")); // Basic primary key index
 	indexPromises.push(createIndex(articlesDb, ["savedAt"], "savedAt"));
 	indexPromises.push(createIndex(articlesDb, ["isRead"], "isRead"));
 	indexPromises.push(createIndex(articlesDb, ["favorite"], "favorite"));
@@ -186,6 +184,7 @@ async function createDbIndexes(): Promise<void> {
 		createIndex(operationsQueueDb, ["timestamp"], "queueTimestamp"),
 	); // For processing order
 	indexPromises.push(createIndex(operationsQueueDb, ["type"], "queueType")); // For filtering by type
+	indexPromises.push(createIndex(operationsQueueDb, ["docId"], "queueDocId")); // For finding specific doc operations
 
 	try {
 		await Promise.all(indexPromises);

@@ -103,7 +103,7 @@ export async function saveArticle(
 					// Decide winner based on version number. If equal, use timestamp (optional).
 					// For simplicity here, assume incoming 'article' is from cloud sync.
 					// A more robust conflict resolver might be needed for multi-client scenarios.
-					const incomingVersion = article.version || 0; // Assume 0 if missing from incoming
+					const incomingVersion = docToSave.version || 0; // Use version from the document intended for saving
 					const localVersion = latestArticle.version || 0;
 
 					let docToRetry: Article;
@@ -115,15 +115,15 @@ export async function saveArticle(
 						);
 						docToRetry = {
 							...latestArticle, // Start with latest local doc
-							...article, // Overwrite with incoming fields
+							...docToSave, // Overwrite with incoming fields
 							_id: latestArticle._id, // Ensure correct ID
 							_rev: latestArticle._rev, // Use latest rev for PouchDB update
 							userId: latestArticle.userId, // Preserve original userId
 							version: incomingVersion, // Use incoming version
 							// Ensure local-only states like readAt, scrollPosition are potentially preserved if desired
-							readAt: article.readAt ?? latestArticle.readAt,
+							readAt: docToSave.readAt ?? latestArticle.readAt,
 							scrollPosition:
-								article.scrollPosition ?? latestArticle.scrollPosition,
+								docToSave.scrollPosition ?? latestArticle.scrollPosition,
 							// Ensure 'deletedAt' is cleared if incoming data represents an undelete/update
 							deletedAt: undefined,
 						};
@@ -202,7 +202,7 @@ export async function bulkSaveArticles(
 		// 1. Prepare documents and identify potential updates
 		const docsToProcess: (Article & { _id: string })[] = [];
 		const potentialUpdateIds: string[] = [];
-		const urlsToCheck: string[] = [];
+		// const urlsToCheck: string[] = []; // REMOVE: Unused variable
 
 		for (const article of articlesToSave) {
 			const docId = article._id || `article_${uuidv4()}`;
@@ -238,9 +238,10 @@ export async function bulkSaveArticles(
 			}
 
 			// Add URL to the list of URLs to check for duplicates
-			if (article.url) {
-				urlsToCheck.push(article.url);
-			}
+			// REMOVE: Unused logic
+			// if (article.url) {
+			// 	urlsToCheck.push(article.url);
+			// }
 		}
 
 		// 2. Fetch existing documents for potential updates by ID
@@ -302,11 +303,13 @@ export async function bulkSaveArticles(
 					};
 				} else {
 					// Local version is newer, keep local
-					console.log(
-						`Bulk Merge: Local version (${localVersion}) > incoming (${incomingVersion}) for ${existingDoc._id}. Keeping local.`,
+					console.warn(
+						`Bulk Merge Conflict: Local version (${localVersion}) > incoming (${incomingVersion}) for ${existingDoc._id}. Keeping local document.`,
 					);
+					// Return the existing local document unmodified for the bulkDocs operation.
+					// PouchDB's bulkDocs will likely treat this as a no-op or update the revision based on its internal handling.
+					// This avoids throwing an error and allows other documents in the batch to proceed.
 					resultDoc = {
-						// Assign to resultDoc
 						...existingDoc,
 					};
 				}
