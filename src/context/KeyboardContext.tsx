@@ -14,6 +14,7 @@ import {
 	useCallback,
 	useContext,
 	useEffect,
+	useMemo,
 	useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
@@ -35,6 +36,9 @@ const KeyboardContext = createContext<KeyboardContextType | undefined>(
 	undefined,
 );
 
+// Hoisted constant outside the component
+const USER_SHORTCUTS_KEY = "userKeyboardShortcuts";
+
 export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 	const navigate = useNavigate();
 	const { theme, setTheme } = useTheme();
@@ -43,7 +47,6 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 	const [isShortcutsDialogOpen, setIsShortcutsDialogOpen] = useState(false);
 	const [isSearchOverlayOpen, setIsSearchOverlayOpen] = useState(false);
 	const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Added sidebar state
-	const USER_SHORTCUTS_KEY = "userKeyboardShortcuts";
 
 	// Get articles context with fallback for when provider isn't available
 	const articlesContext = (() => {
@@ -68,7 +71,7 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 	const toggleSidebar = useCallback(() => {
 		setIsSidebarCollapsed((prev) => !prev);
 		// Potentially trigger animations if needed here
-	}, []);
+	}, []); // Removed setIsSidebarCollapsed dependency (stable function)
 
 	// Function to get action by ID (avoids repetition)
 	const getActionById = useCallback(
@@ -217,86 +220,81 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 	}, [getActionById]); // Removed unnecessary dependencies, added missing getActionById
 
 	// Function to update shortcuts and persist
-	const updateShortcuts = (newShortcuts: Shortcut[]): boolean => {
-		// --- Validation: Check for global duplicates ---
-		const keyMap = new Map<string, string>(); // Map "key+modifiers" string to shortcut ID
-		for (const shortcut of newShortcuts) {
-			for (const key of shortcut.keys) {
-				const keyString = `${key.key.toLowerCase()}_${!!key.modifiers.ctrl}_${!!key.modifiers.alt}_${!!key.modifiers.shift}_${!!key.modifiers.meta}`;
-				if (keyMap.has(keyString)) {
-					const existingId = keyMap.get(keyString);
-					if (existingId !== shortcut.id) {
-						toast({
-							title: "Duplicate Shortcut",
-							description: `The combination "${formatShortcut([key])}" is already assigned to another action. Please choose a different shortcut.`,
-							variant: "destructive",
-						});
-						return false; // Validation failed
+	const updateShortcuts = useCallback(
+		(newShortcuts: Shortcut[]): boolean => {
+			// --- Validation: Check for global duplicates ---
+			const keyMap = new Map<string, string>(); // Map "key+modifiers" string to shortcut ID
+			for (const shortcut of newShortcuts) {
+				for (const key of shortcut.keys) {
+					const keyString = `${key.key.toLowerCase()}_${!!key.modifiers.ctrl}_${!!key.modifiers.alt}_${!!key.modifiers.shift}_${!!key.modifiers.meta}`;
+					if (keyMap.has(keyString)) {
+						const existingId = keyMap.get(keyString);
+						if (existingId !== shortcut.id) {
+							toast({
+								title: "Duplicate Shortcut",
+								description: `The combination "${formatShortcut([key])}" is already assigned to another action. Please choose a different shortcut.`,
+								variant: "destructive",
+							});
+							return false; // Validation failed
+						}
+					} else {
+						keyMap.set(keyString, shortcut.id);
 					}
-				} else {
-					keyMap.set(keyString, shortcut.id);
 				}
 			}
-		}
-		// --- End Validation ---
+			// --- End Validation ---
 
-		// Update state (re-assign actions as they are not part of the input)
-		const updatedShortcutsWithActions = newShortcuts.map((sc) => ({
-			...sc,
-			action: getActionById(sc.id), // Re-assign action
-		}));
-		setShortcuts(updatedShortcutsWithActions);
+			// Update state (re-assign actions as they are not part of the input)
+			const updatedShortcutsWithActions = newShortcuts.map((sc) => ({
+				...sc,
+				action: getActionById(sc.id), // Re-assign action
+			}));
+			setShortcuts(updatedShortcutsWithActions);
 
-		// Persist only the keys configuration
-		const configToStore: Record<string, Shortcut["keys"]> = {};
-		for (const sc of updatedShortcutsWithActions) {
-			configToStore[sc.id] = sc.keys;
-		}
-		localStorage.setItem(USER_SHORTCUTS_KEY, JSON.stringify(configToStore));
-		toast({
-			title: "Shortcuts Saved",
-			description: "Your keyboard shortcuts have been updated.",
-		});
-		return true; // Success
-	};
+			// Persist only the keys configuration
+			const configToStore: Record<string, Shortcut["keys"]> = {};
+			for (const sc of updatedShortcutsWithActions) {
+				configToStore[sc.id] = sc.keys;
+			}
+			localStorage.setItem(USER_SHORTCUTS_KEY, JSON.stringify(configToStore));
+			toast({
+				title: "Shortcuts Saved",
+				description: "Your keyboard shortcuts have been updated.",
+			});
+			return true; // Success
+		},
+		[getActionById, toast], // Removed setShortcuts (stable function)
+	);
 
 	// Set up global keyboard event listener
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
-			// Don't trigger shortcuts when the target is an input, textarea, select, or contenteditable element
-			if (
-				event.target instanceof HTMLElement &&
-				(event.target instanceof HTMLInputElement ||
-					event.target instanceof HTMLTextAreaElement ||
-					event.target instanceof HTMLSelectElement ||
-					event.target.isContentEditable)
-			) {
-				// Exception: Allow Esc key for closing overlays/dialogs even in inputs
-				if (event.key === "Escape") {
-					// Check highest priority overlay first (Search Overlay)
-					if (isSearchOverlayOpen) {
-						event.preventDefault();
-						closeSearchOverlay();
+			// Check if the focus is inside an input, textarea, or contentEditable element
+			const targetElement = event.target as HTMLElement | null;
+			if (targetElement) {
+				const isInput = targetElement instanceof HTMLInputElement;
+				const isTextArea = targetElement instanceof HTMLTextAreaElement;
+				const isSelect = targetElement instanceof HTMLSelectElement;
+				const isEditable = targetElement.isContentEditable;
+
+				if (isInput || isTextArea || isSelect || isEditable) {
+					// If it's an input field and the key isn't Enter/Escape, allow default behavior
+					if (isInput && event.key !== "Enter" && event.key !== "Escape") {
 						return;
-					} // Then check shortcuts dialog
-					if (isShortcutsDialogOpen) {
-						event.preventDefault();
-						closeShortcutsDialog();
-						return;
-					}
+					} // Allow Enter/Escape in inputs, and all keys in other editable fields
 				} else {
-					// Otherwise, ignore event if target is editable
-					return;
+					// If not an editable element, proceed with shortcut matching
 				}
 			}
 
-			// Check if the event matches any shortcuts
-			for (const shortcut of shortcuts) {
-				if (matchesShortcut(event, shortcut.keys)) {
-					event.preventDefault();
-					shortcut.action();
-					break;
-				}
+			// Find the matching shortcut
+			const matchedShortcut = shortcuts.find((shortcut) =>
+				matchesShortcut(event, shortcut.keys),
+			);
+
+			if (matchedShortcut) {
+				event.preventDefault();
+				matchedShortcut.action();
 			}
 		};
 
@@ -304,26 +302,49 @@ export function KeyboardProvider({ children }: { children: React.ReactNode }) {
 		return () => {
 			window.removeEventListener("keydown", handleKeyDown);
 		};
-	}, [shortcuts, isShortcutsDialogOpen, isSearchOverlayOpen]); // Add dialog/overlay states as dependencies
+	}, [shortcuts]); // Only depend on shortcuts for the listener logic
 
-	const openShortcutsDialog = () => setIsShortcutsDialogOpen(true);
-	const closeShortcutsDialog = () => setIsShortcutsDialogOpen(false);
-	const openSearchOverlay = () => setIsSearchOverlayOpen(true);
-	const closeSearchOverlay = () => setIsSearchOverlayOpen(false);
+	const openShortcutsDialog = useCallback(
+		() => setIsShortcutsDialogOpen(true),
+		[],
+	);
+	const closeShortcutsDialog = useCallback(
+		() => setIsShortcutsDialogOpen(false),
+		[],
+	);
+	const openSearchOverlay = useCallback(() => setIsSearchOverlayOpen(true), []);
+	const closeSearchOverlay = useCallback(
+		() => setIsSearchOverlayOpen(false),
+		[],
+	);
 
 	// Include sidebar state and toggle in context value
-	const value = {
-		shortcuts,
-		isShortcutsDialogOpen,
-		openShortcutsDialog,
-		closeShortcutsDialog,
-		isSearchOverlayOpen,
-		openSearchOverlay,
-		closeSearchOverlay,
-		updateShortcuts,
-		isSidebarCollapsed,
-		toggleSidebar,
-	};
+	const value = useMemo(
+		() => ({
+			shortcuts,
+			isShortcutsDialogOpen,
+			openShortcutsDialog,
+			closeShortcutsDialog,
+			isSearchOverlayOpen,
+			openSearchOverlay,
+			closeSearchOverlay,
+			updateShortcuts,
+			isSidebarCollapsed,
+			toggleSidebar,
+		}),
+		[
+			shortcuts,
+			isShortcutsDialogOpen,
+			openShortcutsDialog, // Added missing dependency
+			closeShortcutsDialog, // Added missing dependency
+			isSearchOverlayOpen,
+			openSearchOverlay, // Added missing dependency
+			closeSearchOverlay, // Added missing dependency
+			updateShortcuts,
+			isSidebarCollapsed,
+			toggleSidebar,
+		],
+	);
 
 	return (
 		<KeyboardContext.Provider value={value}>

@@ -125,7 +125,8 @@ export const ArticleProvider: React.FC<{ children: React.ReactNode }> = ({
 	// 1.5. Fetch initial data from backend after auth and DB init
 	useEffect(() => {
 		let isMounted = true;
-		const controller = new AbortController(); // Create an AbortController
+		// Controller needs to be declared here so cleanup can access it
+		const controller = new AbortController();
 
 		const fetchInitialData = async () => {
 			if (isLoaded && isSignedIn && isDbInitialized && !hasFetchedInitialData) {

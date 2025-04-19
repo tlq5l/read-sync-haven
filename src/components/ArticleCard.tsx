@@ -44,13 +44,10 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 		delay: index * 30, // Stagger effect based on card position
 	});
 
-	// Removed handleToggleFavorite as it's replaced by Move to Inbox
-	const handleDelete = async (e: React.MouseEvent) => {
-		e.preventDefault();
-		e.stopPropagation();
+	// Helper function to handle article deletion logic
+	const deleteCurrentArticle = async () => {
 		try {
-			// No need to check _rev for optimistic remove
-			await optimisticRemoveArticle(article._id); // Revert function call
+			await optimisticRemoveArticle(article._id);
 		} catch (error) {
 			console.error("Error deleting article:", error);
 			toast({
@@ -59,6 +56,13 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 				variant: "destructive",
 			});
 		}
+	};
+
+	// Removed handleToggleFavorite as it's replaced by Move to Inbox
+	const handleDelete = async (e: React.MouseEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		await deleteCurrentArticle(); // Call the shared helper function
 	};
 
 	// Format the saved date with error handling
@@ -92,19 +96,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
 		if (e.key === "Delete") {
 			e.preventDefault();
 			e.stopPropagation();
-			// Call optimistic remove directly, similar to handleDelete but for keyboard event
-			try {
-				await optimisticRemoveArticle(article._id);
-			} catch (error: any) {
-				// Revert function call
-				// Reverted handler
-				console.error("Error deleting article via keyboard:", error);
-				toast({
-					title: "Error",
-					description: "Could not delete article",
-					variant: "destructive",
-				});
-			}
+			await deleteCurrentArticle(); // Call the shared helper function
 		}
 	};
 	return (

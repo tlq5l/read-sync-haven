@@ -336,9 +336,9 @@ export async function bulkSaveArticles(
 
 			// Log errors from the response
 			const errors = response.filter(
-				(
-					res: PouchDB.Core.Response | PouchDB.Core.Error,
-				): res is PouchDB.Core.Error => "error" in res && !!res.error,
+				// Type guard to filter for error responses
+				// Type inference correctly identifies `res` as `PouchDB.Core.Response | PouchDB.Core.Error`
+				(res): res is PouchDB.Core.Error => "error" in res && !!res.error,
 			);
 			if (errors.length > 0) {
 				console.error(
